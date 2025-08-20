@@ -1,2 +1,2 @@
 # Food-Ordering-system
-A simple design with JAVA
+A simple design with React
