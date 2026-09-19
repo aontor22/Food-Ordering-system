@@ -6,6 +6,7 @@ import { AppError } from '../lib/errors.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
+import { serializePayment, reconcileSslCommerzPayment } from '../services/payment.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -69,11 +70,11 @@ router.delete('/products/:id', async (req, res, next) => {
 
 router.get('/orders', async (_req, res) => {
   const orders = await prisma.order.findMany({
-    include: { items: true, user: { select: { id: true, name: true, email: true } } },
+    include: { items: true, payment: true, user: { select: { id: true, name: true, email: true } } },
     orderBy: { createdAt: 'desc' },
     take: 250,
   });
-  res.json({ orders });
+  res.json({ orders: orders.map(order => ({ ...order, payment: serializePayment(order.payment) })) });
 });
 
 const orderTransitions = {
@@ -92,29 +93,97 @@ const statusUpdate = z.object({
 
 router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next) => {
   try {
-    const existing = await prisma.order.findUnique({ where: { id: req.validated.params.id }, include: { items: true } });
+    let previousStatus;
+    const order = await prisma.$transaction(async transaction => {
+    const existing = await transaction.order.findUnique({ where: { id: req.validated.params.id }, include: { items: true, payment: true } });
     if (!existing) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
     const nextStatus = req.validated.body.status;
+    previousStatus = existing.status;
     if (!orderTransitions[existing.status]?.includes(nextStatus)) {
       throw new AppError(409, 'INVALID_STATUS_TRANSITION', `Order cannot move from ${existing.status} to ${nextStatus}`);
     }
-    const order = await prisma.$transaction(async transaction => {
+    if (nextStatus === 'CANCELLED' && existing.paymentMethod === 'ONLINE' && existing.paymentStatus === 'PAID') {
+      throw new AppError(409, 'REFUND_REQUIRED', 'Refund the online payment before cancelling this order');
+    }
+    if (existing.paymentMethod === 'ONLINE' && existing.paymentStatus !== 'PAID' && nextStatus !== 'CANCELLED') {
+      throw new AppError(409, 'PAYMENT_REQUIRED', 'Online payment must be verified before fulfilment can begin');
+    }
+    const settleCod = nextStatus === 'DELIVERED' && existing.paymentMethod === 'COD' && existing.paymentStatus !== 'REFUNDED';
+    if (nextStatus === 'CANCELLED' && existing.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW'].includes(existing.payment.status)) throw new AppError(409, 'PAYMENT_PROCESSING', 'Wait for gateway verification before cancelling');
       if (nextStatus === 'CANCELLED') {
         for (const item of existing.items) {
           await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
         }
+        if (existing.payment) await transaction.payment.updateMany({ where: { id: existing.payment.id, status: { notIn: ['PAID', 'REFUNDED'] } }, data: { status: 'CANCELLED', failureReason: 'Order cancelled by administrator' } });
+      }
+      if (settleCod && existing.payment) {
+        await transaction.payment.updateMany({ where: { id: existing.payment.id, status: { notIn: ['PAID', 'REFUNDED'] } }, data: { status: 'PAID', paidAt: new Date(), failureReason: null } });
       }
       return transaction.order.update({
         where: { id: existing.id },
         data: {
           status: nextStatus,
-          ...(nextStatus === 'DELIVERED' && existing.paymentMethod === 'COD' ? { paymentStatus: 'PAID' } : {}),
+          ...(settleCod ? { paymentStatus: 'PAID' } : {}),
+          ...(nextStatus === 'CANCELLED' && !['PAID', 'REFUNDED'].includes(existing.paymentStatus) ? { paymentStatus: 'CANCELLED' } : {}),
         },
-        include: { items: true, user: { select: { id: true, name: true, email: true } } },
+        include: { items: true, payment: true, user: { select: { id: true, name: true, email: true } } },
       });
     });
-    await audit(req, 'ORDER_STATUS_UPDATED', 'Order', order.id, { from: existing.status, to: order.status });
-    res.json({ order });
+    await audit(req, 'ORDER_STATUS_UPDATED', 'Order', order.id, { from: previousStatus, to: order.status });
+    res.json({ order: { ...order, payment: serializePayment(order.payment) } });
+  } catch (error) { next(error); }
+});
+
+router.get('/payments', async (_req, res) => {
+  const payments = await prisma.payment.findMany({
+    include: { order: { include: { user: { select: { id: true, name: true, email: true } } } } },
+    orderBy: { createdAt: 'desc' },
+    take: 250,
+  });
+  res.json({ payments: payments.map(payment => ({ ...serializePayment(payment), order: payment.order })) });
+});
+
+router.post('/payments/:id/check', async (req, res, next) => {
+  try {
+    const payment = await prisma.payment.findUnique({ where: { id: req.params.id } });
+    if (!payment) throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Payment not found');
+    if (payment.provider !== 'SSLCOMMERZ') throw new AppError(409, 'NOT_GATEWAY_PAYMENT', 'This payment does not use SSLCOMMERZ');
+    await reconcileSslCommerzPayment(payment.transactionId);
+    await audit(req, 'PAYMENT_STATUS_CHECKED', 'Payment', payment.id);
+    res.json({ payment: serializePayment(await prisma.payment.findUnique({ where: { id: payment.id } })) });
+  } catch (error) { next(error); }
+});
+
+router.post('/payments/:id/cash-received', async (req, res, next) => {
+  try {
+    const payment = await prisma.$transaction(async transaction => {
+    const existing = await transaction.payment.findUnique({ where: { id: req.params.id }, include: { order: true } });
+    if (!existing) throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Payment not found');
+    if (existing.provider !== 'COD') throw new AppError(409, 'GATEWAY_VERIFICATION_REQUIRED', 'Online payments can only be confirmed by the payment gateway');
+    if (existing.order.status === 'CANCELLED') throw new AppError(409, 'ORDER_CANCELLED', 'A cancelled order cannot be marked as paid');
+    if (existing.status === 'PAID') return existing;
+    if (existing.status === 'REFUNDED') throw new AppError(409, 'PAYMENT_REFUNDED', 'A refunded payment cannot be collected again');
+      const updated = await transaction.payment.update({ where: { id: existing.id }, data: { status: 'PAID', paidAt: new Date(), failureReason: null } });
+      await transaction.order.update({ where: { id: existing.orderId }, data: { paymentStatus: 'PAID' } });
+      return updated;
+    });
+    await audit(req, 'CASH_PAYMENT_CONFIRMED', 'Payment', payment.id, { orderId: payment.orderId });
+    res.json({ payment: serializePayment(payment) });
+  } catch (error) { next(error); }
+});
+
+router.post('/payments/:id/cash-refunded', async (req, res, next) => {
+  try {
+    const payment = await prisma.$transaction(async transaction => {
+    const existing = await transaction.payment.findUnique({ where: { id: req.params.id }, include: { order: true } });
+    if (!existing) throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Payment not found');
+    if (existing.provider !== 'COD' || existing.status !== 'PAID') throw new AppError(409, 'MANUAL_REFUND_NOT_ALLOWED', 'Only a paid cash-on-delivery transaction can be manually refunded');
+      const updated = await transaction.payment.update({ where: { id: existing.id }, data: { status: 'REFUNDED', failureReason: null } });
+      await transaction.order.update({ where: { id: existing.orderId }, data: { paymentStatus: 'REFUNDED' } });
+      return updated;
+    });
+    await audit(req, 'CASH_PAYMENT_REFUNDED', 'Payment', payment.id, { orderId: payment.orderId });
+    res.json({ payment: serializePayment(payment) });
   } catch (error) { next(error); }
 });
 

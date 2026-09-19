@@ -4,6 +4,7 @@ import { StoreContext } from '../../context/StoreContext';
 import OrderSummary from '../../components/ui/OrderSummary';
 import EmptyState from '../../components/ui/EmptyState';
 import Icon from '../../components/ui/Icon';
+import { api } from '../../lib/api';
 import './PlaceOrder.css';
 
 const emptyForm = { firstName: '', lastName: '', email: '', street: '', city: '', state: '', postalCode: '', country: 'Bangladesh', phone: '', notes: '' };
@@ -13,8 +14,11 @@ export default function PlaceOrder({ onLogin }) {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('COD');
+  const [paymentOptions, setPaymentOptions] = useState(null);
   const navigate = useNavigate();
   useEffect(() => { if (user?.email) setForm(previous => ({ ...previous, email: user.email })); }, [user]);
+  useEffect(() => { api.getPaymentOptions().then(setPaymentOptions).catch(() => setPaymentOptions(null)); }, []);
 
   if (!cartProducts.length) return <EmptyState icon="🥡" title="Nothing to check out yet" text="Choose your favourites before starting checkout." />;
 
@@ -25,9 +29,11 @@ export default function PlaceOrder({ onLogin }) {
     setBusy(true); setError('');
     try {
       const items = cartProducts.map(item => ({ productId: item._id, quantity: item.quantity }));
-      const { order } = await createOrder({ items, paymentMethod: 'COD', ...(couponCode && { couponCode }), delivery: form });
+      const result = await createOrder({ items, paymentMethod, ...(couponCode && { couponCode }), delivery: form });
+      const { order } = result;
       setCartItems({});
-      navigate(`/order-success/${order.orderNumber}`, { state: { order } });
+      if (paymentMethod === 'ONLINE' && result.paymentUrl) window.location.assign(result.paymentUrl);
+      else navigate(`/order-success/${order.orderNumber}`, { state: { order, paymentError: result.paymentError } });
     } catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
   };
@@ -53,10 +59,17 @@ export default function PlaceOrder({ onLogin }) {
           <div className="field"><label htmlFor="country">Country *</label><input id="country" name="country" value={form.country} onChange={update} required autoComplete="country-name" /></div>
         </div>
         <div className="field"><label htmlFor="notes">Delivery note <span className="muted">(optional)</span></label><textarea id="notes" name="notes" value={form.notes} onChange={update} maxLength="500" placeholder="Landmark, gate code, or delivery instruction" /></div>
+        <div className="checkout-divider" />
+        <div className="checkout-section-title"><span>3</span><div><h2>Payment method</h2><p>Choose how you would like to pay.</p></div></div>
+        <div className="payment-options" role="radiogroup" aria-label="Payment method">
+          <label className={`payment-option ${paymentMethod === 'COD' ? 'is-selected' : ''}`}><input type="radio" name="paymentMethod" value="COD" checked={paymentMethod === 'COD'} onChange={() => setPaymentMethod('COD')} /><Icon name="cash" size={24} /><div><strong>Cash on delivery</strong><small>Pay in cash when your food arrives</small></div><span className="payment-radio" /></label>
+          <label className={`payment-option ${paymentMethod === 'ONLINE' ? 'is-selected' : ''} ${!paymentOptions?.methods.find(method => method.id === 'ONLINE')?.enabled ? 'is-disabled' : ''}`}><input type="radio" name="paymentMethod" value="ONLINE" checked={paymentMethod === 'ONLINE'} disabled={!paymentOptions?.methods.find(method => method.id === 'ONLINE')?.enabled} onChange={() => setPaymentMethod('ONLINE')} /><Icon name="card" size={24} /><div><strong>{paymentOptions?.methods.find(method => method.id === 'ONLINE')?.label || 'Online payment'}</strong><small>{!paymentOptions ? 'Loading online payment…' : paymentOptions.methods.find(method => method.id === 'ONLINE')?.mode === 'demo' ? 'Development-only secure flow simulation' : 'Card, mobile banking and supported methods'}</small></div><span className="payment-radio" /></label>
+        </div>
+        {paymentOptions?.methods.find(method => method.id === 'ONLINE')?.mode === 'demo' && paymentMethod === 'ONLINE' && <p className="payment-demo-note"><Icon name="alert" size={17} />Demo gateway is enabled for development. Configure SSLCOMMERZ credentials before production.</p>}
       </section>
       <div className="checkout-sidebar">
-        <OrderSummary subtotal={getTotalCartAmount()} action={{ type: 'submit' }} actionLabel={busy ? 'Placing order…' : 'Place order'} disabled={busy}>
-          <div className="payment-card"><Icon name="check" /><div><strong>Cash on delivery</strong><small>Pay when your food arrives</small></div></div>
+        <OrderSummary subtotal={getTotalCartAmount()} action={{ type: 'submit' }} actionLabel={busy ? 'Processing…' : paymentMethod === 'ONLINE' ? 'Continue to secure payment' : 'Place order'} disabled={busy}>
+          <div className="payment-card"><Icon name={paymentMethod === 'ONLINE' ? 'lock' : 'check'} /><div><strong>{paymentMethod === 'ONLINE' ? 'Server-verified payment' : 'Cash on delivery'}</strong><small>{paymentMethod === 'ONLINE' ? 'Payment status is updated only after verification' : 'Pay when your food arrives'}</small></div></div>
           {couponCode && <p className="coupon-notice">Promo code <strong>{couponCode}</strong> will be verified now.</p>}
           {!user && <div className="signin-notice"><p>Already have an account?</p><button type="button" className="button button-secondary button-full" onClick={onLogin}><Icon name="user" />Sign in to continue</button></div>}
           {error && <p className="form-error" role="alert">{error}</p>}

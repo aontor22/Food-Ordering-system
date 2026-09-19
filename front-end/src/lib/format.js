@@ -1,6 +1,6 @@
 export const formatCurrency = (value) => new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'USD',
+  currency: import.meta.env.VITE_CURRENCY || 'USD',
   minimumFractionDigits: 2,
 }).format(Number(value || 0));
 

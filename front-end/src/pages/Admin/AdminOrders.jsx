@@ -63,6 +63,12 @@ export default function AdminOrders() {
 }
 
 function OrderRows({ order, expanded, onExpand, onStatus, busy }) {
+  const availableTransitions = transitions[order.status].filter(nextStatus => {
+    if (nextStatus === 'CANCELLED' && order.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW'].includes(order.paymentStatus)) return false;
+    if (nextStatus === 'CANCELLED' && order.paymentMethod === 'ONLINE' && order.paymentStatus === 'PAID') return false;
+    if (nextStatus !== 'CANCELLED' && order.paymentMethod === 'ONLINE' && order.paymentStatus !== 'PAID') return false;
+    return true;
+  });
   return <>
     <tr>
       <td><strong>{order.orderNumber}</strong><small>{formatDate(order.createdAt)}</small></td>
@@ -73,8 +79,8 @@ function OrderRows({ order, expanded, onExpand, onStatus, busy }) {
     {expanded && <tr className="order-expanded"><td colSpan="6"><div className="order-detail">
       <div><h4>Order items</h4><ul>{order.items.map(item => <li key={item.id}>{item.quantity} × {item.productName} — {formatCurrency(item.lineTotalCents / 100)}</li>)}</ul>{order.discountCents > 0 && <p>Discount: −{formatCurrency(order.discountCents / 100)} ({order.couponCode})</p>}</div>
       <div><h4>Delivery address</h4><p>{order.firstName} {order.lastName}<br />{order.street}<br />{order.city}, {order.state} {order.postalCode}<br />{order.country}<br />{order.phone}</p>{order.notes && <p><strong>Note:</strong> {order.notes}</p>}</div>
-      <div><h4>Update status</h4><div className="order-actions">{transitions[order.status].map(nextStatus => <button key={nextStatus} className={`button button-small ${nextStatus === 'CANCELLED' ? 'button-secondary' : 'button-primary'}`} disabled={Boolean(busy)} onClick={() => onStatus(nextStatus)}>{busy === `${order.id}:${nextStatus}` ? 'Updating…' : humanizeStatus(nextStatus)}</button>)}{!transitions[order.status].length && <StatusBadge value={order.status} />}</div></div>
-      <div><h4>Payment & total</h4><p>{order.paymentMethod} · {humanizeStatus(order.paymentStatus)}<br /><strong>{formatCurrency(order.totalCents / 100)}</strong></p></div>
+      <div><h4>Update status</h4><div className="order-actions">{availableTransitions.map(nextStatus => <button key={nextStatus} className={`button button-small ${nextStatus === 'CANCELLED' ? 'button-secondary' : 'button-primary'}`} disabled={Boolean(busy)} onClick={() => onStatus(nextStatus)}>{busy === `${order.id}:${nextStatus}` ? 'Updating…' : humanizeStatus(nextStatus)}</button>)}{!availableTransitions.length && <StatusBadge value={order.status} />}</div>{order.paymentMethod === 'ONLINE' && order.paymentStatus === 'PAID' && ['PENDING','CONFIRMED','PREPARING'].includes(order.status) && <p>Paid online orders require a gateway refund before cancellation.</p>}</div>
+      <div><h4>Payment & total</h4><p>{order.paymentMethod === 'ONLINE' ? order.payment?.provider || 'Online' : 'Cash on delivery'} · {humanizeStatus(order.paymentStatus)}<br />Transaction: {order.payment?.transactionId || 'Legacy order'}<br />Attempts: {order.payment?.attempts || 0}<br /><strong>{formatCurrency(order.totalCents / 100)}</strong></p>{order.payment?.failureReason && <p><strong>Payment note:</strong> {order.payment.failureReason}</p>}</div>
     </div></td></tr>}
   </>;
 }

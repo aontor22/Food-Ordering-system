@@ -86,7 +86,29 @@ model Order {
   userId String
   user User @relation(fields: [userId], references: [id])
   items OrderItem[]
+  payment Payment?
   @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model Payment {
+  id String @id @default(cuid())
+  transactionId String @unique
+  provider String
+  status String @default("PENDING")
+  amountCents Int
+  currency String @default("USD")
+  gatewaySessionId String?
+  gatewayTransactionId String?
+  validationId String?
+  failureReason String?
+  attempts Int @default(0)
+  lastAttemptAt DateTime?
+  paidAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orderId String @unique
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   @@index([status, createdAt])
 }
 

@@ -9,8 +9,13 @@
 .payment-card { display: flex; align-items: center; gap: 12px; padding: 14px; margin: 2px 0 18px; border-radius: 13px; background: #eff8f3; color: var(--success); }
 .payment-card > svg { flex: 0 0 auto; }
 .payment-card div { display: grid; }.payment-card small { color: #5d7467; margin-top: 3px; }
+.payment-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.payment-option { position: relative; min-height: 92px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 13px; padding: 17px; border: 1.5px solid var(--line); border-radius: 15px; background: #fff; cursor: pointer; transition: .2s; }
+.payment-option:hover { border-color: #f2ad9d; }.payment-option.is-selected { border-color: var(--brand); background: #fff8f5; box-shadow: 0 0 0 3px rgba(244,81,44,.08); }.payment-option.is-disabled { opacity: .55; cursor: not-allowed; }
+.payment-option > input { position: absolute; opacity: 0; }.payment-option > svg { color: var(--brand); }.payment-option div { display: grid; gap: 4px; }.payment-option small { color: var(--muted); line-height: 1.4; }.payment-radio { width: 18px; height: 18px; display: grid; place-items: center; border: 2px solid #c9cfcb; border-radius: 50%; }.payment-option.is-selected .payment-radio { border: 5px solid var(--brand); }
+.payment-demo-note { display: flex; align-items: flex-start; gap: 8px; padding: 12px 14px; border-radius: 12px; color: #805b13; background: #fff7dd; font-size: .8rem; line-height: 1.45; }.payment-demo-note svg { flex: 0 0 auto; margin-top: 1px; }
 .coupon-notice { margin: -4px 0 18px; color: var(--success); font-size: .85rem; }
 .signin-notice { display: grid; gap: 9px; padding: 16px 0; border-top: 1px solid var(--line); }.signin-notice p { color: var(--muted); font-size: .85rem; }
 .back-to-cart { text-align: center; color: var(--muted); font-weight: 700; font-size: .88rem; }
 @media (max-width: 900px) { .checkout-layout { grid-template-columns: 1fr; } }
-@media (max-width: 580px) { .checkout-form { padding: 22px 18px; } }
+@media (max-width: 580px) { .checkout-form { padding: 22px 18px; }.payment-options { grid-template-columns: 1fr; } }

@@ -10,7 +10,13 @@ const schema = z.object({
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_DAYS: z.coerce.number().int().min(1).max(30).default(7),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
-  DELIVERY_FEE_CENTS: z.coerce.number().int().nonnegative().default(200)
+  PUBLIC_API_URL: z.url().default('http://localhost:4000'),
+  DELIVERY_FEE_CENTS: z.coerce.number().int().nonnegative().default(200),
+  PAYMENT_CURRENCY: z.string().trim().length(3).transform(value => value.toUpperCase()).default('USD'),
+  ENABLE_DEMO_PAYMENTS: z.enum(['true', 'false']).default('true').transform(value => value === 'true'),
+  SSLCOMMERZ_STORE_ID: z.string().trim().optional(),
+  SSLCOMMERZ_STORE_PASSWORD: z.string().trim().optional(),
+  SSLCOMMERZ_LIVE: z.enum(['true', 'false']).default('false').transform(value => value === 'true')
 });
 
 export const config = schema.parse(process.env);

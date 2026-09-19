@@ -17,6 +17,9 @@ import AdminOrders from './pages/Admin/AdminOrders';
 import AdminCustomers from './pages/Admin/AdminCustomers';
 import AdminCoupons from './pages/Admin/AdminCoupons';
 import AdminActivity from './pages/Admin/AdminActivity';
+import AdminPayments from './pages/Admin/AdminPayments';
+import PaymentDemo from './pages/Payment/PaymentDemo';
+import PaymentResult from './pages/Payment/PaymentResult';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -36,6 +39,7 @@ export default function App() {
         <Route index element={<AdminDashboard />} />
         <Route path="products" element={<AdminProducts />} />
         <Route path="orders" element={<AdminOrders />} />
+        <Route path="payments" element={<AdminPayments />} />
         <Route path="customers" element={<AdminCustomers />} />
         <Route path="coupons" element={<AdminCoupons />} />
         <Route path="activity" element={<AdminActivity />} />
@@ -50,6 +54,8 @@ export default function App() {
         <Route path="/order" element={<PlaceOrder onLogin={() => setShowLogin(true)} />} />
         <Route path="/orders" element={<Orders onLogin={() => setShowLogin(true)} />} />
         <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
+        <Route path="/payment/demo/:transactionId" element={<PaymentDemo onLogin={() => setShowLogin(true)} />} />
+        <Route path="/payment/result" element={<PaymentResult />} />
         <Route path="*" element={<EmptyState icon="🧭" title="Page not found" text="The page you requested may have moved or no longer exists." />} />
       </Routes>
       </main>
