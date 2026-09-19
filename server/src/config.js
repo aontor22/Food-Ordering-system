@@ -11,6 +11,7 @@ const schema = z.object({
   REFRESH_TOKEN_DAYS: z.coerce.number().int().min(1).max(30).default(7),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
   PUBLIC_API_URL: z.url().default('http://localhost:4000'),
+  GOOGLE_CLIENT_ID: z.string().trim().optional().transform(value => value || undefined),
   DELIVERY_FEE_CENTS: z.coerce.number().int().nonnegative().default(200),
   PAYMENT_CURRENCY: z.string().trim().length(3).transform(value => value.toUpperCase()).default('USD'),
   ENABLE_DEMO_PAYMENTS: z.enum(['true', 'false']).default('true').transform(value => value === 'true'),

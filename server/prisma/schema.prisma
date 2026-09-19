@@ -12,6 +12,8 @@ model User {
   name String
   email String @unique
   passwordHash String
+  googleSub String? @unique
+  avatarUrl String?
   role String @default("CUSTOMER")
   isActive Boolean @default(true)
   createdAt DateTime @default(now())

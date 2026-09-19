@@ -70,6 +70,13 @@ export default function StoreContextProvider({ children }) {
     return data;
   };
 
+  const authenticateWithGoogle = async credential => {
+    const data = await api.googleLogin(credential);
+    setAccessToken(data.accessToken);
+    setUser(data.user);
+    return data;
+  };
+
   const logout = async () => {
     await api.logout();
     setAccessToken(null);
@@ -79,7 +86,7 @@ export default function StoreContextProvider({ children }) {
   return <StoreContext.Provider value={{
     food_list, cartItems, cartProducts, cartCount, setCartItems, setQuantity,
     addToCart, removeFromCart, removeItem, getTotalCartAmount,
-    user, setUser, loading, authenticate, logout,
+    user, setUser, loading, authenticate, authenticateWithGoogle, logout,
     searchQuery, setSearchQuery, couponCode, setCouponCode,
     createOrder: api.createOrder, getOrders: api.getOrders, refreshProducts,
   }}>{children}</StoreContext.Provider>;

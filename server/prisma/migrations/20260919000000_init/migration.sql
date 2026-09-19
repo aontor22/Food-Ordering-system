@@ -1,6 +1,7 @@
 -- CreateTable
-CREATE TABLE "User" ("id" TEXT NOT NULL PRIMARY KEY, "name" TEXT NOT NULL, "email" TEXT NOT NULL, "passwordHash" TEXT NOT NULL, "role" TEXT NOT NULL DEFAULT 'CUSTOMER', "isActive" BOOLEAN NOT NULL DEFAULT true, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL);
+CREATE TABLE "User" ("id" TEXT NOT NULL PRIMARY KEY, "name" TEXT NOT NULL, "email" TEXT NOT NULL, "passwordHash" TEXT NOT NULL, "googleSub" TEXT, "avatarUrl" TEXT, "role" TEXT NOT NULL DEFAULT 'CUSTOMER', "isActive" BOOLEAN NOT NULL DEFAULT true, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL);
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+CREATE UNIQUE INDEX "User_googleSub_key" ON "User"("googleSub");
 CREATE TABLE "Session" ("id" TEXT NOT NULL PRIMARY KEY, "tokenHash" TEXT NOT NULL, "userAgent" TEXT, "ipAddress" TEXT, "expiresAt" DATETIME NOT NULL, "revokedAt" DATETIME, "replacedById" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "userId" TEXT NOT NULL, CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE);
 CREATE UNIQUE INDEX "Session_tokenHash_key" ON "Session"("tokenHash"); CREATE INDEX "Session_userId_expiresAt_idx" ON "Session"("userId", "expiresAt");
 CREATE TABLE "Product" ("id" TEXT NOT NULL PRIMARY KEY, "name" TEXT NOT NULL, "description" TEXT NOT NULL, "category" TEXT NOT NULL, "imageUrl" TEXT, "priceCents" INTEGER NOT NULL, "stock" INTEGER NOT NULL DEFAULT 100, "isAvailable" BOOLEAN NOT NULL DEFAULT true, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL);

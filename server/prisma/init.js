@@ -42,6 +42,20 @@ if (!tableExists('User')) {
   transaction(() => db.exec(readFileSync(path.join(here, 'migrations/20260919000000_init/migration.sql'), 'utf8')));
 }
 
+// Google sign-in columns were added after the original user table. Keep the
+// initializer idempotent so existing Render/SQLite deployments upgrade in place.
+transaction(() => {
+  if (!columnExists('User', 'googleSub')) {
+    db.exec('ALTER TABLE "User" ADD COLUMN "googleSub" TEXT;');
+  }
+  if (!columnExists('User', 'avatarUrl')) {
+    db.exec('ALTER TABLE "User" ADD COLUMN "avatarUrl" TEXT;');
+  }
+  if (!indexExists('User_googleSub_key')) {
+    db.exec('CREATE UNIQUE INDEX "User_googleSub_key" ON "User"("googleSub");');
+  }
+});
+
 // Upgrade projects created before the payment ledger existed.
 if (!tableExists('Payment')) {
   transaction(() => db.exec(readFileSync(path.join(here, 'migrations/20260919010000_payments/migration.sql'), 'utf8')));

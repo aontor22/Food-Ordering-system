@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -6,13 +7,15 @@ import { AppError } from '../lib/errors.js';
 import { config, isProduction } from '../config.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
+import { GoogleTokenError, verifyGoogleIdToken } from '../lib/google-auth.js';
 import { hashToken, newSessionId, signAccessToken, signRefreshToken, verifyRefreshToken } from '../lib/tokens.js';
 
 const router = Router();
 const credentials = z.object({ email: z.email().max(254).transform(v => v.toLowerCase().trim()), password: z.string().min(8).max(72) });
 const authBody = z.object({ body: credentials.extend({ name: z.string().trim().min(2).max(80) }), query: z.any(), params: z.any() });
 const loginBody = z.object({ body: credentials, query: z.any(), params: z.any() });
-const publicUser = ({ passwordHash, ...user }) => user;
+const googleBody = z.object({ body: z.object({ credential: z.string().min(100).max(10000) }), query: z.any(), params: z.any() });
+const publicUser = ({ passwordHash, googleSub, ...user }) => user;
 const cookieOptions = { httpOnly: true, secure: isProduction, sameSite: isProduction ? 'none' : 'lax', path: '/api/auth', maxAge: config.REFRESH_TOKEN_DAYS * 86400000 };
 
 async function issueSession(req, res, user) {
@@ -37,6 +40,50 @@ router.post('/login', validate(loginBody), async (req, res, next) => {
     if (!user || !user.isActive || !(await bcrypt.compare(password, user.passwordHash))) throw new AppError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
     res.json(await issueSession(req, res, user));
   } catch (e) { next(e); }
+});
+router.post('/google', validate(googleBody), async (req, res, next) => {
+  try {
+    if (!config.GOOGLE_CLIENT_ID) throw new AppError(503, 'GOOGLE_AUTH_NOT_CONFIGURED', 'Google sign-in is not configured');
+    const profile = await verifyGoogleIdToken(req.validated.body.credential);
+    const email = profile.email.toLowerCase().trim();
+
+    let user = await prisma.user.findUnique({ where: { googleSub: profile.sub } });
+    if (!user) {
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        if (!existing.isActive) throw new AppError(401, 'ACCOUNT_DISABLED', 'Account is unavailable');
+        if (existing.googleSub && existing.googleSub !== profile.sub) throw new AppError(409, 'GOOGLE_ACCOUNT_MISMATCH', 'This email is already linked to another Google account');
+        const googleIsAuthoritativeForEmail = email.endsWith('@gmail.com') || Boolean(profile.hd);
+        if (!existing.googleSub && !googleIsAuthoritativeForEmail) {
+          throw new AppError(409, 'ACCOUNT_LINK_REQUIRED', 'Sign in with your password first before linking this Google account');
+        }
+        user = await prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            googleSub: profile.sub,
+            avatarUrl: existing.avatarUrl || profile.picture || null,
+          },
+        });
+      } else {
+        const generatedPassword = crypto.randomBytes(48).toString('base64url');
+        user = await prisma.user.create({
+          data: {
+            name: String(profile.name || email.split('@')[0] || 'Google User').trim().slice(0, 80),
+            email,
+            passwordHash: await bcrypt.hash(generatedPassword, 12),
+            googleSub: profile.sub,
+            avatarUrl: profile.picture || null,
+          },
+        });
+      }
+    }
+
+    if (!user.isActive) throw new AppError(401, 'ACCOUNT_DISABLED', 'Account is unavailable');
+    res.json(await issueSession(req, res, user));
+  } catch (e) {
+    if (e instanceof GoogleTokenError) return next(new AppError(e.status, e.code, e.message));
+    next(e);
+  }
 });
 router.post('/refresh', async (req, res, next) => {
   const token = req.cookies.refreshToken;

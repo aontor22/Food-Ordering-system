@@ -17,6 +17,7 @@ export const api = {
   getProducts: () => request('/products'),
   register: body => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: body => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  googleLogin: credential => request('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
   refresh: () => request('/auth/refresh', { method: 'POST' }, false),
   logout: () => request('/auth/logout', { method: 'POST' }),
   createOrder: body => request('/orders', { method: 'POST', body: JSON.stringify(body) }),
