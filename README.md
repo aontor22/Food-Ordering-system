@@ -1,6 +1,6 @@
 # Food Ordering System — Full Stack
 
-A working Preact storefront with a Node.js/Express API, relational SQLite database, secure authentication, inventory-aware ordering, coupons, and admin APIs.
+A working Preact storefront and responsive restaurant admin dashboard with a Node.js/Express API, relational SQLite database, secure authentication, inventory-aware ordering, coupons, and audited management workflows.
 
 ## Included
 
@@ -8,7 +8,10 @@ A working Preact storefront with a Node.js/Express API, relational SQLite databa
 - Short-lived JWT access tokens and rotating, hashed refresh sessions in HTTP-only cookies
 - Product catalog, persistent cart, and database-backed checkout
 - Server-calculated totals, transactional stock control, coupons, and cancellation
-- Customer order ownership and admin product/order/dashboard APIs
+- Protected admin dashboard with revenue/order analytics, recent orders, status distribution, and top products
+- Admin product inventory, order fulfilment, customer access, coupon, and activity-log management
+- Validated order-status transitions and automatic stock restoration when an admin cancels an order
+- Customer order ownership and server-enforced administrator authorization on every management API
 - Validation, role checks, CORS allowlist, secure headers, rate limits, audit logs, and sanitized errors
 - Prisma schema, seed data (32 products and `WELCOME10` coupon), and integration tests
 - Responsive design system with desktop/mobile navigation, accessible controls, loading and empty states
@@ -28,6 +31,9 @@ npm run dev
 ```
 
 Open `http://localhost:5173`; the API runs on `http://localhost:4000`.
+
+Customer storefront: `http://localhost:5173/`  
+Admin workspace: `http://localhost:5173/admin`
 
 ### GitHub Codespaces
 
@@ -50,7 +56,12 @@ npm run build
 | Auth | `POST /api/auth/register`, `login`, `refresh`, `logout`; `GET /me` |
 | Catalog | `GET /api/products`, `/api/products/categories` |
 | Orders | `POST/GET /api/orders`, detail, and cancellation |
-| Admin | Product create/update/archive, order list/status, dashboard under `/api/admin` |
+| Admin dashboard | `GET /api/admin/dashboard` |
+| Admin products | List, create, update, archive and restore under `/api/admin/products` |
+| Admin orders | List and controlled status transitions under `/api/admin/orders` |
+| Admin customers | Account list and active-state management under `/api/admin/users` |
+| Admin coupons | List, create, update and disable under `/api/admin/coupons` |
+| Admin audit | `GET /api/admin/audit-logs` |
 
 ## Production checklist
 
@@ -63,7 +74,7 @@ npm run build
 ## Structure
 
 ```text
-front-end/       Preact/Vite storefront and API client
+front-end/       Preact/Vite storefront, admin workspace, and API client
 server/prisma/   Schema, migration, initializer, and seed
 server/src/      Routes, middleware, services, and app bootstrap
 server/test/     API integration tests

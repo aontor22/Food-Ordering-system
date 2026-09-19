@@ -55,6 +55,7 @@ export default function Navbar({ onLogin }) {
             <Icon name="chevronDown" size={16} />
           </button>
           {accountOpen && <div className="account-dropdown surface-card">
+            {user.role === 'ADMIN' && <Link to="/admin"><Icon name="dashboard" />Admin dashboard</Link>}
             <Link to="/orders"><Icon name="orders" />My orders</Link>
             <button onClick={logout}><Icon name="logout" />Sign out</button>
           </div>}

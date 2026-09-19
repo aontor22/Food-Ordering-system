@@ -40,7 +40,7 @@ export default function LoginPopup({ onClose }) {
         <div className="field"><label htmlFor="auth-email">Email address</label><input id="auth-email" name="email" value={values.email} onChange={update} required type="email" autoComplete="email" placeholder="you@example.com" /></div>
         <div className="field"><label htmlFor="auth-password">Password</label><input id="auth-password" name="password" value={values.password} onChange={update} required minLength="8" maxLength="72" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="At least 8 characters" /></div>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <label className="terms-check"><input type="checkbox" required /><span>I agree to the terms of use and privacy policy.</span></label>
+        {mode === 'register' && <label className="terms-check"><input type="checkbox" required /><span>I agree to the terms of use and privacy policy.</span></label>}
         <button className="button button-primary button-full" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}</button>
       </form>
       <p className="auth-switch">{mode === 'login' ? 'New to Tomato?' : 'Already have an account?'} <button onClick={switchMode}>{mode === 'login' ? 'Create an account' : 'Sign in'}</button></p>

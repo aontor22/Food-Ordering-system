@@ -9,6 +9,14 @@ import PlaceOrder from './pages/PlaceOrder/PlaceOrder';
 import Orders from './pages/Orders/Orders';
 import OrderSuccess from './pages/OrderSuccess/OrderSuccess';
 import EmptyState from './components/ui/EmptyState';
+import AdminGuard from './components/admin/AdminGuard';
+import AdminLayout from './components/admin/AdminLayout';
+import AdminDashboard from './pages/Admin/AdminDashboard';
+import AdminProducts from './pages/Admin/AdminProducts';
+import AdminOrders from './pages/Admin/AdminOrders';
+import AdminCustomers from './pages/Admin/AdminCustomers';
+import AdminCoupons from './pages/Admin/AdminCoupons';
+import AdminActivity from './pages/Admin/AdminActivity';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -18,11 +26,24 @@ function ScrollToTop() {
 
 export default function App() {
   const [showLogin, setShowLogin] = useState(false);
+  const { pathname } = useLocation();
+  const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
   return <div className="app-shell">
     <ScrollToTop />
     {showLogin && <LoginPopup onClose={() => setShowLogin(false)} />}
-    <Navbar onLogin={() => setShowLogin(true)} />
-    <main className="page-main page-container">
+    {isAdmin ? <Routes>
+      <Route path="/admin" element={<AdminGuard onLogin={() => setShowLogin(true)}><AdminLayout /></AdminGuard>}>
+        <Route index element={<AdminDashboard />} />
+        <Route path="products" element={<AdminProducts />} />
+        <Route path="orders" element={<AdminOrders />} />
+        <Route path="customers" element={<AdminCustomers />} />
+        <Route path="coupons" element={<AdminCoupons />} />
+        <Route path="activity" element={<AdminActivity />} />
+        <Route path="*" element={<AdminDashboard />} />
+      </Route>
+    </Routes> : <>
+      <Navbar onLogin={() => setShowLogin(true)} />
+      <main className="page-main page-container">
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/cart" element={<Cart />} />
@@ -31,7 +52,8 @@ export default function App() {
         <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
         <Route path="*" element={<EmptyState icon="🧭" title="Page not found" text="The page you requested may have moved or no longer exists." />} />
       </Routes>
-    </main>
-    <Footer />
+      </main>
+      <Footer />
+    </>}
   </div>;
 }

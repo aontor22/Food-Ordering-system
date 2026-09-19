@@ -17,16 +17,24 @@ export default function StoreContextProvider({ children }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [couponCode, setCouponCode] = useState('');
 
+  const normalizeProducts = products => products.map(product => ({
+    ...product,
+    _id: product.id,
+    image: fallbackFoods.find(food => food._id === product.id)?.image || product.imageUrl,
+  }));
+
+  const refreshProducts = async () => {
+    const data = await api.getProducts();
+    setFoodList(normalizeProducts(data.products));
+    return data.products;
+  };
+
   useEffect(() => {
     let active = true;
     Promise.allSettled([api.getProducts(), api.refresh()]).then(([productsResult, authResult]) => {
       if (!active) return;
       if (productsResult.status === 'fulfilled') {
-        setFoodList(productsResult.value.products.map(product => ({
-          ...product,
-          _id: product.id,
-          image: fallbackFoods.find(food => food._id === product.id)?.image,
-        })));
+        setFoodList(normalizeProducts(productsResult.value.products));
       }
       if (authResult.status === 'fulfilled') {
         setAccessToken(authResult.value.accessToken);
@@ -73,6 +81,6 @@ export default function StoreContextProvider({ children }) {
     addToCart, removeFromCart, removeItem, getTotalCartAmount,
     user, setUser, loading, authenticate, logout,
     searchQuery, setSearchQuery, couponCode, setCouponCode,
-    createOrder: api.createOrder, getOrders: api.getOrders,
+    createOrder: api.createOrder, getOrders: api.getOrders, refreshProducts,
   }}>{children}</StoreContext.Provider>;
 }
