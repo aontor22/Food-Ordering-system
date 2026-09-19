@@ -55,7 +55,7 @@ export default function LoginPopup({ onClose }) {
         <button className="button button-primary button-full" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}</button>
       </form>
       {googleEnabled && <>
-        <div className="auth-divider" aria-hidden="true"><span>or</span></div>
+        <div className="auth-divider" aria-hidden="true"><span>or continue with</span></div>
         <GoogleSignInButton disabled={busy} onCredential={googleSignIn} onError={requestError => setError(requestError.message)} />
       </>}
       <p className="auth-switch">{mode === 'login' ? 'New to Tomato?' : 'Already have an account?'} <button onClick={switchMode}>{mode === 'login' ? 'Create an account' : 'Sign in'}</button></p>

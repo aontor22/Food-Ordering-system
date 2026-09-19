@@ -38,12 +38,14 @@ export default function GoogleSignInButton({ disabled = false, onCredential, onE
 
   useEffect(() => {
     if (!clientId) return undefined;
-    let cancelled = false;
 
-    const render = () => {
+    let cancelled = false;
+    let observer = null;
+    let lastWidth = 0;
+
+    loadGoogleScript().then(() => {
       if (cancelled || !slotRef.current || !window.google?.accounts?.id) return;
-      const width = Math.max(240, Math.min(400, Math.floor(slotRef.current.clientWidth || 340)));
-      slotRef.current.replaceChildren();
+
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: response => {
@@ -54,21 +56,35 @@ export default function GoogleSignInButton({ disabled = false, onCredential, onE
         auto_select: false,
         cancel_on_tap_outside: true,
       });
-      window.google.accounts.id.renderButton(slotRef.current, {
-        type: 'standard',
-        theme: 'filled_blue',
-        size: 'large',
-        text: 'continue_with',
-        shape: 'rectangular',
-        logo_alignment: 'left',
-        width,
-      });
-      setReady(true);
-    };
 
-    loadGoogleScript().then(render).catch(error => !cancelled && errorRef.current?.(error));
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => ready && render());
-    if (observer && slotRef.current) observer.observe(slotRef.current);
+      const renderButton = () => {
+        if (cancelled || !slotRef.current) return;
+        const measuredWidth = Math.floor(slotRef.current.getBoundingClientRect().width || 0);
+        const width = Math.max(240, Math.min(400, measuredWidth || 340));
+        if (width === lastWidth) return;
+        lastWidth = width;
+
+        slotRef.current.replaceChildren();
+        window.google.accounts.id.renderButton(slotRef.current, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          text: 'continue_with',
+          shape: 'pill',
+          logo_alignment: 'left',
+          width,
+        });
+        setReady(true);
+      };
+
+      renderButton();
+      if (typeof ResizeObserver !== 'undefined') {
+        observer = new ResizeObserver(renderButton);
+        observer.observe(slotRef.current);
+      }
+    }).catch(error => {
+      if (!cancelled) errorRef.current?.(error);
+    });
 
     return () => {
       cancelled = true;
@@ -77,7 +93,14 @@ export default function GoogleSignInButton({ disabled = false, onCredential, onE
   }, [clientId]);
 
   if (!clientId) return null;
-  return <div className={`google-signin-shell${disabled ? ' is-disabled' : ''}`} aria-busy={disabled || !ready}>
-    <div className="google-signin-slot" ref={slotRef} />
-  </div>;
+
+  return (
+    <div
+      className={`google-signin-shell${disabled ? ' is-disabled' : ''}${ready ? ' is-ready' : ''}`}
+      aria-busy={disabled || !ready}
+    >
+      {!ready && <div className="google-signin-placeholder" aria-hidden="true" />}
+      <div className="google-signin-slot" ref={slotRef} />
+    </div>
+  );
 }
