@@ -1,39 +1,30 @@
-import React, { useContext } from 'react'
-import './FoodItem.css'
-import { assets } from '../../assets/assets'
+import { useContext } from 'react';
 import { StoreContext } from '../../context/StoreContext';
+import { formatCurrency } from '../../lib/format';
+import Icon from '../ui/Icon';
+import './FoodItem.css';
 
-const FoodItem = ({id,name,price,description,image}) => {
-
-    const {cartItems,addToCart,removeFromCart} = useContext(StoreContext);
-
-  return (
-    <div className='food-item'>
-      <div className="food-item-img-container">
-        <img className='food-item-image' src={image} alt='' />
-        {!cartItems[id]
-            ?<img className='add' onClick={()=>addToCart(id)} src={assets.add_icon_white} alt=''/>
-            :<div className='food-item-counter'>
-                <img onClick={()=>removeFromCart(id)} src={assets.remove_icon_red} alt="" />
-                <p>{cartItems[id]}</p>
-                <img onClick={()=>addToCart(id)} src={assets.add_icon_green} alt="" />
-            </div>
-        }
-      </div>
-      <div className="food-item-info">
-        <div className="food-item-rating">
-            <p>{name}</p>
-            <img src={assets.rating_starts} alt="" />
-        </div>
-        <p className="food-item-desc">
-            {description}
-        </p>
-        <p className="food-item-price">
-            ${price}
-        </p>
+export default function FoodItem({ item }) {
+  const { cartItems, addToCart, removeFromCart } = useContext(StoreContext);
+  const quantity = cartItems[item._id] || 0;
+  return <article className="food-card">
+    <div className="food-card-media">
+      <img src={item.image} alt={item.name} loading="lazy" />
+      <span className="food-category">{item.category}</span>
+      <span className="food-rating" aria-label="Rated 4.8 out of 5">★ 4.8</span>
+    </div>
+    <div className="food-card-body">
+      <div className="food-card-heading"><h3>{item.name}</h3><strong>{formatCurrency(item.price)}</strong></div>
+      <p>{item.description}</p>
+      <div className="food-card-footer">
+        <span className="delivery-time"><Icon name="clock" size={16} />20–30 min</span>
+        {quantity === 0 ? <button className="add-button" onClick={() => addToCart(item._id)} aria-label={`Add ${item.name} to cart`}><Icon name="plus" size={18} />Add</button>
+          : <div className="quantity-control" aria-label={`${item.name} quantity`}>
+            <button onClick={() => removeFromCart(item._id)} aria-label={`Remove one ${item.name}`}><Icon name="minus" size={16} /></button>
+            <strong aria-live="polite">{quantity}</strong>
+            <button onClick={() => addToCart(item._id)} aria-label={`Add one ${item.name}`}><Icon name="plus" size={16} /></button>
+          </div>}
       </div>
     </div>
-  )
+  </article>;
 }
-
-export default FoodItem

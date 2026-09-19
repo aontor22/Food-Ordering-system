@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id String @id @default(cuid())
+  name String
+  email String @unique
+  passwordHash String
+  role String @default("CUSTOMER")
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sessions Session[]
+  orders Order[]
+  auditLogs AuditLog[] @relation("ActorLogs")
+}
+
+model Session {
+  id String @id
+  tokenHash String @unique
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  replacedById String?
+  createdAt DateTime @default(now())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, expiresAt])
+}
+
+model Product {
+  id String @id
+  name String
+  description String
+  category String
+  imageUrl String?
+  priceCents Int
+  stock Int @default(100)
+  isAvailable Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orderItems OrderItem[]
+  @@index([category, isAvailable])
+}
+
+model Coupon {
+  id String @id @default(cuid())
+  code String @unique
+  percentOff Int
+  minimumCents Int @default(0)
+  active Boolean @default(true)
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id String @id @default(cuid())
+  orderNumber String @unique
+  status String @default("PENDING")
+  paymentMethod String @default("COD")
+  paymentStatus String @default("PENDING")
+  subtotalCents Int
+  discountCents Int @default(0)
+  deliveryFeeCents Int
+  totalCents Int
+  couponCode String?
+  firstName String
+  lastName String
+  email String
+  phone String
+  street String
+  city String
+  state String
+  postalCode String
+  country String
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  items OrderItem[]
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id String @id @default(cuid())
+  productName String
+  unitPriceCents Int
+  quantity Int
+  lineTotalCents Int
+  orderId String
+  productId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+  @@index([orderId])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+  action String
+  entity String
+  entityId String?
+  metadata String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  actorId String?
+  actor User? @relation("ActorLogs", fields: [actorId], references: [id], onDelete: SetNull)
+  @@index([actorId, createdAt])
+}

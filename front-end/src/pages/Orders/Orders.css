@@ -1,0 +1,11 @@
+.orders-page { max-width: 880px; margin: 0 auto; }
+.orders-list { display: grid; gap: 18px; }
+.order-card { padding: 24px; }
+.order-card-head { display: flex; justify-content: space-between; gap: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.order-card-head small { color: var(--muted); }.order-card-head h2 { margin: 3px 0; font-size: 1.15rem; }.order-card-head p { color: var(--muted); font-size: .82rem; }
+.status { height: max-content; padding: 7px 11px; border-radius: 999px; font-size: .72rem; font-weight: 800; background: #fff3d8; color: #875a00; }
+.status-delivered { background: #e7f6ed; color: #176b43; }.status-cancelled { background: #ffebe8; color: #a5281d; }.status-out_for_delivery { background: #e8f1ff; color: #245c9e; }
+.order-items-preview { padding: 14px 0; display: grid; gap: 8px; }.order-items-preview > div { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; color: var(--muted); font-size: .9rem; }.order-items-preview strong { color: var(--ink); }
+.order-card-foot { display: flex; justify-content: space-between; gap: 20px; padding-top: 16px; border-top: 1px solid var(--line); }.order-card-foot > span { display: flex; align-items: center; gap: 7px; color: var(--muted); }.order-card-foot strong { margin-left: 8px; font-size: 1.12rem; }
+.orders-loading { min-height: 250px; display: grid; place-items: center; align-content: center; gap: 14px; color: var(--muted); }.orders-loading span { width: 34px; height: 34px; border: 3px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite; }
+@media (max-width: 560px) { .order-card { padding: 18px; }.order-card-head, .order-card-foot { align-items: start; flex-direction: column; }.order-card-foot { gap: 10px; }.order-card-foot p { align-self: stretch; display: flex; justify-content: space-between; } }

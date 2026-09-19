@@ -1,0 +1,7 @@
+.benefit-strip { margin-top: 26px; padding: 20px 26px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; border: 1px solid var(--line); background: #fff; border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+.benefit-strip > div { display: flex; align-items: center; justify-content: center; gap: 13px; }
+.benefit-strip > div + div { border-left: 1px solid var(--line); }
+.benefit-strip > div > span { flex: 0 0 42px; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; background: var(--brand-soft); color: var(--brand); }
+.benefit-strip p { display: grid; line-height: 1.2; }
+.benefit-strip small { color: var(--muted); margin-top: 5px; }
+@media (max-width: 760px) { .benefit-strip { grid-template-columns: 1fr; padding: 14px 20px; gap: 0; } .benefit-strip > div { justify-content: start; padding: 13px 0; } .benefit-strip > div + div { border-left: 0; border-top: 1px solid var(--line); } }

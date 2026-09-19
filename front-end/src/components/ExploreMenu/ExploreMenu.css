@@ -1,54 +1,7 @@
-.explore-menu{
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-.explore-menu h1{
-    color: #262626;
-    font-weight: 500;
-}
-.explore-menu-text{
-    max-width: 60%;
-    color: #808080;
-}
-.explore-menu-list{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 30px;
-    text-align: center;
-    margin: 20px 0px;
-    overflow-x: scroll;
-}
-.explore-menu-list::-webkit-scrollbar{
-    display: none;
-}
-.explore-menu-list-item img{
-    width: 7.5vw;
-    min-width: 80px;
-    cursor: pointer;
-    border-radius: 50%;
-    transition: 0.2s;
-}
-.explore-menu-list-item p{
-    margin-top: 10px;
-    color: #747474;
-    font-size: max(1.4vw,16px);
-    cursor: pointer;
-}
-.explore-menu hr{
-    margin: 10px 0px;
-    height: 2px;
-    background-color: #e2e2e2;
-    border: none;
-}
-.explore-menu-list-item .active{
-    border: 4px solid tomato;
-    padding: 2px;
-}
-@media (max-width:1050px) {
-    .explore-menu-text{
-        max-width: 100%;
-        font-size: 14px;
-    }
-}
+.category-list { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(104px, 1fr); gap: 14px; overflow-x: auto; padding: 4px 4px 15px; scrollbar-width: thin; scrollbar-color: #d7d2c9 transparent; }
+.category-card { border: 1px solid var(--line); background: #fff; border-radius: 18px; padding: 14px 10px; min-width: 104px; display: grid; justify-items: center; gap: 10px; color: var(--muted); font-weight: 700; transition: .22s; }
+.category-card:hover { transform: translateY(-3px); border-color: #f4b6a7; color: var(--brand-dark); box-shadow: var(--shadow-sm); }
+.category-card.active { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); box-shadow: 0 8px 20px rgba(244,81,44,.10); }
+.category-card img, .all-category { width: 68px; height: 68px; border-radius: 50%; object-fit: cover; }
+.all-category { display: grid; place-items: center; background: linear-gradient(135deg, var(--brand), #ff8b70); color: #fff; font-family: 'Manrope'; font-size: 1.1rem; }
+@media (max-width: 700px) { .category-list { grid-auto-columns: 100px; margin-right: -14px; } .category-card img, .all-category { width: 62px; height: 62px; } }

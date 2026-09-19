@@ -1,50 +1,78 @@
-import { createContext, useEffect, useState } from "react";
-import { food_list } from "../assets/assets";
+import { createContext, useEffect, useMemo, useState } from 'react';
+import { food_list as fallbackFoods } from '../assets/assets';
+import { api, setAccessToken } from '../lib/api';
 
-export const StoreContext = createContext(null)
+export const StoreContext = createContext(null);
 
-const StoreContextProvider = (props) => {
-
-    const [cartItems, setCartItems] = useState({});
-
-    const addToCart = (itemId) => {
-        if (!cartItems[itemId]){
-            setCartItems((prev)=>({...prev,[itemId]:1}))
-        }
-        else {
-            setCartItems((prev)=>({...prev,[itemId]:prev[itemId]+1}))
-        }
-    }
-
-    const removeFromCart = (itemId) => {
-        setCartItems((prev)=>({...prev,[itemId]:prev[itemId]-1}))
-    }
-
-    const getTotalCartAmount = () => {
-        let totalAmount = 0;
-        for(const item in cartItems){
-            if(cartItems[item]>0){
-                let itemInfo = food_list.find((product)=> product._id === item);
-                totalAmount += itemInfo.price* cartItems[item];
-            }
-        }
-        return totalAmount;
-    }
-
-    const contextValue = {
-        food_list,
-        cartItems,
-        setCartItems,
-        addToCart,
-        removeFromCart,
-        getTotalCartAmount
-    }
-
-    return(
-        <StoreContext.Provider value={contextValue}>
-            {props.children}
-        </StoreContext.Provider>
-    )
+function loadCart() {
+  try { return JSON.parse(localStorage.getItem('cart') || '{}'); }
+  catch { return {}; }
 }
 
-export default StoreContextProvider;
+export default function StoreContextProvider({ children }) {
+  const [cartItems, setCartItems] = useState(loadCart);
+  const [food_list, setFoodList] = useState(fallbackFoods);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    Promise.allSettled([api.getProducts(), api.refresh()]).then(([productsResult, authResult]) => {
+      if (!active) return;
+      if (productsResult.status === 'fulfilled') {
+        setFoodList(productsResult.value.products.map(product => ({
+          ...product,
+          _id: product.id,
+          image: fallbackFoods.find(food => food._id === product.id)?.image,
+        })));
+      }
+      if (authResult.status === 'fulfilled') {
+        setAccessToken(authResult.value.accessToken);
+        setUser(authResult.value.user);
+      }
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => localStorage.setItem('cart', JSON.stringify(cartItems)), [cartItems]);
+
+  const setQuantity = (itemId, quantity) => setCartItems(previous => ({
+    ...previous,
+    [itemId]: Math.max(0, Math.min(20, Number(quantity) || 0)),
+  }));
+
+  const addToCart = itemId => setCartItems(previous => ({ ...previous, [itemId]: Math.min(20, (previous[itemId] || 0) + 1) }));
+  const removeFromCart = itemId => setCartItems(previous => ({ ...previous, [itemId]: Math.max(0, (previous[itemId] || 0) - 1) }));
+  const removeItem = itemId => setQuantity(itemId, 0);
+
+  const cartProducts = useMemo(() => food_list
+    .filter(product => cartItems[product._id] > 0)
+    .map(product => ({ ...product, quantity: cartItems[product._id] })), [food_list, cartItems]);
+
+  const cartCount = cartProducts.reduce((sum, product) => sum + product.quantity, 0);
+  const getTotalCartAmount = () => cartProducts.reduce((sum, product) => sum + product.price * product.quantity, 0);
+
+  const authenticate = async (mode, values) => {
+    const data = await api[mode](values);
+    setAccessToken(data.accessToken);
+    setUser(data.user);
+    return data;
+  };
+
+  const logout = async () => {
+    await api.logout();
+    setAccessToken(null);
+    setUser(null);
+  };
+
+  return <StoreContext.Provider value={{
+    food_list, cartItems, cartProducts, cartCount, setCartItems, setQuantity,
+    addToCart, removeFromCart, removeItem, getTotalCartAmount,
+    user, setUser, loading, authenticate, logout,
+    searchQuery, setSearchQuery, couponCode, setCouponCode,
+    createOrder: api.createOrder, getOrders: api.getOrders,
+  }}>{children}</StoreContext.Provider>;
+}

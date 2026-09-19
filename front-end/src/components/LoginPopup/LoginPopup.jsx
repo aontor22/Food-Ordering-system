@@ -1,34 +1,49 @@
-import React, { useState } from 'react'
-import './LoginPopup.css'
-import { assets } from '../../assets/assets'
+import { useContext, useEffect, useState } from 'react';
+import { StoreContext } from '../../context/StoreContext';
+import Icon from '../ui/Icon';
+import './LoginPopup.css';
 
-const LoginPopup = ({setShowLogin}) => {
+export default function LoginPopup({ onClose }) {
+  const [mode, setMode] = useState('login');
+  const [values, setValues] = useState({ name: '', email: '', password: '' });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const { authenticate } = useContext(StoreContext);
 
-  const [currentState, setCurrentState] = useState("Login")
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    const close = event => event.key === 'Escape' && onClose();
+    document.addEventListener('keydown', close);
+    return () => { document.body.classList.remove('modal-open'); document.removeEventListener('keydown', close); };
+  }, [onClose]);
 
-  return (
-    <div className='login-popup'>
-      <form action="" className="login-popup-container">
-        <div className="login-popup-title">
-          <h2>{currentState}</h2>
-          <img onClick={() =>setShowLogin(false)} src={assets.cross_icon} alt="" />
-        </div>
-        <div className="login-popup-inputs">
-          {currentState==="Login"?<></>:<input type="text" placeholder='Enter your name' required/>}
-          <input type="email" placeholder='Enter your email' required/>
-          <input type="password" placeholder='Enter your password' required/>
-        </div>
-        <button>{currentState==="Sign Up" ? "Create account":"Login"}</button>
-        <div className="login-popup-condition">
-          <input type="checkbox" required />
-          <p>By continuing, i agree to the terms of use & privacy policy.</p>
-        </div>
-        {currentState==="Login"?<p>Create a new account? <span onClick={()=> setCurrentState("Sign Up")}>Click here</span></p>:<p>Already have an account? <span onClick={()=> setCurrentState("Login")}>Login here</span></p>}
-        
-        
+  const update = event => setValues(previous => ({ ...previous, [event.target.name]: event.target.value }));
+  const switchMode = () => { setMode(value => value === 'login' ? 'register' : 'login'); setError(''); };
+  const submit = async event => {
+    event.preventDefault(); setError(''); setBusy(true);
+    try {
+      await authenticate(mode, mode === 'login' ? { email: values.email, password: values.password } : values);
+      onClose();
+    } catch (requestError) { setError(requestError.message); }
+    finally { setBusy(false); }
+  };
+
+  return <div className="auth-overlay" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}>
+    <section className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <button className="auth-close icon-button" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
+      <div className="auth-mark">T.</div>
+      <div className="section-kicker">Welcome to Tomato</div>
+      <h2 id="auth-title">{mode === 'login' ? 'Good to see you again' : 'Create your account'}</h2>
+      <p>{mode === 'login' ? 'Sign in to place orders and track deliveries.' : 'Save your details and order your favourites faster.'}</p>
+      <form onSubmit={submit}>
+        {mode === 'register' && <div className="field"><label htmlFor="auth-name">Full name</label><input id="auth-name" name="name" value={values.name} onChange={update} required autoComplete="name" placeholder="Your name" /></div>}
+        <div className="field"><label htmlFor="auth-email">Email address</label><input id="auth-email" name="email" value={values.email} onChange={update} required type="email" autoComplete="email" placeholder="you@example.com" /></div>
+        <div className="field"><label htmlFor="auth-password">Password</label><input id="auth-password" name="password" value={values.password} onChange={update} required minLength="8" maxLength="72" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="At least 8 characters" /></div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <label className="terms-check"><input type="checkbox" required /><span>I agree to the terms of use and privacy policy.</span></label>
+        <button className="button button-primary button-full" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}</button>
       </form>
-    </div>
-  )
+      <p className="auth-switch">{mode === 'login' ? 'New to Tomato?' : 'Already have an account?'} <button onClick={switchMode}>{mode === 'login' ? 'Create an account' : 'Sign in'}</button></p>
+    </section>
+  </div>;
 }
-
-export default LoginPopup

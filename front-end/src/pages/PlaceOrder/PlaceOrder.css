@@ -1,35 +1,16 @@
-.place-order{
-    display: flex;
-    align-items: start;
-    justify-content: space-between;
-    gap: 50px;
-    margin-top: 100px;
-}
-.place-order-left {
-    width: 100%;
-    max-width: max(30%,500px);
-}
-.place-order-left .title{
-    font-size: 30px;
-    font-weight: 600;
-    margin-bottom: 50px;
-}
-.place-order-left input{
-    margin-bottom: 15px;
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #c5c5c5;
-    border-radius: 4px;
-    outline-color: tomato;
-}
-.place-order-left .multi-fields{
-    display: flex;
-    gap: 10px;
-}
-.place-order-right{
-    width: 100%;
-    max-width: max(40%,500px);
-}
-.place-order .cart-total button{
-    margin-top: 30px;
-}
+.checkout-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .75fr); gap: 26px; align-items: start; }
+.checkout-form { padding: 32px; display: grid; gap: 18px; }
+.checkout-section-title { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+.checkout-section-title > span { flex: 0 0 38px; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: var(--brand); font-family: 'Manrope'; font-weight: 800; }
+.checkout-section-title h2 { font-size: 1.25rem; }
+.checkout-section-title p { color: var(--muted); font-size: .83rem; margin-top: 3px; }
+.checkout-divider { height: 1px; background: var(--line); margin: 8px 0; }
+.checkout-sidebar { display: grid; gap: 16px; }
+.payment-card { display: flex; align-items: center; gap: 12px; padding: 14px; margin: 2px 0 18px; border-radius: 13px; background: #eff8f3; color: var(--success); }
+.payment-card > svg { flex: 0 0 auto; }
+.payment-card div { display: grid; }.payment-card small { color: #5d7467; margin-top: 3px; }
+.coupon-notice { margin: -4px 0 18px; color: var(--success); font-size: .85rem; }
+.signin-notice { display: grid; gap: 9px; padding: 16px 0; border-top: 1px solid var(--line); }.signin-notice p { color: var(--muted); font-size: .85rem; }
+.back-to-cart { text-align: center; color: var(--muted); font-weight: 700; font-size: .88rem; }
+@media (max-width: 900px) { .checkout-layout { grid-template-columns: 1fr; } }
+@media (max-width: 580px) { .checkout-form { padding: 22px 18px; } }

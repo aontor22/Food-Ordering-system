@@ -1,79 +1,53 @@
-import React, { useContext } from 'react'
-import './Cart.css'
-import { StoreContext } from '../../context/StoreContext'
-import { assets } from '../../assets/assets';
-import { useNavigate } from 'react-router-dom';
+import { useContext, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { StoreContext } from '../../context/StoreContext';
+import { formatCurrency } from '../../lib/format';
+import OrderSummary from '../../components/ui/OrderSummary';
+import EmptyState from '../../components/ui/EmptyState';
+import Icon from '../../components/ui/Icon';
+import './Cart.css';
 
-const cart = () => {
-
-  const {cartItems, food_list, removeFromCart, getTotalCartAmount} = useContext(StoreContext);
-
+export default function Cart() {
+  const { cartProducts, setQuantity, removeItem, getTotalCartAmount, couponCode, setCouponCode } = useContext(StoreContext);
+  const [promo, setPromo] = useState(couponCode);
+  const [promoMessage, setPromoMessage] = useState('');
   const navigate = useNavigate();
 
-  return (
-    <div className='cart'>
-      <div className="cart-items">
-        <div className="cart-items-title">
-          <p>Items</p>
-          <p>Title</p>
-          <p>Price</p>
-          <p>Quantity</p>
-          <p>Total</p>
-          <p>Remove</p>
-        </div>
-        <br />
-        <hr />
-        {food_list.map((item,index)=>{
-          if(cartItems[item._id]>0){
-            return(
-              <div>
-                <div className="cart-items-title cart-items-item">
-                  <img src={item.image} alt="" />
-                  <p>{item.name}</p>
-                  <p>${item.price}</p>
-                  <p>{cartItems[item._id]}</p>
-                  <p>${item.price*cartItems[item._id]}</p>
-                  <p onClick={()=> removeFromCart(item._id)} className='cross'>x</p>
-                </div>
-                <hr />
-              </div>
-            ) 
-          }
-        })}
-      </div>
-      <div className="cart-bottom">
-        <div className="cart-total">
-          <h2>Cart Totals</h2>
-          <div>
-            <div className="cart-total-details">
-              <p>Subtotal</p>
-              <p>${getTotalCartAmount()}</p>
-            </div>
-            <hr />
-            <div className="cart-total-details">
-              <p>Delivery Fee</p>
-              <p>${getTotalCartAmount()===0?0:2}</p>
-            </div>
-            <hr />
-            <div className="cart-total-details">
-              <p>Total</p>
-              <p>${getTotalCartAmount() === 0?0:getTotalCartAmount()+2}</p>
-            </div>
+  if (!cartProducts.length) return <EmptyState icon="🛒" title="Your cart is waiting" text="Add a few delicious dishes and they’ll appear here, ready for checkout." />;
+
+  const applyPromo = event => {
+    event.preventDefault();
+    const value = promo.trim().toUpperCase();
+    setCouponCode(value);
+    setPromoMessage(value ? 'Code saved. Eligibility and discount will be verified when you place the order.' : '');
+  };
+
+  return <div className="cart-page">
+    <header className="page-title"><div className="section-kicker">Almost there</div><h1>Your cart</h1><p>Review your dishes and quantities before checkout.</p></header>
+    <div className="cart-layout">
+      <section className="cart-list surface-card" aria-label="Cart items">
+        {cartProducts.map(item => <article className="cart-row" key={item._id}>
+          <img src={item.image} alt={item.name} />
+          <div className="cart-item-copy"><span>{item.category}</span><h2>{item.name}</h2><p>{formatCurrency(item.price)} each</p></div>
+          <div className="quantity-control cart-quantity">
+            <button onClick={() => setQuantity(item._id, item.quantity - 1)} aria-label={`Decrease ${item.name} quantity`}><Icon name="minus" size={16} /></button>
+            <strong>{item.quantity}</strong>
+            <button onClick={() => setQuantity(item._id, item.quantity + 1)} aria-label={`Increase ${item.name} quantity`}><Icon name="plus" size={16} /></button>
           </div>
-            <button onClick={()=>navigate('/order')}>PROCEED TO CHECKOUT</button>
-        </div>
-        <div className="cart-promocode">
-          <div> 
-            <p>If you have a promo code, Enter it here</p>
-            <div className="cart-promocode-input">
-              <input type="text" placeholder='Enter promo code' />
-              <button>Submit</button>
-            </div>
-          </div>
-        </div>
+          <strong className="cart-line-total">{formatCurrency(item.price * item.quantity)}</strong>
+          <button className="remove-item" onClick={() => removeItem(item._id)} aria-label={`Remove ${item.name}`}><Icon name="trash" size={19} /></button>
+        </article>)}
+        <div className="cart-list-footer"><Link className="text-link" to="/">← Continue shopping</Link><span>{cartProducts.length} selected {cartProducts.length === 1 ? 'dish' : 'dishes'}</span></div>
+      </section>
+      <div>
+        <OrderSummary subtotal={getTotalCartAmount()} action={{ onClick: () => navigate('/order') }}>
+          <form className="promo-form" onSubmit={applyPromo}>
+            <label htmlFor="promo">Promo code</label>
+            <div><input id="promo" value={promo} onChange={event => setPromo(event.target.value)} placeholder="e.g. WELCOME10" /><button>Apply</button></div>
+            {promoMessage && <small>{promoMessage}</small>}
+          </form>
+        </OrderSummary>
       </div>
     </div>
-  )
+  </div>;
 }
-
-export default cart

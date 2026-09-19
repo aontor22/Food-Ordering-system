@@ -1,25 +1,18 @@
-import React from 'react'
-import './ExploreMenu.css'
-import { menu_list } from '../../assets/assets'
+import { menu_list } from '../../assets/assets';
+import './ExploreMenu.css';
 
-const ExploreMenu = ({category,setCategory}) => {
-  return (
-    <div className='explore-menu' id='explore-menu'>
-      <h1>Explore our menu</h1>
-      <p className='explore-menu-text'>Choose from a diverse menu featuring a delectable array of dishes crafted with the finest ingredients and culinary expertise. Our mission is to satisfy your cravings and elevate your dining experience, one delicious meal at a time.</p>
-      <div className="explore-menu-list">
-        {menu_list.map((item,index)=>{
-            return(
-                <div onClick={()=>setCategory(prev=>prev===item.menu_name?"All":item.menu_name)} key={index} className="explore-menu-list-item">
-                    <img className={category===item.menu_name?"active":""} src={item.menu_image} alt="" />
-                    <p>{item.menu_name}</p>
-                </div>
-            )
-        })}
-      </div>
-      <hr />
+export default function ExploreMenu({ category, setCategory }) {
+  const categories = [{ menu_name: 'All', menu_image: null }, ...menu_list];
+  return <section className="section explore-menu" id="menu">
+    <div className="section-heading">
+      <div><div className="section-kicker">Something for everyone</div><h2>Explore our menu</h2></div>
+      <p>From crisp salads to comforting pasta, find a dish for every craving and every moment.</p>
     </div>
-  )
+    <div className="category-list" role="list" aria-label="Food categories">
+      {categories.map(item => <button key={item.menu_name} className={`category-card ${category === item.menu_name ? 'active' : ''}`} onClick={() => setCategory(item.menu_name)} aria-pressed={category === item.menu_name}>
+        {item.menu_image ? <img src={item.menu_image} alt="" /> : <span className="all-category">All</span>}
+        <span>{item.menu_name}</span>
+      </button>)}
+    </div>
+  </section>;
 }
-
-export default ExploreMenu

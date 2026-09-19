@@ -1,0 +1,11 @@
+services:
+  api:
+    build: .
+    env_file: server/.env
+    ports: ["8080:4000"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: file:/data/dev.db
+    volumes: ["food_data:/data"]
+volumes:
+  food_data:

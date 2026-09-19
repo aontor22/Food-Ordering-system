@@ -1,0 +1,7 @@
+.success-page { max-width: 720px; margin: 80px auto; padding: 58px; text-align: center; }
+.success-check { width: 84px; height: 84px; margin: 0 auto 24px; display: grid; place-items: center; border-radius: 50%; background: #e8f7ee; color: var(--success); }
+.success-page h1 { font-size: clamp(2rem, 5vw, 3.3rem); letter-spacing: -.05em; line-height: 1.08; }
+.success-page > p { max-width: 560px; margin: 16px auto 28px; color: var(--muted); line-height: 1.7; }
+.success-details { display: grid; grid-template-columns: repeat(3, 1fr); padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }.success-details > div { display: grid; gap: 6px; }.success-details > div + div { border-left: 1px solid var(--line); }.success-details span { color: var(--muted); font-size: .78rem; }
+.success-actions { display: flex; justify-content: center; gap: 12px; margin-top: 28px; }
+@media (max-width: 600px) { .success-page { margin: 40px auto; padding: 36px 20px; }.success-details { grid-template-columns: 1fr; gap: 15px; }.success-details > div + div { border-left: 0; }.success-actions { flex-direction: column; } }
