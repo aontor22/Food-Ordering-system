@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
+import { getManualOrder, submitManualPayment } from '../services/manual-payment.js';
 import {
   completeDemoPayment,
   reconcileSslCommerzPayment,
@@ -18,7 +19,7 @@ const router = Router();
 const clientOrigin = config.CLIENT_ORIGIN.split(',')[0].trim().replace(/\/$/, '');
 const paymentResult = (status, orderNumber = '') => `${clientOrigin}/payment/result?status=${encodeURIComponent(status)}&order=${encodeURIComponent(orderNumber)}`;
 
-router.get('/options', (_req, res) => res.json(getPaymentOptions()));
+router.get('/options', async (_req, res) => res.json(await getPaymentOptions()));
 
 router.post('/sslcommerz/ipn', async (req, res, next) => {
   try {
@@ -54,6 +55,15 @@ router.post('/sslcommerz/cancel', async (req, res) => {
 });
 
 router.use(requireAuth);
+
+router.get('/manual/:orderId', async (req, res, next) => {
+  try { res.json(await getManualOrder(req.params.orderId, req.auth.sub)); }
+  catch (error) { next(error); }
+});
+router.post('/manual/:orderId/submit', async (req, res, next) => {
+  try { res.status(201).json({ submission: await submitManualPayment(req.params.orderId, req.auth.sub, req.body, req) }); }
+  catch (error) { next(error); }
+});
 
 router.post('/orders/:orderId/initiate', async (req, res, next) => {
   try {

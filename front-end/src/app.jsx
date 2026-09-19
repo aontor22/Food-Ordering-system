@@ -20,6 +20,7 @@ import AdminActivity from './pages/Admin/AdminActivity';
 import AdminPayments from './pages/Admin/AdminPayments';
 import PaymentDemo from './pages/Payment/PaymentDemo';
 import PaymentResult from './pages/Payment/PaymentResult';
+import ManualPayment from './pages/Payment/ManualPayment';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
         <Route path="/payment/demo/:transactionId" element={<PaymentDemo onLogin={() => setShowLogin(true)} />} />
         <Route path="/payment/result" element={<PaymentResult />} />
+        <Route path="/payment/manual/:orderId" element={<ManualPayment onLogin={() => setShowLogin(true)} />} />
         <Route path="*" element={<EmptyState icon="🧭" title="Page not found" text="The page you requested may have moved or no longer exists." />} />
       </Routes>
       </main>

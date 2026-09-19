@@ -11,11 +11,14 @@ const sslBaseUrl = () => config.SSLCOMMERZ_LIVE
   ? 'https://securepay.sslcommerz.com'
   : 'https://sandbox.sslcommerz.com';
 
-export function getPaymentOptions() {
+export async function getPaymentOptions() {
+  const manualChannels = await prisma.manualPaymentChannel.findMany({ where: { active: true, ...(config.PAYMENT_CURRENCY !== 'BDT' ? { provider: 'BANK' } : {}) }, orderBy: { createdAt: 'asc' } });
   return {
     currency: config.PAYMENT_CURRENCY,
+    manualChannels,
     methods: [
       { id: 'COD', label: 'Cash on delivery', enabled: true, mode: 'live' },
+      { id: 'MANUAL', label: 'Manual payment', enabled: manualChannels.length > 0, mode: 'manual' },
       {
         id: 'ONLINE',
         label: hasSslCommerz ? 'Online payment' : demoEnabled ? 'Online payment (demo)' : 'Online payment unavailable',
@@ -42,6 +45,8 @@ export function serializePayment(payment) {
     currency: payment.currency,
     gatewayTransactionId: payment.gatewayTransactionId,
     failureReason: payment.failureReason,
+    manualDestination: payment.manualDestination ? JSON.parse(payment.manualDestination) : null,
+    ...(payment.manualSubmissions ? { manualSubmissions: payment.manualSubmissions.map(({ referenceKey, reviewedBy, ...item }) => item) } : {}),
     attempts: payment.attempts,
     paidAt: payment.paidAt,
     createdAt: payment.createdAt,

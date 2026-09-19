@@ -7,6 +7,8 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { serializePayment, reconcileSslCommerzPayment } from '../services/payment.js';
+import { validateChannel, reviewManualPayment, refundManualPayment } from '../services/manual-payment.js';
+import { config } from '../config.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -102,12 +104,13 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
     if (!orderTransitions[existing.status]?.includes(nextStatus)) {
       throw new AppError(409, 'INVALID_STATUS_TRANSITION', `Order cannot move from ${existing.status} to ${nextStatus}`);
     }
-    if (nextStatus === 'CANCELLED' && existing.paymentMethod === 'ONLINE' && existing.paymentStatus === 'PAID') {
-      throw new AppError(409, 'REFUND_REQUIRED', 'Refund the online payment before cancelling this order');
+    if (nextStatus === 'CANCELLED' && existing.paymentMethod !== 'COD' && existing.paymentStatus === 'PAID') {
+      throw new AppError(409, 'REFUND_REQUIRED', 'Record the refund before cancelling this prepaid order');
     }
-    if (existing.paymentMethod === 'ONLINE' && existing.paymentStatus !== 'PAID' && nextStatus !== 'CANCELLED') {
-      throw new AppError(409, 'PAYMENT_REQUIRED', 'Online payment must be verified before fulfilment can begin');
+    if (existing.paymentMethod !== 'COD' && existing.paymentStatus !== 'PAID' && nextStatus !== 'CANCELLED') {
+      throw new AppError(409, 'PAYMENT_REQUIRED', 'Payment must be verified before fulfilment can begin');
     }
+    if (nextStatus === 'CANCELLED' && existing.paymentMethod === 'MANUAL' && existing.paymentStatus === 'REVIEW') throw new AppError(409, 'PAYMENT_UNDER_REVIEW', 'Review the submitted payment before cancelling');
     const settleCod = nextStatus === 'DELIVERED' && existing.paymentMethod === 'COD' && existing.paymentStatus !== 'REFUNDED';
     if (nextStatus === 'CANCELLED' && existing.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW'].includes(existing.payment.status)) throw new AppError(409, 'PAYMENT_PROCESSING', 'Wait for gateway verification before cancelling');
       if (nextStatus === 'CANCELLED') {
@@ -136,11 +139,39 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
 
 router.get('/payments', async (_req, res) => {
   const payments = await prisma.payment.findMany({
-    include: { order: { include: { user: { select: { id: true, name: true, email: true } } } } },
+    include: { manualSubmissions: { orderBy: { createdAt: 'desc' } }, order: { include: { user: { select: { id: true, name: true, email: true } } } } },
     orderBy: { createdAt: 'desc' },
     take: 250,
   });
   res.json({ payments: payments.map(payment => ({ ...serializePayment(payment), order: payment.order })) });
+});
+
+router.get('/payment-channels', async (_req, res) => {
+  res.json({ currency: config.PAYMENT_CURRENCY, channels: await prisma.manualPaymentChannel.findMany({ orderBy: { createdAt: 'asc' } }) });
+});
+router.post('/payment-channels', async (req, res, next) => {
+  try {
+    const data = validateChannel(req.body);
+    const channel = await prisma.manualPaymentChannel.create({ data });
+    await audit(req, 'PAYMENT_CHANNEL_CREATED', 'ManualPaymentChannel', channel.id);
+    res.status(201).json({ channel });
+  } catch (error) { next(error); }
+});
+router.patch('/payment-channels/:id', async (req, res, next) => {
+  try {
+    const data = validateChannel(req.body);
+    const channel = await prisma.manualPaymentChannel.update({ where: { id: req.params.id }, data });
+    await audit(req, 'PAYMENT_CHANNEL_UPDATED', 'ManualPaymentChannel', channel.id);
+    res.json({ channel });
+  } catch (error) { next(error); }
+});
+router.post('/payments/:id/manual-review', async (req, res, next) => {
+  try { res.json({ payment: await reviewManualPayment(req.params.id, req.body, req) }); }
+  catch (error) { next(error); }
+});
+router.post('/payments/:id/manual-refunded', async (req, res, next) => {
+  try { res.json({ payment: await refundManualPayment(req.params.id, req.body, req) }); }
+  catch (error) { next(error); }
 });
 
 router.post('/payments/:id/check', async (req, res, next) => {

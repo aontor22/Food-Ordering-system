@@ -55,6 +55,17 @@ Tests use a temporary SQLite database and include mocked provider responses for 
 
 ## Payments and upgrading
 
+### Manual payments (no SSLCOMMERZ account needed)
+
+1. For bKash/Nagad/Rocket, set `PAYMENT_CURRENCY=BDT` in `server/.env` and `VITE_CURRENCY=BDT` in `front-end/.env`. Restart development servers (or rebuild the production frontend). Check product prices and `DELIVERY_FEE_CENTS`: 6000 means ৳60 with BDT. Currency changes do not convert prices or historical orders. Mobile channels cannot be enabled while the store uses USD.
+2. Run `npm run db:setup` once after installing this update. It adds manual-payment tables without deleting existing data.
+3. Sign in as admin → **Payments → Manual payment accounts & instructions**. Add a provider (bKash/Nagad/Rocket/Bank), label, actual merchant/account number, and instructions. Enable and save it. No fictitious recipient is preconfigured.
+4. Customer selects **Manual payment** and an account at checkout, places the order, then sees the exact amount/currency and receiving instructions. After paying through the chosen channel, they submit the transaction ID, sender identifier and optional note. No PIN, OTP or password is requested.
+5. The order remains pending with payment **Awaiting verification**. Admin → Payments → **Review & approve** shows the amount, recipient, sender and transaction ID. Verify these against the receiving account, add a note and confirm receipt before approving. Only then does the order become confirmed/paid. Rejection requires a customer-visible reason and permits a corrected reference.
+6. Duplicate transaction references are blocked (including case/separator variants). A rejected reference remains reserved to prevent reuse: the customer should contact the restaurant if the original reference was correct, not pay again simply to resubmit. Under-review and paid manual orders cannot be cancelled until review/refund is handled. **Record refund** only records money already returned; it does not transfer money.
+
+Channel edits affect new orders. Existing orders retain their original destination and instructions. No gateway setup credentials are required for this manual workflow; any provider/account charges are separate. Customer details and review history are restricted to the owner and administrators.
+
 After copying updated files into an existing project, keep your existing `.env` and database, stop the server, then run `npm install`, `npm run db:setup`, and `npm run dev`. The initializer adds the Payment table and backfills existing COD orders without deleting orders/users. Back up your SQLite database before upgrading. Do not mix the bundled initializer with `prisma migrate deploy` against an already initialized database without first baselining migrations.
 
 At checkout choose **Cash on delivery** or **Online payment (demo)**. The demo lets you test success/failure/cancel without charging money. My orders shows payment status and offers retry. Open `/admin/payments` as an administrator to view the ledger. **Cash received** records money already collected, and **Mark refunded** records cash already returned; these buttons do not transfer money. Delivery also records COD collection. Online orders cannot enter fulfilment until verified paid.
@@ -75,6 +86,8 @@ Gateway timeouts remain processing until verified; retry checks the provider bef
 | Orders | `POST/GET /api/orders`, detail, and cancellation |
 | Payments | `GET /api/payments/options`, `POST /api/payments/orders/:orderId/initiate`, authenticated demo routes, SSLCOMMERZ callback routes |
 | Admin payments | `GET /api/admin/payments`, `POST /api/admin/payments/:id/cash-received`, `cash-refunded` |
+| Manual customer payments | `GET /api/payments/manual/:orderId`, `POST /api/payments/manual/:orderId/submit` |
+| Manual admin operations | `GET/POST /api/admin/payment-channels`, `PATCH /api/admin/payment-channels/:id`, `POST /api/admin/payments/:id/manual-review`, `manual-refunded` |
 | Admin dashboard | `GET /api/admin/dashboard` |
 | Admin products | List, create, update, archive and restore under `/api/admin/products` |
 | Admin orders | List and controlled status transitions under `/api/admin/orders` |

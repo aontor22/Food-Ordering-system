@@ -11,12 +11,15 @@ Verified locally on 19 September 2026.
 - Gateway settlement validates transaction identity, amount, currency, and risk. Failure/cancel notifications trigger a server-to-server query. Duplicate settlement cannot downgrade paid status.
 - Existing COD orders are backfilled into the ledger on database setup. Re-running setup preserves the records.
 - Disabled accounts lose access immediately, including previously issued access tokens.
+- Manual payment channels are configurable from Admin → Payments; customer submissions require administrator review and never directly set paid status.
+- Reference reuse, foreign-order access, stale reviews, unverified fulfilment and under-review cancellation are blocked. Destination instructions are snapshotted on each order.
+- Mobile manual payment channels require BDT. Admin approval includes an explicit receipt-verification confirmation; manual refunds record already-returned funds.
 
 ## Verification
 
-- `npm test`: 12 passing integration tests, isolated temporary SQLite database.
+- `npm test`: 18 integration tests, isolated temporary SQLite database; includes manual submission, approval, rejection/correction, duplication, currency, refund and ownership cases.
 - Gateway verification tests use mocked provider responses; no money charged.
-- `npm run build`: passed, 128 frontend modules.
+- `npm run build`: frontend production build verified after the manual payment update.
 - `npm audit --omit=dev`: zero reported production dependency vulnerabilities at check time.
 - Server JavaScript syntax checks passed.
 - Production smoke checks passed for `/admin/payments`, `/payment/result`, `/orders`, unknown API 404, unauthenticated payment rejection, and disabled production demo.

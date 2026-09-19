@@ -147,6 +147,9 @@ test('enforces admin authorization and supports management operations', async ()
   r = await request(app).get('/api/admin/audit-logs').set('Authorization', `Bearer ${adminToken}`);
   assert.equal(r.status, 200);
   assert.ok(r.body.logs.some(log => log.action === 'PRODUCT_CREATED'));
+  r = await request(app).post('/api/admin/payment-channels').set('Authorization', `Bearer ${adminToken}`).send({ provider: 'BKASH', label: 'Test merchant', account: 'TEST-ACCOUNT', instructions: 'Test only; never pay', active: true });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error.code, 'CURRENCY_MISMATCH');
 });
 
 test('failed demo payment can retry, invalid signatures and cancelled sessions cannot settle', async () => {

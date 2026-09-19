@@ -28,7 +28,7 @@ export default function OrderSuccess() {
     {paymentError && <p className="success-alert"><Icon name="alert" size={18} />{paymentError}</p>}
     {order && <div className="success-details">
       <div><span>Payment</span><strong>{isOnline ? 'Online payment' : 'Cash on delivery'}</strong></div>
-      <div><span>Order total</span><strong>{formatCurrency(order.totalCents / 100)}</strong></div>
+      <div><span>Order total</span><strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></div>
       <div><span>Payment status</span><strong>{humanizeStatus(order.paymentStatus)}</strong></div>
     </div>}
     <div className="success-actions">{isOnline && order?.paymentStatus !== 'PAID' && <button className="button button-primary" onClick={retry} disabled={busy}>{busy ? 'Opening payment…' : 'Retry payment'}</button>}<Link to="/orders" className="button button-primary">View my orders</Link><Link to="/" className="button button-secondary">Back to menu</Link></div>

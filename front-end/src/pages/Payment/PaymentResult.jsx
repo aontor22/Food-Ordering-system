@@ -47,7 +47,7 @@ export default function PaymentResult() {
     <div className="section-kicker">{details.kicker}</div><h1>{details.title}</h1><p>{details.text}</p>
     {!user && !authLoading && <p>Sign in through My orders to view your verified result.</p>}
     {error && <p className="form-error" role="alert">{error}</p>}
-    {(orderNumber || order) && <div className="payment-receipt compact"><div><span>Order</span><strong>{orderNumber || '—'}</strong></div>{order && <><div><span>Payment status</span><strong>{humanizeStatus(order.paymentStatus)}</strong></div><div><span>Amount</span><strong>{formatCurrency(order.totalCents / 100)}</strong></div></>}</div>}
+    {(orderNumber || order) && <div className="payment-receipt compact"><div><span>Order</span><strong>{orderNumber || '—'}</strong></div>{order && <><div><span>Payment status</span><strong>{humanizeStatus(order.paymentStatus)}</strong></div><div><span>Amount</span><strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></div></>}</div>}
     <div className="payment-actions">{order && order.paymentMethod === 'ONLINE' && !['PAID', 'REFUNDED', 'REVIEW'].includes(order.paymentStatus) && !['CANCELLED', 'DELIVERED'].includes(order.status) && <button className="button button-primary" onClick={retry} disabled={busy}>{busy ? 'Checking payment…' : order.paymentStatus === 'PROCESSING' ? 'Check / continue payment' : 'Retry payment'}</button>}<Link className="button button-primary" to="/orders">View my orders</Link><Link className="button button-secondary" to="/">Back to menu</Link></div>
   </section>;
 }

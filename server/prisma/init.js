@@ -15,6 +15,12 @@ const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND 
 if (!table) db.exec(readFileSync(path.join(here, 'migrations/20260919000000_init/migration.sql'), 'utf8'));
 const paymentTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='Payment'").get();
 if (!paymentTable) db.exec(readFileSync(path.join(here, 'migrations/20260919010000_payments/migration.sql'), 'utf8'));
+const manualTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ManualPaymentChannel'").get();
+if (!manualTable) {
+  db.exec('BEGIN');
+  try { db.exec(readFileSync(path.join(here, 'migrations/20260919020000_manual_payments/migration.sql'), 'utf8')); db.exec('COMMIT'); }
+  catch (error) { db.exec('ROLLBACK'); throw error; }
+}
 // Existing COD orders must also appear in the payment ledger after an upgrade.
 db.prepare(`INSERT INTO Payment (id, transactionId, provider, status, amountCents, currency, paidAt, createdAt, updatedAt, orderId)
  SELECT 'legacy_' || id, 'LEGACY-' || id, 'COD',

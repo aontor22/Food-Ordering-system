@@ -102,6 +102,8 @@ model Payment {
   gatewayTransactionId String?
   validationId String?
   failureReason String?
+  manualDestination String?
+  manualSubmissions ManualPaymentSubmission[]
   attempts Int @default(0)
   lastAttemptAt DateTime?
   paidAt DateTime?
@@ -110,6 +112,35 @@ model Payment {
   orderId String @unique
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   @@index([status, createdAt])
+}
+
+model ManualPaymentChannel {
+  id String @id @default(cuid())
+  provider String
+  label String
+  account String
+  instructions String
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ManualPaymentSubmission {
+  id String @id @default(cuid())
+  reference String
+  referenceKey String @unique
+  sender String
+  note String?
+  amountCents Int
+  currency String
+  status String @default("SUBMITTED")
+  reviewNote String?
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+  paymentId String
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  @@index([paymentId, createdAt])
 }
 
 model OrderItem {
