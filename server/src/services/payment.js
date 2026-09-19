@@ -34,6 +34,18 @@ export function newPaymentTransactionId() {
   return `PAY${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
 }
 
+function parseManualDestination(value) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    // Never let one legacy/corrupt JSON value take the entire admin payment
+    // ledger down. The payment can still be inspected/reconciled normally.
+    return null;
+  }
+}
+
 export function serializePayment(payment) {
   if (!payment) return null;
   return {
@@ -45,7 +57,7 @@ export function serializePayment(payment) {
     currency: payment.currency,
     gatewayTransactionId: payment.gatewayTransactionId,
     failureReason: payment.failureReason,
-    manualDestination: payment.manualDestination ? JSON.parse(payment.manualDestination) : null,
+    manualDestination: parseManualDestination(payment.manualDestination),
     ...(payment.manualSubmissions ? { manualSubmissions: payment.manualSubmissions.map(({ referenceKey, reviewedBy, ...item }) => item) } : {}),
     attempts: payment.attempts,
     paidAt: payment.paidAt,
