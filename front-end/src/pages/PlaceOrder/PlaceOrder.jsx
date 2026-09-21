@@ -1,10 +1,11 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { StoreContext } from '../../context/StoreContext';
 import OrderSummary from '../../components/ui/OrderSummary';
 import EmptyState from '../../components/ui/EmptyState';
 import Icon from '../../components/ui/Icon';
 import { api } from '../../lib/api';
+import { formatCurrency } from '../../lib/format';
 import './PlaceOrder.css';
 
 const emptyForm = { firstName: '', lastName: '', email: '', street: '', city: '', state: '', postalCode: '', country: 'Bangladesh', phone: '', notes: '' };
@@ -17,9 +18,32 @@ export default function PlaceOrder({ onLogin }) {
   const [paymentMethod, setPaymentMethod] = useState('COD');
   const [paymentOptions, setPaymentOptions] = useState(null);
   const [manualChannelId, setManualChannelId] = useState('');
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [quote, setQuote] = useState(null);
+  const [quoteError, setQuoteError] = useState('');
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const navigate = useNavigate();
+
   useEffect(() => { if (user?.email) setForm(previous => ({ ...previous, email: user.email })); }, [user]);
   useEffect(() => { api.getPaymentOptions().then(setPaymentOptions).catch(() => setPaymentOptions(null)); }, []);
+
+  const orderItems = useMemo(() => cartProducts.map(item => ({ productId: item._id, quantity: item.quantity })), [cartProducts]);
+  const orderItemKey = useMemo(() => orderItems.map(item => `${item.productId}:${item.quantity}`).join('|'), [orderItems]);
+
+  useEffect(() => {
+    if (!user || !orderItems.length) { setQuote(null); setQuoteError(''); return undefined; }
+    let active = true;
+    const timer = setTimeout(async () => {
+      setQuoteLoading(true); setQuoteError('');
+      try {
+        const data = await api.quoteOrder({ items: orderItems, ...(couponCode && { couponCode }), pointsToRedeem: Number(pointsToRedeem) || 0 });
+        if (active) setQuote(data.quote);
+      } catch (requestError) {
+        if (active) setQuoteError(requestError.message);
+      } finally { if (active) setQuoteLoading(false); }
+    }, 220);
+    return () => { active = false; clearTimeout(timer); };
+  }, [user, orderItemKey, couponCode, pointsToRedeem]);
 
   if (!cartProducts.length) return <EmptyState icon="🥡" title="Nothing to check out yet" text="Choose your favourites before starting checkout." />;
 
@@ -27,18 +51,32 @@ export default function PlaceOrder({ onLogin }) {
   const submit = async event => {
     event.preventDefault();
     if (!user) { setError('Please sign in to place your order.'); return; }
+    if (quoteError) { setError(quoteError); return; }
     setBusy(true); setError('');
     try {
-      const items = cartProducts.map(item => ({ productId: item._id, quantity: item.quantity }));
-      const result = await createOrder({ items, paymentMethod, ...(paymentMethod === 'MANUAL' && { manualChannelId }), ...(couponCode && { couponCode }), delivery: form });
+      const result = await createOrder({
+        items: orderItems,
+        paymentMethod,
+        pointsToRedeem: Number(pointsToRedeem) || 0,
+        ...(paymentMethod === 'MANUAL' && { manualChannelId }),
+        ...(couponCode && { couponCode }),
+        delivery: form,
+      });
       const { order } = result;
       setCartItems({});
       if (paymentMethod === 'MANUAL') navigate(`/payment/manual/${order.id}`);
       else if (paymentMethod === 'ONLINE' && result.paymentUrl) window.location.assign(result.paymentUrl);
-      else navigate(`/order-success/${order.orderNumber}`, { state: { order, paymentError: result.paymentError } });
+      else navigate(`/order-success/${order.orderNumber}`, { state: { order, paymentError: result.paymentError, loyalty: result.loyalty } });
     } catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
   };
+
+  const loyalty = quote?.loyalty;
+  const subtotal = quote ? quote.subtotalCents / 100 : getTotalCartAmount();
+  const promoDiscount = quote ? quote.discountCents / 100 : 0;
+  const pointsDiscount = quote ? quote.pointsDiscountCents / 100 : 0;
+  const delivery = quote ? quote.deliveryFeeCents / 100 : (subtotal > 0 ? 2 : 0);
+  const total = quote ? quote.totalCents / 100 : undefined;
 
   return <div className="checkout-page">
     <header className="page-title"><div className="section-kicker">Secure checkout</div><h1>Delivery details</h1><p>Tell us where to bring your order. Fields marked with * are required.</p></header>
@@ -72,9 +110,19 @@ export default function PlaceOrder({ onLogin }) {
         {paymentMethod === 'MANUAL' && <div className="field" style={{ marginTop: '16px' }}><label htmlFor="manual-channel">Payment account</label><select id="manual-channel" required value={manualChannelId} onChange={event => setManualChannelId(event.target.value)}>{paymentOptions.manualChannels.map(channel => <option key={channel.id} value={channel.id}>{channel.label} · {channel.provider}</option>)}</select><p className="muted">Place your order to see the exact amount and payment instructions.</p></div>}
       </section>
       <div className="checkout-sidebar">
-        <OrderSummary subtotal={getTotalCartAmount()} action={{ type: 'submit' }} actionLabel={busy ? 'Processing…' : paymentMethod === 'MANUAL' ? 'Place order & view payment details' : paymentMethod === 'ONLINE' ? 'Continue to secure payment' : 'Place order'} disabled={busy}>
+        <OrderSummary subtotal={subtotal} discount={promoDiscount} pointsDiscount={pointsDiscount} delivery={delivery} total={total} action={{ type: 'submit' }} actionLabel={busy ? 'Processing…' : paymentMethod === 'MANUAL' ? 'Place order & view payment details' : paymentMethod === 'ONLINE' ? 'Continue to secure payment' : 'Place order'} disabled={busy || quoteLoading || Boolean(quoteError)}>
+          {user && loyalty && <section className={`loyalty-checkout ${loyalty.enabled ? '' : 'is-disabled'}`}>
+            <div className="loyalty-checkout-head"><div><span><Icon name="gift" size={18} />Tomato Points</span><strong>{loyalty.pointsBalance} points</strong></div>{loyalty.enabled && loyalty.pointsPerOrder > 0 && <small>Earn {loyalty.pointsPerOrder} more after delivery</small>}</div>
+            {!loyalty.enabled ? <p>Points are currently paused by the restaurant. Your balance is kept safely.</p> : loyalty.pointsBalance < loyalty.minimumRedeemPoints ? <p>You need at least <strong>{loyalty.minimumRedeemPoints}</strong> points to unlock a discount.</p> : <>
+              <label htmlFor="points-to-redeem">Use points on this order</label>
+              <div className="points-redeem-row"><input id="points-to-redeem" type="number" min="0" max={loyalty.maxRedeemPoints || loyalty.pointsBalance} step="1" value={pointsToRedeem} onChange={event => setPointsToRedeem(Math.max(0, Number(event.target.value) || 0))} /><button type="button" onClick={() => setPointsToRedeem(loyalty.maxRedeemPoints || 0)} disabled={!loyalty.maxRedeemPoints}>Use max</button></div>
+              <small>Minimum {loyalty.minimumRedeemPoints} points · 1 point = {formatCurrency(loyalty.pointValueCents / 100, loyalty.currency)}</small>
+            </>}
+          </section>}
           <div className="payment-card"><Icon name={paymentMethod === 'COD' ? 'check' : 'lock'} /><div><strong>{paymentMethod === 'MANUAL' ? 'Manual payment verification' : paymentMethod === 'ONLINE' ? 'Server-verified payment' : 'Cash on delivery'}</strong><small>{paymentMethod === 'MANUAL' ? 'The restaurant verifies your submitted transaction' : paymentMethod === 'ONLINE' ? 'Payment status is updated only after verification' : 'Pay when your food arrives'}</small></div></div>
-          {couponCode && <p className="coupon-notice">Promo code <strong>{couponCode}</strong> will be verified now.</p>}
+          {couponCode && <p className="coupon-notice">Promo code <strong>{couponCode}</strong> {quote?.couponCode ? 'applied.' : 'will be verified now.'}</p>}
+          {quoteLoading && <p className="quote-note">Updating secure total…</p>}
+          {quoteError && <p className="form-error" role="alert">{quoteError}</p>}
           {!user && <div className="signin-notice"><p>Already have an account?</p><button type="button" className="button button-secondary button-full" onClick={onLogin}><Icon name="user" />Sign in to continue</button></div>}
           {error && <p className="form-error" role="alert">{error}</p>}
         </OrderSummary>

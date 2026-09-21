@@ -16,10 +16,13 @@ model User {
   avatarUrl String?
   role String @default("CUSTOMER")
   isActive Boolean @default(true)
+  pointsBalance Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   sessions Session[]
   orders Order[]
+  reviews Review[]
+  loyaltyTransactions LoyaltyTransaction[]
   auditLogs AuditLog[] @relation("ActorLogs")
 }
 
@@ -49,6 +52,7 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   orderItems OrderItem[]
+  reviews Review[]
   @@index([category, isAvailable])
 }
 
@@ -62,6 +66,30 @@ model Coupon {
   createdAt DateTime @default(now())
 }
 
+model LoyaltySetting {
+  id String @id @default("default")
+  enabled Boolean @default(true)
+  pointsPerOrder Int @default(5)
+  minimumRedeemPoints Int @default(50)
+  pointValueCents Int @default(100)
+  updatedAt DateTime @updatedAt
+}
+
+model LoyaltyTransaction {
+  id String @id @default(cuid())
+  type String
+  points Int
+  balanceAfter Int
+  note String?
+  createdAt DateTime @default(now())
+  userId String
+  orderId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@unique([orderId, type])
+  @@index([userId, createdAt])
+}
+
 model Order {
   id String @id @default(cuid())
   orderNumber String @unique
@@ -70,6 +98,11 @@ model Order {
   paymentStatus String @default("PENDING")
   subtotalCents Int
   discountCents Int @default(0)
+  pointsRedeemed Int @default(0)
+  pointsDiscountCents Int @default(0)
+  pointsEarned Int @default(0)
+  pointsAwardedAt DateTime?
+  pointsRestoredAt DateTime?
   deliveryFeeCents Int
   totalCents Int
   couponCode String?
@@ -88,6 +121,8 @@ model Order {
   userId String
   user User @relation(fields: [userId], references: [id])
   items OrderItem[]
+  reviews Review[]
+  loyaltyTransactions LoyaltyTransaction[]
   payment Payment?
   @@index([userId, createdAt])
   @@index([status, createdAt])
@@ -155,7 +190,27 @@ model OrderItem {
   productId String
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
+  review Review?
   @@index([orderId])
+}
+
+model Review {
+  id String @id @default(cuid())
+  rating Int
+  comment String?
+  status String @default("PUBLISHED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId String
+  productId String
+  orderId String
+  orderItemId String @unique
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  @@index([productId, status, createdAt])
+  @@index([userId, createdAt])
 }
 
 model AuditLog {

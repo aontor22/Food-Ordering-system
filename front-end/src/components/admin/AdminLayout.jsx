@@ -10,6 +10,8 @@ const navigation = [
   { to: '/admin/orders', label: 'Orders', icon: 'orders' },
   { to: '/admin/payments', label: 'Payments', icon: 'card' },
   { to: '/admin/customers', label: 'Customers', icon: 'users' },
+  { to: '/admin/reviews', label: 'Reviews', icon: 'star' },
+  { to: '/admin/loyalty', label: 'Tomato Points', icon: 'gift' },
   { to: '/admin/coupons', label: 'Coupons', icon: 'coupon' },
   { to: '/admin/activity', label: 'Activity log', icon: 'activity' },
 ];
@@ -19,7 +21,9 @@ const titles = {
   '/admin/products': ['Product management', 'Control menu availability, prices and stock.'],
   '/admin/orders': ['Order operations', 'Review orders and move them through fulfilment.'],
   '/admin/payments': ['Payment operations', 'Verify cash collection and monitor gateway transactions.'],
-  '/admin/customers': ['Customer accounts', 'Review activity and manage account access.'],
+  '/admin/customers': ['Customer accounts', 'Review activity, points balances and manage account access.'],
+  '/admin/reviews': ['Food reviews', 'Moderate verified customer feedback from delivered orders.'],
+  '/admin/loyalty': ['Tomato Points', 'Control rewards, redemption thresholds and point value.'],
   '/admin/coupons': ['Coupons & offers', 'Create and manage customer promotions.'],
   '/admin/activity': ['Activity log', 'Review sensitive administrative actions.'],
 };

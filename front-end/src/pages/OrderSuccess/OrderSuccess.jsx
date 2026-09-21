@@ -10,6 +10,7 @@ export default function OrderSuccess() {
   const { state } = useLocation();
   const order = state?.order;
   const paymentError = state?.paymentError;
+  const loyalty = state?.loyalty;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const isOnline = order?.paymentMethod === 'ONLINE';
@@ -30,6 +31,8 @@ export default function OrderSuccess() {
       <div><span>Payment</span><strong>{isOnline ? 'Online payment' : 'Cash on delivery'}</strong></div>
       <div><span>Order total</span><strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></div>
       <div><span>Payment status</span><strong>{humanizeStatus(order.paymentStatus)}</strong></div>
+      {order.pointsRedeemed > 0 && <div><span>Points used</span><strong>{order.pointsRedeemed} · saved {formatCurrency(order.pointsDiscountCents / 100, order.payment?.currency)}</strong></div>}
+      {loyalty && <div><span>Points balance</span><strong>{loyalty.pointsBalance}</strong></div>}
     </div>}
     <div className="success-actions">{isOnline && order?.paymentStatus !== 'PAID' && <button className="button button-primary" onClick={retry} disabled={busy}>{busy ? 'Opening payment…' : 'Retry payment'}</button>}<Link to="/orders" className="button button-primary">View my orders</Link><Link to="/" className="button button-secondary">Back to menu</Link></div>
   </section>;

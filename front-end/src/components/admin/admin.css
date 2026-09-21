@@ -47,3 +47,9 @@
 .manual-review-panel { border: 1px solid #b5d6c6; }
 .manual-review-panel form { max-width: 680px; }
 .status-rejected { color: #a13a31; background: #fcecea; }
+
+.loyalty-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.loyalty-settings-card { overflow: hidden; }.loyalty-settings-card .admin-card-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; border-bottom: 1px solid #e7ece9; }.loyalty-settings-card .admin-card-header h3 { font-size: 1.05rem; }.loyalty-settings-card .admin-card-header p { margin-top: 4px; color: #77817b; font-size: .78rem; }.loyalty-form { max-width: 760px; }.loyalty-form .field small { margin-top: 6px; color: #7b857f; line-height: 1.45; }.loyalty-example { display: flex; gap: 12px; padding: 14px; border: 1px solid #f0d9c8; border-radius: 12px; color: #7d5137; background: #fff8f3; }.loyalty-example svg { flex: 0 0 auto; color: var(--brand); }.loyalty-example strong { color: #4c3527; }.loyalty-example p { margin-top: 3px; font-size: .78rem; line-height: 1.55; }.form-success { margin-bottom: 16px; padding: 11px 13px; border-radius: 10px; color: #176b43; background: #e7f6ed; font-size: .82rem; font-weight: 700; }
+.review-admin-table { min-width: 980px; }.review-copy-cell { min-width: 300px; max-width: 440px; white-space: normal !important; }.review-copy-cell p { margin: 6px 0; color: #59655f; line-height: 1.5; }.admin-stars { color: #f0a21b; letter-spacing: 1px; }.admin-stars span { color: #d9ddda; }.status-hidden { color: #77583c; background: #f7eee6; }
+@media (max-width: 1120px) { .loyalty-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .loyalty-metrics { grid-template-columns: 1fr; }.loyalty-settings-card .admin-card-header { align-items: flex-start; flex-direction: column; } }

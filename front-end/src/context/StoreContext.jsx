@@ -77,6 +77,12 @@ export default function StoreContextProvider({ children }) {
     return data;
   };
 
+  const createOrder = async body => {
+    const data = await api.createOrder(body);
+    if (data.loyalty && user) setUser(previous => previous ? { ...previous, pointsBalance: data.loyalty.pointsBalance } : previous);
+    return data;
+  };
+
   const logout = async () => {
     await api.logout();
     setAccessToken(null);
@@ -88,6 +94,6 @@ export default function StoreContextProvider({ children }) {
     addToCart, removeFromCart, removeItem, getTotalCartAmount,
     user, setUser, loading, authenticate, authenticateWithGoogle, logout,
     searchQuery, setSearchQuery, couponCode, setCouponCode,
-    createOrder: api.createOrder, getOrders: api.getOrders, refreshProducts,
+    createOrder, getOrders: api.getOrders, refreshProducts,
   }}>{children}</StoreContext.Provider>;
 }

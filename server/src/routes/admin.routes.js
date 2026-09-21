@@ -9,6 +9,7 @@ import { audit } from '../services/audit.js';
 import { serializePayment, reconcileSslCommerzPayment } from '../services/payment.js';
 import { validateChannel, reviewManualPayment, refundManualPayment } from '../services/manual-payment.js';
 import { config } from '../config.js';
+import { awardDeliveredOrderPoints, getLoyaltySettings, restoreCancelledOrderPoints } from '../services/loyalty.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -96,44 +97,57 @@ const statusUpdate = z.object({
 router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next) => {
   try {
     let previousStatus;
+    let pointsAwarded = 0;
+    let pointsRestored = 0;
     const order = await prisma.$transaction(async transaction => {
-    const existing = await transaction.order.findUnique({ where: { id: req.validated.params.id }, include: { items: true, payment: true } });
-    if (!existing) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
-    const nextStatus = req.validated.body.status;
-    previousStatus = existing.status;
-    if (!orderTransitions[existing.status]?.includes(nextStatus)) {
-      throw new AppError(409, 'INVALID_STATUS_TRANSITION', `Order cannot move from ${existing.status} to ${nextStatus}`);
-    }
-    if (nextStatus === 'CANCELLED' && existing.paymentMethod !== 'COD' && existing.paymentStatus === 'PAID') {
-      throw new AppError(409, 'REFUND_REQUIRED', 'Record the refund before cancelling this prepaid order');
-    }
-    if (existing.paymentMethod !== 'COD' && existing.paymentStatus !== 'PAID' && nextStatus !== 'CANCELLED') {
-      throw new AppError(409, 'PAYMENT_REQUIRED', 'Payment must be verified before fulfilment can begin');
-    }
-    if (nextStatus === 'CANCELLED' && existing.paymentMethod === 'MANUAL' && existing.paymentStatus === 'REVIEW') throw new AppError(409, 'PAYMENT_UNDER_REVIEW', 'Review the submitted payment before cancelling');
-    const settleCod = nextStatus === 'DELIVERED' && existing.paymentMethod === 'COD' && existing.paymentStatus !== 'REFUNDED';
-    if (nextStatus === 'CANCELLED' && existing.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW'].includes(existing.payment.status)) throw new AppError(409, 'PAYMENT_PROCESSING', 'Wait for gateway verification before cancelling');
+      const existing = await transaction.order.findUnique({ where: { id: req.validated.params.id }, include: { items: true, payment: true } });
+      if (!existing) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+      const nextStatus = req.validated.body.status;
+      previousStatus = existing.status;
+      if (!orderTransitions[existing.status]?.includes(nextStatus)) {
+        throw new AppError(409, 'INVALID_STATUS_TRANSITION', `Order cannot move from ${existing.status} to ${nextStatus}`);
+      }
+      if (nextStatus === 'CANCELLED' && existing.paymentMethod !== 'COD' && existing.paymentStatus === 'PAID') {
+        throw new AppError(409, 'REFUND_REQUIRED', 'Record the refund before cancelling this prepaid order');
+      }
+      if (existing.paymentMethod !== 'COD' && existing.paymentStatus !== 'PAID' && nextStatus !== 'CANCELLED') {
+        throw new AppError(409, 'PAYMENT_REQUIRED', 'Payment must be verified before fulfilment can begin');
+      }
+      if (nextStatus === 'CANCELLED' && existing.paymentMethod === 'MANUAL' && existing.paymentStatus === 'REVIEW') throw new AppError(409, 'PAYMENT_UNDER_REVIEW', 'Review the submitted payment before cancelling');
+      if (nextStatus === 'CANCELLED' && existing.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW'].includes(existing.payment.status)) throw new AppError(409, 'PAYMENT_PROCESSING', 'Wait for gateway verification before cancelling');
+      const settleCod = nextStatus === 'DELIVERED' && existing.paymentMethod === 'COD' && existing.paymentStatus !== 'REFUNDED';
+
       if (nextStatus === 'CANCELLED') {
-        for (const item of existing.items) {
-          await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
-        }
+        for (const item of existing.items) await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
         if (existing.payment) await transaction.payment.updateMany({ where: { id: existing.payment.id, status: { notIn: ['PAID', 'REFUNDED'] } }, data: { status: 'CANCELLED', failureReason: 'Order cancelled by administrator' } });
       }
       if (settleCod && existing.payment) {
         await transaction.payment.updateMany({ where: { id: existing.payment.id, status: { notIn: ['PAID', 'REFUNDED'] } }, data: { status: 'PAID', paidAt: new Date(), failureReason: null } });
       }
-      return transaction.order.update({
+
+      let updated = await transaction.order.update({
         where: { id: existing.id },
         data: {
           status: nextStatus,
           ...(settleCod ? { paymentStatus: 'PAID' } : {}),
           ...(nextStatus === 'CANCELLED' && !['PAID', 'REFUNDED'].includes(existing.paymentStatus) ? { paymentStatus: 'CANCELLED' } : {}),
         },
-        include: { items: true, payment: true, user: { select: { id: true, name: true, email: true } } },
+      });
+      if (nextStatus === 'DELIVERED') {
+        const result = await awardDeliveredOrderPoints(transaction, { ...existing, ...updated });
+        pointsAwarded = result.awarded;
+      }
+      if (nextStatus === 'CANCELLED') {
+        const result = await restoreCancelledOrderPoints(transaction, { ...existing, ...updated });
+        pointsRestored = result.restored;
+      }
+      return transaction.order.findUnique({
+        where: { id: existing.id },
+        include: { items: true, payment: true, user: { select: { id: true, name: true, email: true, pointsBalance: true } } },
       });
     });
-    await audit(req, 'ORDER_STATUS_UPDATED', 'Order', order.id, { from: previousStatus, to: order.status });
-    res.json({ order: { ...order, payment: serializePayment(order.payment) } });
+    await audit(req, 'ORDER_STATUS_UPDATED', 'Order', order.id, { from: previousStatus, to: order.status, pointsAwarded, pointsRestored });
+    res.json({ order: { ...order, payment: serializePayment(order.payment) }, pointsAwarded, pointsRestored });
   } catch (error) { next(error); }
 });
 
@@ -221,7 +235,7 @@ router.post('/payments/:id/cash-refunded', async (req, res, next) => {
 router.get('/users', async (_req, res) => {
   const users = await prisma.user.findMany({
     select: {
-      id: true, name: true, email: true, role: true, isActive: true, createdAt: true,
+      id: true, name: true, email: true, role: true, isActive: true, pointsBalance: true, createdAt: true,
       _count: { select: { orders: true } },
       orders: { where: { status: 'DELIVERED' }, select: { totalCents: true } },
     },
@@ -260,6 +274,85 @@ router.patch('/users/:id', validate(userUpdate), async (req, res, next) => {
     if (!user.isActive) await prisma.session.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
     await audit(req, user.isActive ? 'USER_ENABLED' : 'USER_DISABLED', 'User', user.id);
     res.json({ user });
+  } catch (error) { next(error); }
+});
+
+
+const loyaltyUpdate = z.object({
+  body: z.object({
+    enabled: z.boolean(),
+    pointsPerOrder: z.number().int().min(0).max(100_000),
+    minimumRedeemPoints: z.number().int().min(1).max(1_000_000),
+    pointValueCents: z.number().int().min(1).max(10_000_000),
+  }),
+  params: empty,
+  query: empty,
+});
+
+router.get('/loyalty', async (_req, res) => {
+  const [settings, balanceAggregate, customerCount, transactionGroups] = await Promise.all([
+    getLoyaltySettings(),
+    prisma.user.aggregate({ where: { role: 'CUSTOMER' }, _sum: { pointsBalance: true } }),
+    prisma.user.count({ where: { role: 'CUSTOMER', pointsBalance: { gt: 0 } } }),
+    prisma.loyaltyTransaction.groupBy({ by: ['type'], _sum: { points: true }, _count: { type: true } }),
+  ]);
+  const byType = Object.fromEntries(transactionGroups.map(group => [group.type, group]));
+  res.json({
+    settings: { ...settings, currency: config.PAYMENT_CURRENCY },
+    stats: {
+      outstandingPoints: balanceAggregate._sum.pointsBalance || 0,
+      customersWithPoints: customerCount,
+      pointsEarned: byType.EARN?._sum.points || 0,
+      pointsRedeemed: Math.abs(byType.REDEEM?._sum.points || 0),
+      pointsRestored: byType.RESTORE?._sum.points || 0,
+    },
+  });
+});
+
+router.patch('/loyalty', validate(loyaltyUpdate), async (req, res, next) => {
+  try {
+    const settings = await prisma.loyaltySetting.upsert({
+      where: { id: 'default' },
+      update: req.validated.body,
+      create: { id: 'default', ...req.validated.body },
+    });
+    await audit(req, 'LOYALTY_SETTINGS_UPDATED', 'LoyaltySetting', settings.id, req.validated.body);
+    res.json({ settings: { ...settings, currency: config.PAYMENT_CURRENCY } });
+  } catch (error) { next(error); }
+});
+
+router.get('/reviews', async (_req, res) => {
+  const reviews = await prisma.review.findMany({
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      product: { select: { id: true, name: true, imageUrl: true } },
+      order: { select: { id: true, orderNumber: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 500,
+  });
+  res.json({ reviews });
+});
+
+router.patch('/reviews/:id', validate(z.object({
+  body: z.object({ status: z.enum(['PUBLISHED', 'HIDDEN']) }),
+  params: z.object({ id: z.string().min(1) }),
+  query: empty,
+})), async (req, res, next) => {
+  try {
+    const review = await prisma.review.update({ where: { id: req.validated.params.id }, data: { status: req.validated.body.status } });
+    await audit(req, 'REVIEW_MODERATED', 'Review', review.id, { status: review.status });
+    res.json({ review });
+  } catch (error) { next(error); }
+});
+
+router.delete('/reviews/:id', async (req, res, next) => {
+  try {
+    const review = await prisma.review.findUnique({ where: { id: req.params.id } });
+    if (!review) throw new AppError(404, 'REVIEW_NOT_FOUND', 'Review not found');
+    await prisma.review.delete({ where: { id: review.id } });
+    await audit(req, 'REVIEW_REMOVED_BY_ADMIN', 'Review', review.id, { productId: review.productId, userId: review.userId });
+    res.status(204).end();
   } catch (error) { next(error); }
 });
 

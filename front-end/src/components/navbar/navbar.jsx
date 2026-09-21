@@ -57,6 +57,7 @@ export default function Navbar({ onLogin }) {
           {accountOpen && <div className="account-dropdown surface-card">
             {user.role === 'ADMIN' && <Link to="/admin"><Icon name="dashboard" />Admin dashboard</Link>}
             <Link to="/orders"><Icon name="orders" />My orders</Link>
+            {user.role !== 'ADMIN' && <Link to="/orders"><Icon name="gift" />{user.pointsBalance || 0} Tomato Points</Link>}
             <button onClick={logout}><Icon name="logout" />Sign out</button>
           </div>}
         </div> : <button className="button button-primary sign-in" onClick={onLogin}>Sign in</button>}

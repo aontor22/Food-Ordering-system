@@ -32,6 +32,8 @@ const paths = {
   card: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/></>,
   cash: <><rect x="3" y="6" width="18" height="13" rx="2"/><circle cx="12" cy="12.5" r="3"/><path d="M7 9H6v1M17 16h1v-1"/></>,
   lock: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
+  star: <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z"/>,
+  gift: <><path d="M4 10h16v11H4zM3 6h18v4H3zM12 6v15"/><path d="M12 6H8.5A2.5 2.5 0 1 1 11 3.5c.7 1.2 1 2.5 1 2.5ZM12 6h3.5A2.5 2.5 0 1 0 13 3.5c-.7 1.2-1 2.5-1 2.5Z"/></>,
 };
 
 export default function Icon({ name, size = 20, className = '', strokeWidth = 1.8 }) {
