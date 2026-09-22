@@ -17,11 +17,14 @@ export default function StoreContextProvider({ children }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [couponCode, setCouponCode] = useState('');
 
-  const normalizeProducts = products => products.map(product => ({
-    ...product,
-    _id: product.id,
-    image: fallbackFoods.find(food => food._id === product.id)?.image || product.imageUrl,
-  }));
+  const normalizeProducts = products => products.map(product => {
+    const imageUrl = product.imageUrl || '';
+    const fallbackImage = /^\/food_\d+\.(png|jpe?g|webp|avif)$/i.test(imageUrl)
+      ? fallbackFoods.find(food => food._id === product.id)?.image
+      : null;
+    const image = /^https?:\/\//i.test(imageUrl) ? imageUrl : fallbackImage || imageUrl || null;
+    return { ...product, _id: product.id, image };
+  });
 
   const refreshProducts = async () => {
     const data = await api.getProducts();

@@ -112,6 +112,14 @@ test('enforces admin authorization and supports management operations', async ()
   assert.ok(r.body.metrics);
   assert.ok(Array.isArray(r.body.revenueByDay));
 
+  r = await request(app).get('/api/admin/media').set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.configured, false);
+  assert.equal(typeof r.body.legacyImageCount, 'number');
+  r = await request(app).post('/api/admin/media/signature').set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(r.status, 503);
+  assert.equal(r.body.error.code, 'CLOUDINARY_NOT_CONFIGURED');
+
   r = await request(app).post('/api/admin/products').set('Authorization', `Bearer ${adminToken}`).send({ id: testProductId, name: 'Test Meal', description: 'Created by the API integration test', category: 'Test', imageUrl: null, priceCents: 1299, stock: 5, isAvailable: true });
   assert.equal(r.status, 201);
   assert.equal(r.body.product.id, testProductId);

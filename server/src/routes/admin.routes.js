@@ -10,6 +10,8 @@ import { serializePayment, reconcileSslCommerzPayment } from '../services/paymen
 import { validateChannel, reviewManualPayment, refundManualPayment } from '../services/manual-payment.js';
 import { config } from '../config.js';
 import { awardDeliveredOrderPoints, getLoyaltySettings, restoreCancelledOrderPoints } from '../services/loyalty.js';
+import { cloudinaryConfigured, cloudinaryFolder, createCloudinaryUploadSignature, destroyCloudinaryImage, optimizeCloudinaryUrl, ownsCloudinaryPublicId } from '../lib/cloudinary.js';
+import { migrateLegacyProductImages } from '../services/product-media.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -19,11 +21,13 @@ const imageUrl = z.string().trim().max(500).nullable().optional().refine(
   value => !value || value.startsWith('/') || /^https?:\/\//i.test(value),
   'Image URL must be an HTTP(S) URL or a root-relative path',
 );
+const imagePublicId = z.string().trim().min(1).max(255).nullable().optional();
 const productFields = {
   name: z.string().trim().min(2).max(100),
   description: z.string().trim().min(5).max(500),
   category: z.string().trim().min(2).max(50),
   imageUrl,
+  imagePublicId,
   priceCents: z.number().int().positive().max(10_000_000),
   stock: z.number().int().nonnegative().max(1_000_000),
   isAvailable: z.boolean(),
@@ -44,21 +48,42 @@ router.get('/products', async (_req, res) => {
   res.json({ products });
 });
 
+function normalizeProductMedia(values) {
+  const next = { ...values };
+  if ('imagePublicId' in next && next.imagePublicId) {
+    if (!cloudinaryConfigured()) throw new AppError(503, 'CLOUDINARY_NOT_CONFIGURED', 'Cloudinary is not configured on the server');
+    if (!ownsCloudinaryPublicId(next.imagePublicId)) throw new AppError(400, 'INVALID_CLOUDINARY_ASSET', 'Product image is outside the configured Cloudinary folder');
+    if (!next.imageUrl || !/^https:\/\/res\.cloudinary\.com\//i.test(next.imageUrl)) throw new AppError(400, 'INVALID_CLOUDINARY_URL', 'Cloudinary product images require a Cloudinary HTTPS URL');
+    next.imageUrl = optimizeCloudinaryUrl(next.imageUrl);
+  }
+  if ('imageUrl' in next && !next.imageUrl) next.imageUrl = null;
+  if ('imagePublicId' in next && !next.imagePublicId) next.imagePublicId = null;
+  return next;
+}
+
 router.post('/products', validate(productCreate), async (req, res, next) => {
   try {
-    const { id, ...values } = req.validated.body;
+    const { id, ...rawValues } = req.validated.body;
+    const values = normalizeProductMedia(rawValues);
     const product = await prisma.product.create({
       data: { id: id || `prd_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`, ...values },
     });
-    await audit(req, 'PRODUCT_CREATED', 'Product', product.id);
+    await audit(req, 'PRODUCT_CREATED', 'Product', product.id, { imageStorage: product.imagePublicId ? 'cloudinary' : 'external_or_local' });
     res.status(201).json({ product });
   } catch (error) { next(error); }
 });
 
 router.patch('/products/:id', validate(productUpdate), async (req, res, next) => {
   try {
-    const product = await prisma.product.update({ where: { id: req.validated.params.id }, data: req.validated.body });
-    await audit(req, 'PRODUCT_UPDATED', 'Product', product.id, req.validated.body);
+    const existing = await prisma.product.findUnique({ where: { id: req.validated.params.id } });
+    if (!existing) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+    const values = normalizeProductMedia(req.validated.body);
+    const product = await prisma.product.update({ where: { id: existing.id }, data: values });
+    if (existing.imagePublicId && existing.imagePublicId !== product.imagePublicId) {
+      try { await destroyCloudinaryImage(existing.imagePublicId); }
+      catch (cleanupError) { req.log?.warn({ err: cleanupError, publicId: existing.imagePublicId }, 'old product image cleanup failed'); }
+    }
+    await audit(req, 'PRODUCT_UPDATED', 'Product', product.id, { ...req.validated.body, imageStorage: product.imagePublicId ? 'cloudinary' : 'external_or_local' });
     res.json({ product });
   } catch (error) { next(error); }
 });
@@ -68,6 +93,36 @@ router.delete('/products/:id', async (req, res, next) => {
     const product = await prisma.product.update({ where: { id: req.params.id }, data: { isAvailable: false } });
     await audit(req, 'PRODUCT_ARCHIVED', 'Product', product.id);
     res.status(204).end();
+  } catch (error) { next(error); }
+});
+
+router.get('/media', async (_req, res) => {
+  const legacyImageCount = await prisma.product.count({ where: { imagePublicId: null, imageUrl: { startsWith: '/' } } });
+  res.json({ configured: cloudinaryConfigured(), folder: cloudinaryFolder(), legacyImageCount, maxUploadBytes: 8 * 1024 * 1024 });
+});
+
+router.post('/media/signature', async (_req, res, next) => {
+  try { res.json(createCloudinaryUploadSignature()); }
+  catch (error) { next(error); }
+});
+
+router.post('/media/cleanup', validate(z.object({
+  body: z.object({ publicId: z.string().trim().min(1).max(255) }), params: empty, query: empty,
+})), async (req, res, next) => {
+  try {
+    const linked = await prisma.product.count({ where: { imagePublicId: req.validated.body.publicId } });
+    if (linked) throw new AppError(409, 'IMAGE_IN_USE', 'This Cloudinary image is already linked to a product');
+    const result = await destroyCloudinaryImage(req.validated.body.publicId);
+    res.json({ result: result.result || 'ok' });
+  } catch (error) { next(error); }
+});
+
+router.post('/media/migrate-legacy', async (req, res, next) => {
+  try {
+    if (!cloudinaryConfigured()) throw new AppError(503, 'CLOUDINARY_NOT_CONFIGURED', 'Cloudinary is not configured on the server');
+    const result = await migrateLegacyProductImages(prisma, { logger: req.log || console });
+    await audit(req, 'PRODUCT_IMAGES_MIGRATED', 'Product', 'cloudinary', result);
+    res.json(result);
   } catch (error) { next(error); }
 });
 

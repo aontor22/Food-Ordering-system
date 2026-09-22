@@ -56,6 +56,17 @@ transaction(() => {
   }
 });
 
+// Product images can be stored in Cloudinary. Only the public URL and public ID
+// live in SQLite; the image bytes stay on Cloudinary's CDN.
+transaction(() => {
+  if (!columnExists('Product', 'imagePublicId')) {
+    db.exec('ALTER TABLE "Product" ADD COLUMN "imagePublicId" TEXT;');
+  }
+  if (!indexExists('Product_imagePublicId_idx')) {
+    db.exec('CREATE INDEX "Product_imagePublicId_idx" ON "Product"("imagePublicId");');
+  }
+});
+
 // Upgrade projects created before the payment ledger existed.
 if (!tableExists('Payment')) {
   transaction(() => db.exec(readFileSync(path.join(here, 'migrations/20260919010000_payments/migration.sql'), 'utf8')));

@@ -46,6 +46,7 @@ model Product {
   description String
   category String
   imageUrl String?
+  imagePublicId String?
   priceCents Int
   stock Int @default(100)
   isAvailable Boolean @default(true)
@@ -54,6 +55,7 @@ model Product {
   orderItems OrderItem[]
   reviews Review[]
   @@index([category, isAvailable])
+  @@index([imagePublicId])
 }
 
 model Coupon {

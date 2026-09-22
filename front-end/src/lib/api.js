@@ -13,6 +13,24 @@ async function request(path, options = {}, retry = true) {
   if (!response.ok) throw new Error(data.error?.message || 'Request failed');
   return data;
 }
+
+async function uploadProductImage(file) {
+  if (!(file instanceof File)) throw new Error('Choose an image file first');
+  if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type)) throw new Error('Use a JPG, PNG, WebP or AVIF image');
+  const signature = await request('/admin/media/signature', { method: 'POST' });
+  if (file.size > signature.maxBytes) throw new Error(`Image must be smaller than ${Math.round(signature.maxBytes / 1024 / 1024)} MB`);
+  const form = new FormData();
+  form.append('file', file);
+  form.append('api_key', signature.apiKey);
+  form.append('timestamp', String(signature.timestamp));
+  form.append('folder', signature.folder);
+  form.append('signature', signature.signature);
+  const response = await fetch(signature.uploadUrl, { method: 'POST', body: form });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error?.message || 'Image upload failed');
+  return { imageUrl: data.secure_url, imagePublicId: data.public_id, width: data.width, height: data.height, bytes: data.bytes, format: data.format };
+}
+
 export const api = {
   getProducts: () => request('/products'),
   register: body => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
@@ -34,6 +52,10 @@ export const api = {
   completeDemoPayment: (transactionId, body) => request(`/payments/demo/${transactionId}/complete`, { method: 'POST', body: JSON.stringify(body) }),
   getAdminDashboard: () => request('/admin/dashboard'),
   getAdminProducts: () => request('/admin/products'),
+  getAdminMedia: () => request('/admin/media'),
+  uploadProductImage,
+  cleanupProductImage: publicId => request('/admin/media/cleanup', { method: 'POST', body: JSON.stringify({ publicId }) }),
+  migrateLegacyProductImages: () => request('/admin/media/migrate-legacy', { method: 'POST' }),
   createAdminProduct: body => request('/admin/products', { method: 'POST', body: JSON.stringify(body) }),
   updateAdminProduct: (id, body) => request(`/admin/products/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   archiveAdminProduct: id => request(`/admin/products/${id}`, { method: 'DELETE' }),
