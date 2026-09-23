@@ -41,6 +41,7 @@ export default function Navbar({ onLogin }) {
         <button type="button" onClick={goToMenu}>Menu</button>
         {user && <NavLink to="/orders">My orders</NavLink>}
         <a href="#footer">Contact</a>
+        {!user && <button type="button" className="mobile-nav-signin" onClick={onLogin}>Sign in</button>}
       </div>
       <div className="navbar-actions">
         <button className="icon-button nav-search-button" aria-label="Search menu" onClick={() => setSearchOpen(value => !value)}><Icon name="search" /></button>

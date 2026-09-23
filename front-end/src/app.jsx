@@ -24,6 +24,7 @@ import AdminLoyalty from './pages/Admin/AdminLoyalty';
 import PaymentDemo from './pages/Payment/PaymentDemo';
 import PaymentResult from './pages/Payment/PaymentResult';
 import ManualPayment from './pages/Payment/ManualPayment';
+import './responsive.css';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
