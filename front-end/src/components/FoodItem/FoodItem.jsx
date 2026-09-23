@@ -6,12 +6,15 @@ import Icon from '../ui/Icon';
 import './FoodItem.css';
 
 export default function FoodItem({ item }) {
-  const { cartItems, addToCart, removeFromCart } = useContext(StoreContext);
+  const { cartItems, addToCart, removeFromCart, isWishlisted, toggleWishlist, wishlistBusy } = useContext(StoreContext);
   const quantity = cartItems[item._id] || 0;
+  const saved = isWishlisted(item._id);
+  const savingWishlist = wishlistBusy.includes(item._id);
   const [showReviews, setShowReviews] = useState(false);
   const [reviews, setReviews] = useState(null);
   const [reviewError, setReviewError] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [wishlistError, setWishlistError] = useState('');
 
   const openReviews = async () => {
     setShowReviews(true);
@@ -22,6 +25,12 @@ export default function FoodItem({ item }) {
     finally { setReviewLoading(false); }
   };
 
+  const toggleSaved = async () => {
+    setWishlistError('');
+    try { await toggleWishlist(item); }
+    catch (error) { setWishlistError(error.message); }
+  };
+
   const ratingLabel = item.reviewCount ? `${Number(item.reviewRating).toFixed(1)} (${item.reviewCount})` : 'No reviews';
 
   return <>
@@ -29,11 +38,13 @@ export default function FoodItem({ item }) {
       <div className="food-card-media">
         <img src={item.image} alt={item.name} loading="lazy" />
         <span className="food-category">{item.category}</span>
+        <button className={`food-wishlist ${saved ? 'is-saved' : ''}`} type="button" onClick={toggleSaved} disabled={savingWishlist} aria-pressed={saved} aria-label={`${saved ? 'Remove' : 'Save'} ${item.name} ${saved ? 'from' : 'to'} wishlist`} title={saved ? 'Remove from wishlist' : 'Save to wishlist'}><Icon name={saved ? 'heartFilled' : 'heart'} size={19} /></button>
         <button className="food-rating" type="button" onClick={openReviews} aria-label={`${item.name}: ${ratingLabel}. View reviews`}><span>★</span>{item.reviewCount ? `${Number(item.reviewRating).toFixed(1)} · ${item.reviewCount}` : 'New'}</button>
       </div>
       <div className="food-card-body">
         <div className="food-card-heading"><h3>{item.name}</h3><strong>{formatCurrency(item.price)}</strong></div>
         <p>{item.description}</p>
+        {wishlistError && <p className="wishlist-error" role="alert">{wishlistError}</p>}
         <div className="food-card-footer">
           <div className="food-card-meta"><span className="delivery-time"><Icon name="clock" size={16} />20–30 min</span><button className="food-review-link" type="button" onClick={openReviews}>{item.reviewCount ? `${item.reviewCount} review${item.reviewCount === 1 ? '' : 's'}` : 'No reviews yet'}</button></div>
           {quantity === 0 ? <button className="add-button" onClick={() => addToCart(item._id)} aria-label={`Add ${item.name} to cart`}><Icon name="plus" size={18} />Add</button>

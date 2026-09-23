@@ -44,8 +44,11 @@ const productUpdate = z.object({
 });
 
 router.get('/products', async (_req, res) => {
-  const products = await prisma.product.findMany({ orderBy: [{ isAvailable: 'desc' }, { updatedAt: 'desc' }] });
-  res.json({ products });
+  const products = await prisma.product.findMany({
+    include: { _count: { select: { wishlistItems: true } } },
+    orderBy: [{ isAvailable: 'desc' }, { updatedAt: 'desc' }],
+  });
+  res.json({ products: products.map(({ _count, ...product }) => ({ ...product, wishlistCount: _count.wishlistItems })) });
 });
 
 function normalizeProductMedia(values) {
@@ -291,7 +294,7 @@ router.get('/users', async (_req, res) => {
   const users = await prisma.user.findMany({
     select: {
       id: true, name: true, email: true, role: true, isActive: true, pointsBalance: true, createdAt: true,
-      _count: { select: { orders: true } },
+      _count: { select: { orders: true, wishlistItems: true } },
       orders: { where: { status: 'DELIVERED' }, select: { totalCents: true } },
     },
     orderBy: { createdAt: 'desc' },
@@ -300,6 +303,7 @@ router.get('/users', async (_req, res) => {
     users: users.map(({ orders, _count, ...user }) => ({
       ...user,
       orderCount: _count.orders,
+      wishlistCount: _count.wishlistItems,
       lifetimeValueCents: orders.reduce((total, order) => total + order.totalCents, 0),
     })),
   });
@@ -466,10 +470,11 @@ router.get('/dashboard', async (_req, res) => {
   const sevenDaysAgo = new Date(startOfToday);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
-  const [customers, orders, products, revenue, todayOrders, pendingOrders, lowStock, recentOrders, statusGroups, deliveredThisWeek, topItems] = await Promise.all([
+  const [customers, orders, products, wishlistSaves, revenue, todayOrders, pendingOrders, lowStock, recentOrders, statusGroups, deliveredThisWeek, topItems] = await Promise.all([
     prisma.user.count({ where: { role: 'CUSTOMER' } }),
     prisma.order.count(),
     prisma.product.count({ where: { isAvailable: true } }),
+    prisma.wishlistItem.count(),
     prisma.order.aggregate({ where: { status: 'DELIVERED' }, _sum: { totalCents: true } }),
     prisma.order.count({ where: { createdAt: { gte: startOfToday } } }),
     prisma.order.count({ where: { status: { in: ['PENDING', 'CONFIRMED', 'PREPARING'] } } }),
@@ -491,7 +496,7 @@ router.get('/dashboard', async (_req, res) => {
   });
 
   res.json({
-    metrics: { customers, orders, products, revenueCents: revenue._sum.totalCents || 0, todayOrders, pendingOrders, lowStock },
+    metrics: { customers, orders, products, wishlistSaves, revenueCents: revenue._sum.totalCents || 0, todayOrders, pendingOrders, lowStock },
     recentOrders,
     ordersByStatus: statusGroups.map(group => ({ status: group.status, count: group._count.status })),
     revenueByDay,

@@ -7,6 +7,7 @@ import Home from './pages/Home/Home';
 import Cart from './pages/Cart/Cart';
 import PlaceOrder from './pages/PlaceOrder/PlaceOrder';
 import Orders from './pages/Orders/Orders';
+import Wishlist from './pages/Wishlist/Wishlist';
 import OrderSuccess from './pages/OrderSuccess/OrderSuccess';
 import EmptyState from './components/ui/EmptyState';
 import AdminGuard from './components/admin/AdminGuard';
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="/cart" element={<Cart />} />
         <Route path="/order" element={<PlaceOrder onLogin={() => setShowLogin(true)} />} />
         <Route path="/orders" element={<Orders onLogin={() => setShowLogin(true)} />} />
+        <Route path="/wishlist" element={<Wishlist />} />
         <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
         <Route path="/payment/demo/:transactionId" element={<PaymentDemo onLogin={() => setShowLogin(true)} />} />
         <Route path="/payment/result" element={<PaymentResult />} />

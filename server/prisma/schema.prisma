@@ -23,6 +23,7 @@ model User {
   orders Order[]
   reviews Review[]
   loyaltyTransactions LoyaltyTransaction[]
+  wishlistItems WishlistItem[]
   auditLogs AuditLog[] @relation("ActorLogs")
 }
 
@@ -54,8 +55,22 @@ model Product {
   updatedAt DateTime @updatedAt
   orderItems OrderItem[]
   reviews Review[]
+  wishlistItems WishlistItem[]
   @@index([category, isAvailable])
   @@index([imagePublicId])
+}
+
+
+model WishlistItem {
+  id String @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId String
+  productId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@unique([userId, productId])
+  @@index([userId, createdAt])
+  @@index([productId, createdAt])
 }
 
 model Coupon {

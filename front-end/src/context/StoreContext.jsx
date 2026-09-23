@@ -3,10 +3,37 @@ import { food_list as fallbackFoods } from '../assets/assets';
 import { api, setAccessToken } from '../lib/api';
 
 export const StoreContext = createContext(null);
+const GUEST_WISHLIST_KEY = 'tomato_guest_wishlist';
 
 function loadCart() {
   try { return JSON.parse(localStorage.getItem('cart') || '{}'); }
   catch { return {}; }
+}
+
+function loadGuestWishlist() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(GUEST_WISHLIST_KEY) || '[]');
+    return Array.isArray(parsed) ? [...new Set(parsed.filter(value => typeof value === 'string'))].slice(0, 100) : [];
+  } catch { return []; }
+}
+
+function saveGuestWishlist(ids) {
+  localStorage.setItem(GUEST_WISHLIST_KEY, JSON.stringify(ids));
+}
+
+function normalizeProducts(products) {
+  return products.map(product => {
+    const imageUrl = product.imageUrl || '';
+    const fallbackImage = /^\/food_\d+\.(png|jpe?g|webp|avif)$/i.test(imageUrl)
+      ? fallbackFoods.find(food => food._id === product.id)?.image
+      : null;
+    const image = /^https?:\/\//i.test(imageUrl) ? imageUrl : fallbackImage || imageUrl || null;
+    return { ...product, _id: product.id, image, price: product.price ?? product.priceCents / 100 };
+  });
+}
+
+function productsFromWishlistResponse(data) {
+  return normalizeProducts((data?.items || []).map(item => item.product));
 }
 
 export default function StoreContextProvider({ children }) {
@@ -16,15 +43,9 @@ export default function StoreContextProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [couponCode, setCouponCode] = useState('');
-
-  const normalizeProducts = products => products.map(product => {
-    const imageUrl = product.imageUrl || '';
-    const fallbackImage = /^\/food_\d+\.(png|jpe?g|webp|avif)$/i.test(imageUrl)
-      ? fallbackFoods.find(food => food._id === product.id)?.image
-      : null;
-    const image = /^https?:\/\//i.test(imageUrl) ? imageUrl : fallbackImage || imageUrl || null;
-    return { ...product, _id: product.id, image };
-  });
+  const [wishlistIds, setWishlistIds] = useState(loadGuestWishlist);
+  const [accountWishlistProducts, setAccountWishlistProducts] = useState([]);
+  const [wishlistBusy, setWishlistBusy] = useState([]);
 
   const refreshProducts = async () => {
     const data = await api.getProducts();
@@ -32,19 +53,41 @@ export default function StoreContextProvider({ children }) {
     return data.products;
   };
 
+  const applyWishlistResponse = data => {
+    const products = productsFromWishlistResponse(data);
+    setAccountWishlistProducts(products);
+    setWishlistIds(products.map(product => product._id));
+    return products;
+  };
+
+  const loadAccountWishlist = async () => applyWishlistResponse(await api.getWishlist());
+
+  const mergeGuestWishlist = async () => {
+    const guestIds = loadGuestWishlist();
+    const data = guestIds.length ? await api.syncWishlist(guestIds) : await api.getWishlist();
+    saveGuestWishlist([]);
+    return applyWishlistResponse(data);
+  };
+
   useEffect(() => {
     let active = true;
-    Promise.allSettled([api.getProducts(), api.refresh()]).then(([productsResult, authResult]) => {
+    (async () => {
+      const [productsResult, authResult] = await Promise.allSettled([api.getProducts(), api.refresh()]);
       if (!active) return;
-      if (productsResult.status === 'fulfilled') {
-        setFoodList(normalizeProducts(productsResult.value.products));
-      }
+      if (productsResult.status === 'fulfilled') setFoodList(normalizeProducts(productsResult.value.products));
       if (authResult.status === 'fulfilled') {
         setAccessToken(authResult.value.accessToken);
         setUser(authResult.value.user);
+        try { if (active) await mergeGuestWishlist(); } catch { /* Wishlist should not block sign-in restoration. */ }
+      } else {
+        const guestIds = loadGuestWishlist();
+        const availableIds = productsResult.status === 'fulfilled' ? new Set(productsResult.value.products.map(product => product.id)) : null;
+        const cleanedIds = availableIds ? guestIds.filter(id => availableIds.has(id)) : guestIds;
+        setWishlistIds(cleanedIds);
+        if (cleanedIds.length !== guestIds.length) saveGuestWishlist(cleanedIds);
       }
-      setLoading(false);
-    });
+      if (active) setLoading(false);
+    })();
     return () => { active = false; };
   }, []);
 
@@ -70,6 +113,7 @@ export default function StoreContextProvider({ children }) {
     const data = await api[mode](values);
     setAccessToken(data.accessToken);
     setUser(data.user);
+    try { await mergeGuestWishlist(); } catch { /* Keep authentication successful if wishlist sync is temporarily unavailable. */ }
     return data;
   };
 
@@ -77,6 +121,7 @@ export default function StoreContextProvider({ children }) {
     const data = await api.googleLogin(credential);
     setAccessToken(data.accessToken);
     setUser(data.user);
+    try { await mergeGuestWishlist(); } catch { /* Keep authentication successful if wishlist sync is temporarily unavailable. */ }
     return data;
   };
 
@@ -86,10 +131,54 @@ export default function StoreContextProvider({ children }) {
     return data;
   };
 
+  const isWishlisted = productId => wishlistIds.includes(productId);
+
+  const toggleWishlist = async product => {
+    const productId = product?._id || product?.id;
+    if (!productId || wishlistBusy.includes(productId)) return;
+    const wasSaved = wishlistIds.includes(productId);
+    const nextIds = wasSaved ? wishlistIds.filter(id => id !== productId) : [productId, ...wishlistIds].slice(0, 100);
+
+    if (!user) {
+      setWishlistIds(nextIds);
+      saveGuestWishlist(nextIds);
+      return;
+    }
+
+    setWishlistBusy(previous => [...previous, productId]);
+    setWishlistIds(nextIds);
+    setAccountWishlistProducts(previous => wasSaved
+      ? previous.filter(item => item._id !== productId)
+      : [product, ...previous.filter(item => item._id !== productId)]);
+    try {
+      if (wasSaved) await api.removeWishlistItem(productId);
+      else await api.saveWishlistItem(productId);
+    } catch (error) {
+      setWishlistIds(wishlistIds);
+      await loadAccountWishlist().catch(() => {});
+      throw error;
+    } finally {
+      setWishlistBusy(previous => previous.filter(id => id !== productId));
+    }
+  };
+
+  const removeWishlistItem = async productId => {
+    const product = (user ? accountWishlistProducts : food_list).find(item => item._id === productId) || { _id: productId };
+    if (isWishlisted(productId)) await toggleWishlist(product);
+  };
+
+  const guestWishlistProducts = useMemo(() => wishlistIds
+    .map(id => food_list.find(product => product._id === id))
+    .filter(Boolean), [wishlistIds, food_list]);
+  const wishlistProducts = user ? (accountWishlistProducts.length || !wishlistIds.length ? accountWishlistProducts : guestWishlistProducts) : guestWishlistProducts;
+  const wishlistCount = wishlistIds.length;
+
   const logout = async () => {
     await api.logout();
     setAccessToken(null);
     setUser(null);
+    setAccountWishlistProducts([]);
+    setWishlistIds(loadGuestWishlist());
   };
 
   return <StoreContext.Provider value={{
@@ -98,5 +187,7 @@ export default function StoreContextProvider({ children }) {
     user, setUser, loading, authenticate, authenticateWithGoogle, logout,
     searchQuery, setSearchQuery, couponCode, setCouponCode,
     createOrder, getOrders: api.getOrders, refreshProducts,
+    wishlistProducts, wishlistIds, wishlistCount, wishlistBusy,
+    isWishlisted, toggleWishlist, removeWishlistItem, refreshWishlist: loadAccountWishlist,
   }}>{children}</StoreContext.Provider>;
 }

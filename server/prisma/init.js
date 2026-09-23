@@ -184,6 +184,24 @@ transaction(() => {
   db.prepare(`INSERT OR IGNORE INTO "LoyaltySetting" ("id", "enabled", "pointsPerOrder", "minimumRedeemPoints", "pointValueCents", "updatedAt") VALUES ('default', 1, 5, 50, 100, CURRENT_TIMESTAMP)`).run();
 });
 
+// Wishlists are account-scoped and survive across devices. Keep this upgrade
+// idempotent so existing SQLite deployments can add the feature in place.
+transaction(() => {
+  if (!tableExists('WishlistItem')) {
+    db.exec(`CREATE TABLE "WishlistItem" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "userId" TEXT NOT NULL,
+      "productId" TEXT NOT NULL,
+      CONSTRAINT "WishlistItem_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT "WishlistItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    );`);
+  }
+  if (!indexExists('WishlistItem_userId_productId_key')) db.exec('CREATE UNIQUE INDEX "WishlistItem_userId_productId_key" ON "WishlistItem"("userId", "productId");');
+  if (!indexExists('WishlistItem_userId_createdAt_idx')) db.exec('CREATE INDEX "WishlistItem_userId_createdAt_idx" ON "WishlistItem"("userId", "createdAt");');
+  if (!indexExists('WishlistItem_productId_createdAt_idx')) db.exec('CREATE INDEX "WishlistItem_productId_createdAt_idx" ON "WishlistItem"("productId", "createdAt");');
+});
+
 // Existing COD orders must also appear in the payment ledger after an upgrade.
 db.prepare(`INSERT INTO Payment (id, transactionId, provider, status, amountCents, currency, paidAt, createdAt, updatedAt, orderId)
  SELECT 'legacy_' || id, 'LEGACY-' || id, 'COD',

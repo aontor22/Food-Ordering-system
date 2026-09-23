@@ -194,12 +194,13 @@ export default function AdminProducts() {
       <select value={availability} onChange={event => setAvailability(event.target.value)} aria-label="Filter availability"><option value="all">All products</option><option value="active">Available</option><option value="archived">Archived</option></select>
     </div>
     <section className="admin-card">
-      {visible.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Image</th><th>Status</th><th className="align-right">Actions</th></tr></thead>
+      {visible.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Wishlist</th><th>Image</th><th>Status</th><th className="align-right">Actions</th></tr></thead>
         <tbody>{visible.map(product => {
           const image = displayImage(product);
           return <tr key={product.id}>
             <td><div className="product-cell"><span className="product-thumb">{image ? <img src={image} alt="" loading="lazy" /> : <Icon name="products" />}</span><div><strong>{product.name}</strong><small>{product.description}</small></div></div></td>
             <td>{product.category}</td><td><strong>{formatCurrency(product.priceCents / 100)}</strong></td><td><span className={product.stock <= 10 ? 'stock-low' : 'stock-ok'}>{product.stock}</span></td>
+            <td><strong>{product.wishlistCount || 0}</strong><small> saves</small></td>
             <td><span className={`media-storage-badge ${product.imagePublicId ? 'is-cloud' : ''}`}>{product.imagePublicId ? 'Cloudinary' : image ? 'Legacy' : 'None'}</span></td>
             <td><StatusBadge value={product.isAvailable ? 'ACTIVE' : 'INACTIVE'} /></td>
             <td><div className="admin-table-actions"><button className="admin-icon-action" onClick={() => openEdit(product)} title="Edit product" aria-label={`Edit ${product.name}`}><Icon name="edit" size={17} /></button><button className={`admin-icon-action ${product.isAvailable ? 'is-danger' : 'is-success'}`} onClick={() => toggleAvailability(product)} title={product.isAvailable ? 'Archive product' : 'Restore product'} aria-label={`${product.isAvailable ? 'Archive' : 'Restore'} ${product.name}`}><Icon name={product.isAvailable ? 'archive' : 'refresh'} size={17} /></button></div></td>

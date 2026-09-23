@@ -29,6 +29,7 @@ export default function AdminDashboard() {
     { label: 'Orders', value: metrics.orders, detail: `${metrics.todayOrders} placed today`, icon: 'orders', tone: 'is-orange' },
     { label: 'Customers', value: metrics.customers, detail: 'Registered accounts', icon: 'users', tone: 'is-blue' },
     { label: 'Active products', value: metrics.products, detail: `${metrics.lowStock} low-stock items`, icon: 'products', tone: 'is-gold' },
+    { label: 'Wishlist saves', value: metrics.wishlistSaves || 0, detail: 'Saved customer favourites', icon: 'heart', tone: 'is-red' },
   ];
 
   return <>

@@ -6,7 +6,7 @@ import Icon from '../ui/Icon';
 import './navbar.css';
 
 export default function Navbar({ onLogin }) {
-  const { cartCount, user, logout, searchQuery, setSearchQuery } = useContext(StoreContext);
+  const { cartCount, wishlistCount, user, logout, searchQuery, setSearchQuery } = useContext(StoreContext);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -44,6 +44,10 @@ export default function Navbar({ onLogin }) {
       </div>
       <div className="navbar-actions">
         <button className="icon-button nav-search-button" aria-label="Search menu" onClick={() => setSearchOpen(value => !value)}><Icon name="search" /></button>
+        <Link className={`wishlist-nav-button ${wishlistCount ? 'is-saved' : ''}`} to="/wishlist" aria-label={`Wishlist with ${wishlistCount} saved items`} title="Wishlist">
+          <Icon name={wishlistCount ? 'heartFilled' : 'heart'} size={21} />
+          {wishlistCount > 0 && <span>{wishlistCount > 99 ? '99+' : wishlistCount}</span>}
+        </Link>
         <Link className="cart-button" to="/cart" aria-label={`Cart with ${cartCount} items`}>
           <Icon name="cart" size={22} />
           {cartCount > 0 && <span>{cartCount > 99 ? '99+' : cartCount}</span>}
@@ -57,6 +61,7 @@ export default function Navbar({ onLogin }) {
           {accountOpen && <div className="account-dropdown surface-card">
             {user.role === 'ADMIN' && <Link to="/admin"><Icon name="dashboard" />Admin dashboard</Link>}
             <Link to="/orders"><Icon name="orders" />My orders</Link>
+            <Link to="/wishlist"><Icon name="heart" />Wishlist {wishlistCount ? `(${wishlistCount})` : ''}</Link>
             {user.role !== 'ADMIN' && <Link to="/orders"><Icon name="gift" />{user.pointsBalance || 0} Tomato Points</Link>}
             <button onClick={logout}><Icon name="logout" />Sign out</button>
           </div>}

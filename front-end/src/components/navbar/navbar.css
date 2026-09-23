@@ -42,3 +42,7 @@
   .sign-in { min-height: 42px; padding: 0 15px; }
   .navbar-actions { gap: 4px; }
 }
+
+.wishlist-nav-button { min-width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; position: relative; border-radius: 50%; color: var(--ink); }
+.wishlist-nav-button:hover, .wishlist-nav-button.is-saved { background: var(--brand-soft); color: var(--brand); }
+.wishlist-nav-button span { position: absolute; top: -3px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border: 2px solid var(--canvas); border-radius: 999px; color: #fff; background: var(--brand); font-size: .67rem; font-weight: 800; }
