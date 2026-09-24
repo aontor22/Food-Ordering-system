@@ -6,8 +6,8 @@ CREATE TABLE "ManualPaymentChannel" (
   "account" TEXT NOT NULL,
   "instructions" TEXT NOT NULL,
   "active" BOOLEAN NOT NULL DEFAULT true,
-  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" DATETIME NOT NULL
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL
 );
 CREATE TABLE "ManualPaymentSubmission" (
   "id" TEXT NOT NULL PRIMARY KEY,
@@ -20,8 +20,8 @@ CREATE TABLE "ManualPaymentSubmission" (
   "status" TEXT NOT NULL DEFAULT 'SUBMITTED',
   "reviewNote" TEXT,
   "reviewedBy" TEXT,
-  "reviewedAt" DATETIME,
-  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "reviewedAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "paymentId" TEXT NOT NULL,
   CONSTRAINT "ManualPaymentSubmission_paymentId_fkey" FOREIGN KEY ("paymentId") REFERENCES "Payment" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );

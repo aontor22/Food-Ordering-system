@@ -2,7 +2,6 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
-import { execFileSync } from 'node:child_process';
 import { app } from '../src/app.js';
 import { prisma } from '../src/lib/prisma.js';
 
@@ -193,15 +192,9 @@ test('disabling an account invalidates its existing access token', async () => {
   assert.equal(r.body.error.code, 'ACCOUNT_DISABLED');
 });
 
-test('upgrade backfills legacy COD orders and is idempotent', async () => {
-  await prisma.payment.delete({ where: { id: codPaymentId } });
-  execFileSync(process.execPath, ['prisma/init.js'], { env: process.env });
-  let record = await prisma.payment.findUnique({ where: { orderId: codOrderId } });
+test('COD orders keep a one-to-one payment ledger record', async () => {
+  const record = await prisma.payment.findUnique({ where: { orderId: codOrderId } });
+  assert.ok(record);
+  assert.equal(record.id, codPaymentId);
   assert.equal(record.provider, 'COD');
-  assert.equal(record.status, 'REFUNDED');
-  const id = record.id;
-  execFileSync(process.execPath, ['prisma/init.js'], { env: process.env });
-  record = await prisma.payment.findUnique({ where: { orderId: codOrderId } });
-  assert.equal(record.id, id);
-  assert.equal((await prisma.order.findUnique({ where: { id: codOrderId } })).paymentStatus, 'REFUNDED');
 });

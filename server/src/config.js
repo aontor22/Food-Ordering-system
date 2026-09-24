@@ -4,7 +4,7 @@ import { z } from 'zod';
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(4000),
-  DATABASE_URL: z.string().default('file:./dev.db'),
+  DATABASE_URL: z.string().refine(value => /^postgres(?:ql)?:\/\//i.test(value), 'DATABASE_URL must be a PostgreSQL connection URL').default('postgresql://tomato:tomato@localhost:5432/tomato?schema=public'),
   JWT_ACCESS_SECRET: z.string().min(32).default('development-access-secret-change-me-123456'),
   JWT_REFRESH_SECRET: z.string().min(32).default('development-refresh-secret-change-me-12345'),
   ACCESS_TOKEN_TTL: z.string().default('15m'),

@@ -1,6 +1,6 @@
 # Food Ordering System — Full Stack
 
-A working Preact storefront and responsive restaurant admin dashboard with a Node.js/Express API, relational SQLite database, secure authentication, inventory-aware ordering, coupons, and audited management workflows.
+A working Preact storefront and responsive restaurant admin dashboard with a Node.js/Express API, PostgreSQL database, secure authentication, inventory-aware ordering, coupons, and audited management workflows.
 
 ## Included
 
@@ -29,6 +29,7 @@ Requires Node.js 22+ (Node 24 recommended).
 npm install
 cp server/.env.example server/.env
 cp front-end/.env.example front-end/.env
+docker compose up -d db
 npm run db:setup
 npm run dev
 ```
@@ -51,14 +52,19 @@ npm test
 npm run build
 ```
 
-Tests use a temporary SQLite database and include mocked provider responses for amount validation, risk review, replay/idempotency, failed-payment retry, and role/ownership checks. They do not charge money or call a live merchant account.
+Tests use an isolated temporary PostgreSQL schema and include mocked provider responses for amount validation, risk review, replay/idempotency, failed-payment retry, and role/ownership checks. They do not charge money or call a live merchant account.
+
+
+## PostgreSQL database
+
+The runtime database is PostgreSQL. For local development, `docker compose up -d db` starts PostgreSQL 16 and the example `DATABASE_URL` connects to it. Production deploys use `prisma migrate deploy`; do not use `prisma migrate dev` against production. On Render, create Render Postgres in the same region as the API and set `DATABASE_URL` to its Internal Database URL. See `POSTGRESQL_SETUP.md` for the exact setup and optional legacy SQLite import.
 
 ## Payments and upgrading
 
 ### Manual payments (no SSLCOMMERZ account needed)
 
 1. For bKash/Nagad/Rocket, set `PAYMENT_CURRENCY=BDT` in `server/.env` and `VITE_CURRENCY=BDT` in `front-end/.env`. Restart development servers (or rebuild the production frontend). Check product prices and `DELIVERY_FEE_CENTS`: 6000 means ৳60 with BDT. Currency changes do not convert prices or historical orders. Mobile channels cannot be enabled while the store uses USD.
-2. Run `npm run db:setup` once after installing this update. It adds manual-payment tables without deleting existing data.
+2. Run `npm run db:setup` after installing or deploying. It generates Prisma Client, applies pending PostgreSQL migrations, and seeds missing defaults without resetting existing rows.
 3. Sign in as admin → **Payments → Manual payment accounts & instructions**. Add a provider (bKash/Nagad/Rocket/Bank), label, actual merchant/account number, and instructions. Enable and save it. No fictitious recipient is preconfigured.
 4. Customer selects **Manual payment** and an account at checkout, places the order, then sees the exact amount/currency and receiving instructions. After paying through the chosen channel, they submit the transaction ID, sender identifier and optional note. No PIN, OTP or password is requested.
 5. The order remains pending with payment **Awaiting verification**. Admin → Payments → **Review & approve** shows the amount, recipient, sender and transaction ID. Verify these against the receiving account, add a note and confirm receipt before approving. Only then does the order become confirmed/paid. Rejection requires a customer-visible reason and permits a corrected reference.
@@ -66,7 +72,7 @@ Tests use a temporary SQLite database and include mocked provider responses for 
 
 Channel edits affect new orders. Existing orders retain their original destination and instructions. No gateway setup credentials are required for this manual workflow; any provider/account charges are separate. Customer details and review history are restricted to the owner and administrators.
 
-After copying updated files into an existing project, keep your existing `.env` and database, stop the server, then run `npm install`, `npm run db:setup`, and `npm run dev`. The initializer adds the Payment table and backfills existing COD orders without deleting orders/users. Back up your SQLite database before upgrading. Do not mix the bundled initializer with `prisma migrate deploy` against an already initialized database without first baselining migrations.
+Database changes are now managed by Prisma Migrate on PostgreSQL. After copying updated files, set a PostgreSQL `DATABASE_URL`, then run `npm install`, `npm run db:setup`, and `npm run dev`. `db:setup` generates Prisma Client, applies only pending migrations, and runs the idempotent seed. If you need to preserve data from a local legacy SQLite file, follow `POSTGRESQL_SETUP.md` and run the included `db:import:sqlite` helper after creating the PostgreSQL schema.
 
 At checkout choose **Cash on delivery** or **Online payment (demo)**. The demo lets you test success/failure/cancel without charging money. My orders shows payment status and offers retry. Open `/admin/payments` as an administrator to view the ledger. **Cash received** records money already collected, and **Mark refunded** records cash already returned; these buttons do not transfer money. Delivery also records COD collection. Online orders cannot enter fulfilment until verified paid.
 
@@ -78,7 +84,7 @@ Gateway timeouts remain processing until verified; retry checks the provider bef
 
 ## Cloudinary product images
 
-Product image files can be stored on Cloudinary instead of the application database or Render filesystem. The browser uploads image bytes directly to Cloudinary using a short-lived signature generated by the authenticated admin API; the Cloudinary API secret never reaches the browser. SQLite stores only `imageUrl` and `imagePublicId`.
+Product image files can be stored on Cloudinary instead of the application database or Render filesystem. The browser uploads image bytes directly to Cloudinary using a short-lived signature generated by the authenticated admin API; the Cloudinary API secret never reaches the browser. PostgreSQL stores only `imageUrl` and `imagePublicId`; image bytes remain on Cloudinary.
 
 Set these backend environment variables on Render (and in `server/.env` for local development):
 
@@ -118,8 +124,8 @@ New or replacement images are selected in Admin → Products. The file goes from
 
 1. Generate two different random JWT secrets of at least 32 characters.
 2. Set exact HTTPS frontend origin(s) in `CLIENT_ORIGIN`.
-3. Replace the seed admin password and never commit `.env` or `dev.db`.
-4. Use HTTPS and persistent SQLite storage. For multi-instance scale, migrate Prisma to PostgreSQL.
+3. Replace the seed admin password and never commit `.env` or database credentials.
+4. Use a managed PostgreSQL database; on Render, use the database Internal URL when the API and database are in the same region.
 5. Configure Cloudinary credentials for product image uploads; keep `CLOUDINARY_API_SECRET` only on the backend.
 6. Configure and validate SSLCOMMERZ sandbox callbacks, currency, and public HTTPS URLs before enabling live online payments. Complete merchant refund/review operations for your deployment.
 
@@ -127,7 +133,7 @@ New or replacement images are selected in Admin → Products. The file goes from
 
 ```text
 front-end/       Preact/Vite storefront, admin workspace, and API client
-server/prisma/   Schema, migration, initializer, and seed
+server/prisma/   PostgreSQL schema, migrations, and seed
 server/src/      Routes, middleware, services, and app bootstrap
 server/test/     API integration tests
 ```
