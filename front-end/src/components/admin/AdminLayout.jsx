@@ -22,7 +22,7 @@ const navigation = [
 const titles = {
   '/admin': ['Dashboard overview', 'Monitor the health of your restaurant in real time.'],
   '/admin/products': ['Product management', 'Control menu availability, prices and stock.'],
-  '/admin/orders': ['Order operations', 'Review orders and move them through fulfilment.'],
+  '/admin/orders': ['Live order operations', 'Track, estimate and move orders through fulfilment in real time.'],
   '/admin/store-operations': ['Store availability', 'Set opening hours, temporary pauses and holiday closures.'],
   '/admin/delivery-zones': ['Delivery zones', 'Control service areas, delivery fees, minimum orders and free-delivery thresholds.'],
   '/admin/fulfillment': ['Fulfilment scheduling', 'Control delivery, pickup, ASAP orders, future slots and capacity.'],

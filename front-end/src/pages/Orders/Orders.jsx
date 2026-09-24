@@ -4,6 +4,7 @@ import { StoreContext } from '../../context/StoreContext';
 import { formatCurrency, formatDate, humanizeStatus } from '../../lib/format';
 import EmptyState from '../../components/ui/EmptyState';
 import Icon from '../../components/ui/Icon';
+import OrderTracking from '../../components/orders/OrderTracking';
 import { api } from '../../lib/api';
 import './Orders.css';
 
@@ -14,6 +15,7 @@ export default function Orders({ onLogin }) {
   const [loading, setLoading] = useState(Boolean(user));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  const [liveState, setLiveState] = useState('connecting');
 
   const load = async () => {
     if (!user) return;
@@ -27,6 +29,21 @@ export default function Orders({ onLogin }) {
     if (!user) { setLoading(false); return; }
     setLoading(true); setError('');
     load().catch(requestError => setError(requestError.message)).finally(() => setLoading(false));
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    return api.subscribeOrders({
+      onState: state => setLiveState(state),
+      onEvent: (event, data) => {
+        if (event !== 'snapshot' || !data) return;
+        if (Array.isArray(data.orders)) setOrders(data.orders);
+        if (data.loyalty) {
+          setLoyalty(data.loyalty);
+          setUser(previous => previous ? { ...previous, pointsBalance: data.loyalty.pointsBalance } : previous);
+        }
+      },
+    });
   }, [user?.id]);
 
   const pay = async order => {
@@ -61,7 +78,7 @@ export default function Orders({ onLogin }) {
   if (!loading && !error && !orders.length) return <EmptyState icon="🧾" title="No orders yet" text="Once you place an order, you can follow its status here." />;
 
   return <div className="orders-page">
-    <header className="page-title"><div className="section-kicker">Your account</div><h1>My orders</h1><p>Track orders, manage payments, collect points and review delivered food.</p></header>
+    <header className="page-title orders-title-row"><div><div className="section-kicker">Your account</div><h1>My orders</h1><p>Track orders live, manage payments, collect points and review delivered food.</p></div><span className={`live-connection live-${liveState}`}><i />{liveState === 'connected' ? 'Live updates' : liveState === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</span></header>
     {loyalty && <section className={`points-wallet surface-card ${!loyalty.enabled ? 'is-paused' : ''}`}>
       <div className="points-wallet-icon"><Icon name="gift" size={24} /></div>
       <div><span>Tomato Points</span><strong>{loyalty.pointsBalance} points</strong><p>{loyalty.enabled ? `Earn ${loyalty.pointsPerOrder} points for every delivered order. Discounts start at ${loyalty.minimumRedeemPoints} points.` : 'The rewards program is paused. Your saved points remain in your account.'}</p></div>
@@ -74,6 +91,7 @@ export default function Orders({ onLogin }) {
           <div><small>Order number</small><h2>{order.orderNumber}</h2><p>{formatDate(order.createdAt)}</p></div>
           <div className="order-statuses"><span className={`status status-${order.status.toLowerCase()}`}>{humanizeStatus(order.status)}</span><span className={`status payment-status payment-${order.paymentStatus.toLowerCase()}`}>{order.paymentMethod === 'MANUAL' && order.paymentStatus === 'REVIEW' ? 'Awaiting verification' : humanizeStatus(order.paymentStatus)}</span></div>
         </div>
+        <OrderTracking order={order} />
         <div className="order-items-preview">{order.items.map(item => <div className="order-item-review-wrap" key={item.id}>
           <div className="order-item-line"><span>{item.quantity}×</span><p>{item.productName}</p><strong>{formatCurrency(item.lineTotalCents / 100, order.payment?.currency)}</strong></div>
           {order.status === 'DELIVERED' && <ReviewEditor orderId={order.id} item={item} onChange={review => updateReview(order.id, item.id, review)} />}

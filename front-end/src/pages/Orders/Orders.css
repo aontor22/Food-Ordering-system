@@ -24,3 +24,11 @@
 .order-pickup-meta { display:grid; gap:3px; padding:10px 12px; border-radius:10px; background:#f7faf8; color:#425149; }
 .order-pickup-meta strong { font-size:.78rem; }
 .order-pickup-meta small { color:#768078; font-size:.71rem; line-height:1.45; }
+
+.orders-title-row { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; }
+.live-connection { display:inline-flex; align-items:center; gap:7px; flex:0 0 auto; padding:7px 10px; border:1px solid #e0e5e2; border-radius:999px; color:#657069; background:#fff; font-size:.69rem; font-weight:800; }
+.live-connection i { width:7px; height:7px; border-radius:50%; background:#c0c7c2; }
+.live-connection.live-connected { color:#246b45; border-color:#cde7d8; background:#f3fbf6; }.live-connection.live-connected i { background:#2d9a61; box-shadow:0 0 0 4px #dff3e7; }
+.live-connection.live-reconnecting { color:#8a6127; background:#fff9ed; }.live-connection.live-reconnecting i { background:#d7952f; animation:live-pulse 1.2s infinite; }
+@keyframes live-pulse { 50% { opacity:.35; } }
+@media (max-width:560px) { .orders-title-row { align-items:flex-start; flex-direction:column; }.live-connection { align-self:flex-start; } }

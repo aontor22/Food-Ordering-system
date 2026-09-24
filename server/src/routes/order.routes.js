@@ -12,6 +12,7 @@ import { getPaymentOptions, initiateOrderPayment, newPaymentTransactionId, seria
 import { getStoreAvailability } from '../services/store-availability.js';
 import { resolveFulfillmentSelection } from '../services/fulfillment-scheduling.js';
 import { calculateZoneDelivery, resolveDeliveryZone, serializeDeliveryZone } from '../services/delivery-zones.js';
+import { openOrderSseStream, publishOrderChange, trackingEventData, trackingTimestampData } from '../services/order-tracking.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -223,9 +224,10 @@ router.post('/', validate(createSchema), async (req, res, next) => {
           country: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.country : null,
           notes: data.delivery.notes,
           items: { create: pricing.products.map(product => ({ productId: product.id, productName: product.name, unitPriceCents: product.priceCents, quantity: pricing.quantities.get(product.id), lineTotalCents: product.priceCents * pricing.quantities.get(product.id) })) },
+          trackingEvents: { create: trackingEventData('PENDING', { actorType: 'CUSTOMER', actorLabel: `${data.delivery.firstName} ${data.delivery.lastName}`, note: 'We received your order and will confirm it shortly.' }) },
           payment: { create: { transactionId: newPaymentTransactionId(), provider: data.paymentMethod === 'ONLINE' ? onlineOption.provider : data.paymentMethod, manualDestination, status: 'PENDING', amountCents: pricing.totalCents, currency: paymentOptions.currency } },
         },
-        include: { items: { include: { review: true } }, payment: true },
+        include: { items: { include: { review: true } }, payment: true, trackingEvents: { orderBy: { createdAt: 'asc' } } },
       });
 
       if (pricing.pointsRedeemed > 0) {
@@ -244,6 +246,7 @@ router.post('/', validate(createSchema), async (req, res, next) => {
       orderNumber, pointsRedeemed: order.pointsRedeemed,
       fulfillmentType: order.fulfillmentType, fulfillmentMode: order.fulfillmentMode, scheduledForLocal: order.scheduledForLocal,
     });
+    publishOrderChange(order);
     let paymentSession;
     let paymentError;
     if (data.paymentMethod === 'ONLINE') {
@@ -251,7 +254,7 @@ router.post('/', validate(createSchema), async (req, res, next) => {
       catch (error) { paymentError = error.message || 'Payment could not be started'; }
     }
     const currentOrder = data.paymentMethod === 'ONLINE'
-      ? await prisma.order.findUnique({ where: { id: order.id }, include: { items: { include: { review: true } }, payment: true } })
+      ? await prisma.order.findUnique({ where: { id: order.id }, include: { items: { include: { review: true } }, payment: true, trackingEvents: { orderBy: { createdAt: 'asc' } } } })
       : order;
     const loyalty = await getLoyaltySnapshot(req.auth.sub);
     res.status(201).json({
@@ -267,10 +270,31 @@ router.post('/', validate(createSchema), async (req, res, next) => {
 router.get('/', async (req, res) => {
   const orders = await prisma.order.findMany({
     where: { userId: req.auth.sub },
-    include: { items: { include: { review: true } }, payment: true },
+    include: { items: { include: { review: true } }, payment: true, trackingEvents: { orderBy: { createdAt: 'asc' } } },
     orderBy: { createdAt: 'desc' },
   });
   res.json({ orders: orders.map(serializeOrder) });
+});
+
+router.get('/live', (req, res) => {
+  openOrderSseStream(req, res, {
+    matches: change => change.userId === req.auth.sub,
+    loadSnapshot: async () => {
+      const [orders, loyalty] = await Promise.all([
+        prisma.order.findMany({
+          where: { userId: req.auth.sub },
+          include: { items: { include: { review: true } }, payment: true, trackingEvents: { orderBy: { createdAt: 'asc' } } },
+          orderBy: { createdAt: 'desc' },
+        }),
+        getLoyaltySnapshot(req.auth.sub),
+      ]);
+      const serialized = orders.map(serializeOrder);
+      return {
+        data: { orders: serialized, loyalty: { ...loyalty, currency: config.PAYMENT_CURRENCY } },
+        signature: serialized.map(order => [order.id, order.status, order.paymentStatus, order.updatedAt, order.payment?.updatedAt, order.trackingEvents?.at(-1)?.createdAt, order.estimatedReadyAt, order.estimatedDeliveryAt, order.pointsEarned]),
+      };
+    },
+  });
 });
 
 router.put('/:orderId/items/:itemId/review', validate(reviewSchema), async (req, res, next) => {
@@ -302,7 +326,7 @@ router.delete('/:orderId/items/:itemId/review', async (req, res, next) => {
 });
 
 router.get('/:id', async (req, res, next) => {
-  const order = await prisma.order.findFirst({ where: { id: req.params.id, userId: req.auth.sub }, include: { items: { include: { review: true } }, payment: true } });
+  const order = await prisma.order.findFirst({ where: { id: req.params.id, userId: req.auth.sub }, include: { items: { include: { review: true } }, payment: true, trackingEvents: { orderBy: { createdAt: 'asc' } } } });
   if (!order) return next(new AppError(404, 'ORDER_NOT_FOUND', 'Order not found'));
   res.json({ order: serializeOrder(order) });
 });
@@ -319,11 +343,20 @@ router.post('/:id/cancel', async (req, res, next) => {
 
       for (const item of order.items) await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
       if (order.payment) await tx.payment.updateMany({ where: { id: order.payment.id, status: { notIn: ['PAID', 'REFUNDED'] } }, data: { status: 'CANCELLED', failureReason: 'Order cancelled by customer' } });
-      await tx.order.update({ where: { id: order.id }, data: { status: 'CANCELLED', paymentStatus: ['PAID', 'REFUNDED'].includes(order.paymentStatus) ? order.paymentStatus : 'CANCELLED' } });
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'CANCELLED',
+          paymentStatus: ['PAID', 'REFUNDED'].includes(order.paymentStatus) ? order.paymentStatus : 'CANCELLED',
+          ...trackingTimestampData('CANCELLED', order),
+          trackingEvents: { create: trackingEventData('CANCELLED', { actorType: 'CUSTOMER', actorLabel: `${order.firstName} ${order.lastName}`, note: 'Cancelled by customer.' }) },
+        },
+      });
       await restoreCancelledOrderPoints(tx, order);
-      return tx.order.findUnique({ where: { id: order.id }, include: { items: { include: { review: true } }, payment: true } });
+      return tx.order.findUnique({ where: { id: order.id }, include: { items: { include: { review: true } }, payment: true, trackingEvents: { orderBy: { createdAt: 'asc' } } } });
     });
     await audit(req, 'ORDER_CANCELLED', 'Order', updated.id, { pointsRestored: updated.pointsRedeemed || 0 });
+    publishOrderChange(updated);
     res.json({ order: serializeOrder(updated), loyalty: { ...(await getLoyaltySnapshot(req.auth.sub)), currency: config.PAYMENT_CURRENCY } });
   } catch (error) { next(error); }
 });

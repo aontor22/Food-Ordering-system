@@ -14,6 +14,79 @@ async function request(path, options = {}, retry = true) {
   return data;
 }
 
+function parseSseBlock(block) {
+  let event = 'message';
+  const dataLines = [];
+  for (const line of block.split(/\r?\n/)) {
+    if (!line || line.startsWith(':')) continue;
+    if (line.startsWith('event:')) event = line.slice(6).trim();
+    else if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart());
+  }
+  if (!dataLines.length) return null;
+  const raw = dataLines.join('\n');
+  try { return { event, data: JSON.parse(raw) }; }
+  catch { return { event, data: raw }; }
+}
+
+function subscribe(path, { onEvent, onState } = {}) {
+  const controller = new AbortController();
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  (async () => {
+    let retryMs = 1200;
+    while (!controller.signal.aborted) {
+      try {
+        onState?.('connecting');
+        let response = await fetch(`${API_URL}${path}`, {
+          method: 'GET',
+          credentials: 'include',
+          signal: controller.signal,
+          headers: { Accept: 'text/event-stream', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+        });
+        if (response.status === 401) {
+          const refreshed = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
+          if (refreshed.ok) {
+            const data = await refreshed.json();
+            setAccessToken(data.accessToken);
+            response = await fetch(`${API_URL}${path}`, {
+              method: 'GET', credentials: 'include', signal: controller.signal,
+              headers: { Accept: 'text/event-stream', Authorization: `Bearer ${data.accessToken}` },
+            });
+          }
+        }
+        if (!response.ok || !response.body) throw new Error(`Live connection failed (${response.status})`);
+        onState?.('connected');
+        retryMs = 1200;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (!controller.signal.aborted) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+          let boundary;
+          while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+            const block = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            const parsed = parseSseBlock(block);
+            if (parsed) onEvent?.(parsed.event, parsed.data);
+          }
+        }
+        if (!controller.signal.aborted) onState?.('reconnecting');
+      } catch (error) {
+        if (controller.signal.aborted || error?.name === 'AbortError') break;
+        onState?.('reconnecting', error);
+      }
+      if (!controller.signal.aborted) {
+        await wait(retryMs);
+        retryMs = Math.min(10_000, Math.round(retryMs * 1.7));
+      }
+    }
+  })();
+
+  return () => controller.abort();
+}
+
 async function uploadProductImage(file) {
   if (!(file instanceof File)) throw new Error('Choose an image file first');
   if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type)) throw new Error('Use a JPG, PNG, WebP or AVIF image');
@@ -45,6 +118,7 @@ export const api = {
   quoteOrder: body => request('/orders/quote', { method: 'POST', body: JSON.stringify(body) }),
   getLoyalty: () => request('/orders/loyalty'),
   getOrders: () => request('/orders'),
+  subscribeOrders: handlers => subscribe('/orders/live', handlers),
   saveReview: (orderId, itemId, body) => request(`/orders/${orderId}/items/${itemId}/review`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteReview: (orderId, itemId) => request(`/orders/${orderId}/items/${itemId}/review`, { method: 'DELETE' }),
   getProductReviews: productId => request(`/products/${productId}/reviews`),
@@ -79,7 +153,9 @@ export const api = {
   updateAdminProduct: (id, body) => request(`/admin/products/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   archiveAdminProduct: id => request(`/admin/products/${id}`, { method: 'DELETE' }),
   getAdminOrders: () => request('/admin/orders'),
-  updateAdminOrderStatus: (id, status) => request(`/admin/orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  subscribeAdminOrders: handlers => subscribe('/admin/orders/live', handlers),
+  updateAdminOrderStatus: (id, status, options = {}) => request(`/admin/orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, ...options }) }),
+  updateAdminOrderEta: (id, minutes, note) => request(`/admin/orders/${id}/eta`, { method: 'PATCH', body: JSON.stringify({ minutes, ...(note ? { note } : {}) }) }),
   getAdminUsers: () => request('/admin/users'),
   updateAdminUser: (id, body) => request(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   getAdminCoupons: () => request('/admin/coupons'),

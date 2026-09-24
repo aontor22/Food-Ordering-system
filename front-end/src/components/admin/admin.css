@@ -198,3 +198,11 @@
 @media (max-width:760px) { .fulfillment-preview-grid, .fulfillment-toggle-grid, .fulfillment-number-grid { grid-template-columns:1fr; }.fulfillment-override-form { grid-template-columns:1fr 1fr; }.fulfillment-override-note { grid-column:1 / -1; } }
 @media (max-width:480px) { .fulfillment-override-form { grid-template-columns:1fr; }.fulfillment-override-note { grid-column:auto; }.fulfillment-override-list article { align-items:flex-start; flex-direction:column; }.fulfillment-override-list .button { width:100%; } }
 .status-ready_for_pickup { color:#6a45a1; background:#f0eaff; }
+
+.admin-live-actions { display:flex; align-items:center; gap:9px; }
+.admin-live-state { display:inline-flex; align-items:center; gap:6px; padding:7px 9px; border:1px solid #e0e5e2; border-radius:999px; color:#68736c; background:#fff; font-size:.68rem; font-weight:800; }
+.admin-live-state i { width:7px; height:7px; border-radius:50%; background:#bdc5c0; }.admin-live-state.is-connected { color:#246b45; border-color:#cce6d7; background:#f2faf5; }.admin-live-state.is-connected i { background:#2d9a61; box-shadow:0 0 0 4px #ddf2e5; }.admin-live-state.is-reconnecting i { background:#d6952e; animation:admin-live-pulse 1.2s infinite; }
+@keyframes admin-live-pulse { 50% { opacity:.35; } }
+.order-tracking-admin { grid-column:1/-1; }.order-tracking-admin > h4 { margin-bottom:7px; }
+.eta-admin-control { display:grid; gap:7px; margin-top:13px; padding-top:12px; border-top:1px solid #e9ecea; }.eta-admin-control > strong { font-size:.72rem; color:#4d5a52; }.eta-admin-control > div { display:flex; flex-wrap:wrap; gap:6px; }.eta-admin-control button { min-width:44px; padding:6px 8px; border:1px solid #e3e7e4; border-radius:8px; color:#5c675f; background:#fff; font-size:.68rem; font-weight:800; }.eta-admin-control button:hover:not(:disabled) { border-color:#ef8a64; color:#d65528; background:#fff6f2; }
+@media (max-width:700px) { .admin-live-actions { align-items:stretch; flex-direction:column; }.admin-live-state { align-self:flex-start; } }

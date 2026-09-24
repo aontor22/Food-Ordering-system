@@ -7,7 +7,7 @@ Implemented sequentially so each release remains deployable and testable.
 - [x] 03 — Restaurant opening hours + temporary/holiday closure + accepting-orders control
 - [x] 04 — Delivery zones, area-based fees, minimum order and free-delivery threshold
 - [x] 05 — Scheduled delivery / pickup time slots and capacity
-- [ ] 06 — Live order timeline and customer-facing tracking
+- [x] 06 — Live order timeline and customer-facing tracking
 - [ ] 07 — Order notifications (email/browser push foundation)
 - [ ] 08 — PWA installability and offline fallback
 - [ ] 09 — Guest checkout and post-order account linking

@@ -131,6 +131,15 @@ model Order {
   schedulingTimezone String?
   pickupAddressSnapshot String?
   pickupInstructionsSnapshot String?
+  statusUpdatedAt DateTime @default(now())
+  confirmedAt DateTime?
+  preparingAt DateTime?
+  readyAt DateTime?
+  outForDeliveryAt DateTime?
+  deliveredAt DateTime?
+  cancelledAt DateTime?
+  estimatedReadyAt DateTime?
+  estimatedDeliveryAt DateTime?
   totalCents Int
   couponCode String?
   firstName String
@@ -151,9 +160,26 @@ model Order {
   reviews Review[]
   loyaltyTransactions LoyaltyTransaction[]
   payment Payment?
+  trackingEvents OrderTrackingEvent[]
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([statusUpdatedAt])
   @@index([fulfillmentMode, scheduledDateKey, scheduledTimeKey])
+}
+
+
+model OrderTrackingEvent {
+  id String @id @default(cuid())
+  kind String @default("STATUS")
+  status String
+  title String
+  note String?
+  actorType String @default("SYSTEM")
+  actorLabel String?
+  createdAt DateTime @default(now())
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@index([orderId, createdAt])
 }
 
 model Payment {

@@ -15,6 +15,7 @@ import { migrateLegacyProductImages } from '../services/product-media.js';
 import { getStoreAvailability, getStoreOperationsConfig, isLocalDateTimeKey, isRealDateKey, isValidTimezone, saveStoreOperations, timeToMinute } from '../services/store-availability.js';
 import { findDeliveryPostalOverlap, listAllDeliveryZones, normalizePostalCodes, serializeDeliveryZone } from '../services/delivery-zones.js';
 import { getFulfillmentAdminConfig } from '../services/fulfillment-scheduling.js';
+import { etaUpdateData, openOrderSseStream, publishOrderChange, trackingEventData, trackingTimestampData } from '../services/order-tracking.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -134,11 +135,28 @@ router.post('/media/migrate-legacy', async (req, res, next) => {
 
 router.get('/orders', async (_req, res) => {
   const orders = await prisma.order.findMany({
-    include: { items: true, payment: true, user: { select: { id: true, name: true, email: true } } },
+    include: { items: true, payment: true, trackingEvents: { orderBy: { createdAt: 'asc' } }, user: { select: { id: true, name: true, email: true } } },
     orderBy: { createdAt: 'desc' },
     take: 250,
   });
   res.json({ orders: orders.map(order => ({ ...order, payment: serializePayment(order.payment) })) });
+});
+
+router.get('/orders/live', (req, res) => {
+  openOrderSseStream(req, res, {
+    loadSnapshot: async () => {
+      const orders = await prisma.order.findMany({
+        include: { items: true, payment: true, trackingEvents: { orderBy: { createdAt: 'asc' } }, user: { select: { id: true, name: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 250,
+      });
+      const serialized = orders.map(order => ({ ...order, payment: serializePayment(order.payment) }));
+      return {
+        data: { orders: serialized },
+        signature: serialized.map(order => [order.id, order.status, order.paymentStatus, order.updatedAt, order.payment?.updatedAt, order.trackingEvents?.at(-1)?.createdAt, order.estimatedReadyAt, order.estimatedDeliveryAt]),
+      };
+    },
+  });
 });
 
 function allowedOrderTransitions(order) {
@@ -154,7 +172,17 @@ function allowedOrderTransitions(order) {
   return transitions[order.status] || [];
 }
 const statusUpdate = z.object({
-  body: z.object({ status: z.enum(['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']) }),
+  body: z.object({
+    status: z.enum(['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+    estimateMinutes: z.number().int().min(5).max(240).optional(),
+    note: z.string().trim().max(240).optional(),
+  }),
+  params: z.object({ id: z.string().min(1) }),
+  query: empty,
+});
+
+const etaUpdate = z.object({
+  body: z.object({ minutes: z.number().int().min(5).max(240), note: z.string().trim().max(240).optional() }),
   params: z.object({ id: z.string().min(1) }),
   query: empty,
 });
@@ -194,8 +222,12 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
         where: { id: existing.id },
         data: {
           status: nextStatus,
+          ...trackingTimestampData(nextStatus, existing, { estimateMinutes: req.validated.body.estimateMinutes }),
           ...(settleCod ? { paymentStatus: 'PAID' } : {}),
           ...(nextStatus === 'CANCELLED' && !['PAID', 'REFUNDED'].includes(existing.paymentStatus) ? { paymentStatus: 'CANCELLED' } : {}),
+          trackingEvents: { create: trackingEventData(nextStatus, {
+            actorType: 'ADMIN', actorLabel: req.auth.email || 'Restaurant team', note: req.validated.body.note || null,
+          }) },
         },
       });
       if (nextStatus === 'DELIVERED') {
@@ -208,11 +240,36 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
       }
       return transaction.order.findUnique({
         where: { id: existing.id },
-        include: { items: true, payment: true, user: { select: { id: true, name: true, email: true, pointsBalance: true } } },
+        include: { items: true, payment: true, trackingEvents: { orderBy: { createdAt: 'asc' } }, user: { select: { id: true, name: true, email: true, pointsBalance: true } } },
       });
     });
     await audit(req, 'ORDER_STATUS_UPDATED', 'Order', order.id, { from: previousStatus, to: order.status, pointsAwarded, pointsRestored });
+    publishOrderChange(order);
     res.json({ order: { ...order, payment: serializePayment(order.payment) }, pointsAwarded, pointsRestored });
+  } catch (error) { next(error); }
+});
+
+router.patch('/orders/:id/eta', validate(etaUpdate), async (req, res, next) => {
+  try {
+    const order = await prisma.$transaction(async transaction => {
+      const existing = await transaction.order.findUnique({ where: { id: req.validated.params.id } });
+      if (!existing) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+      let update;
+      try { update = etaUpdateData(existing, req.validated.body.minutes); }
+      catch (error) { throw new AppError(409, error.code || 'ETA_NOT_AVAILABLE', error.message); }
+      if (req.validated.body.note) update.event.note = `${update.event.note} ${req.validated.body.note}`.slice(0, 240);
+      await transaction.order.update({
+        where: { id: existing.id },
+        data: { ...update.data, trackingEvents: { create: { ...update.event, actorLabel: req.auth.email || 'Restaurant team' } } },
+      });
+      return transaction.order.findUnique({
+        where: { id: existing.id },
+        include: { items: true, payment: true, trackingEvents: { orderBy: { createdAt: 'asc' } }, user: { select: { id: true, name: true, email: true, pointsBalance: true } } },
+      });
+    });
+    await audit(req, 'ORDER_ETA_UPDATED', 'Order', order.id, { status: order.status, minutes: req.validated.body.minutes });
+    publishOrderChange(order);
+    res.json({ order: { ...order, payment: serializePayment(order.payment) } });
   } catch (error) { next(error); }
 });
 
