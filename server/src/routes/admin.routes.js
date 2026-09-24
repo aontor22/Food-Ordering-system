@@ -14,6 +14,7 @@ import { cloudinaryConfigured, cloudinaryFolder, createCloudinaryUploadSignature
 import { migrateLegacyProductImages } from '../services/product-media.js';
 import { getStoreAvailability, getStoreOperationsConfig, isLocalDateTimeKey, isRealDateKey, isValidTimezone, saveStoreOperations, timeToMinute } from '../services/store-availability.js';
 import { findDeliveryPostalOverlap, listAllDeliveryZones, normalizePostalCodes, serializeDeliveryZone } from '../services/delivery-zones.js';
+import { getFulfillmentAdminConfig } from '../services/fulfillment-scheduling.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -140,16 +141,20 @@ router.get('/orders', async (_req, res) => {
   res.json({ orders: orders.map(order => ({ ...order, payment: serializePayment(order.payment) })) });
 });
 
-const orderTransitions = {
-  PENDING: ['CONFIRMED', 'CANCELLED'],
-  CONFIRMED: ['PREPARING', 'CANCELLED'],
-  PREPARING: ['OUT_FOR_DELIVERY', 'CANCELLED'],
-  OUT_FOR_DELIVERY: ['DELIVERED'],
-  DELIVERED: [],
-  CANCELLED: [],
-};
+function allowedOrderTransitions(order) {
+  const transitions = {
+    PENDING: ['CONFIRMED', 'CANCELLED'],
+    CONFIRMED: ['PREPARING', 'CANCELLED'],
+    PREPARING: [order.fulfillmentType === 'PICKUP' ? 'READY_FOR_PICKUP' : 'OUT_FOR_DELIVERY', 'CANCELLED'],
+    READY_FOR_PICKUP: ['DELIVERED'],
+    OUT_FOR_DELIVERY: ['DELIVERED'],
+    DELIVERED: [],
+    CANCELLED: [],
+  };
+  return transitions[order.status] || [];
+}
 const statusUpdate = z.object({
-  body: z.object({ status: z.enum(['PENDING', 'CONFIRMED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']) }),
+  body: z.object({ status: z.enum(['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']) }),
   params: z.object({ id: z.string().min(1) }),
   query: empty,
 });
@@ -164,7 +169,7 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
       if (!existing) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
       const nextStatus = req.validated.body.status;
       previousStatus = existing.status;
-      if (!orderTransitions[existing.status]?.includes(nextStatus)) {
+      if (!allowedOrderTransitions(existing).includes(nextStatus)) {
         throw new AppError(409, 'INVALID_STATUS_TRANSITION', `Order cannot move from ${existing.status} to ${nextStatus}`);
       }
       if (nextStatus === 'CANCELLED' && existing.paymentMethod !== 'COD' && existing.paymentStatus === 'PAID') {
@@ -468,7 +473,7 @@ function normalizeDeliveryZoneData(values, existing = null) {
 async function ensureZoneCanBeDisabled(id, nextActive) {
   if (nextActive !== false) return;
   const activeCount = await prisma.deliveryZone.count({ where: { active: true, id: { not: id } } });
-  if (!activeCount) throw new AppError(409, 'LAST_DELIVERY_ZONE', 'Keep at least one delivery zone active. Pause ordering from Store hours if delivery should stop.');
+  if (!activeCount) throw new AppError(409, 'LAST_DELIVERY_ZONE', 'Keep at least one delivery zone active. Disable delivery from Scheduling if you only want pickup.');
 }
 
 async function ensurePostalCodesUnique(postalCodes, id = null, active = true) {
@@ -521,6 +526,79 @@ router.delete('/delivery-zones/:id', async (req, res, next) => {
     await ensureZoneCanBeDisabled(existing.id, false);
     const zone = await prisma.deliveryZone.update({ where: { id: existing.id }, data: { active: false } });
     await audit(req, 'DELIVERY_ZONE_ARCHIVED', 'DeliveryZone', zone.id, { name: zone.name });
+    res.status(204).end();
+  } catch (error) { next(error); }
+});
+
+
+const fulfillmentSettingsUpdate = z.object({
+  body: z.object({
+    deliveryEnabled: z.boolean(),
+    pickupEnabled: z.boolean(),
+    asapEnabled: z.boolean(),
+    scheduledEnabled: z.boolean(),
+    deliveryLeadMinutes: z.number().int().min(0).max(720),
+    pickupLeadMinutes: z.number().int().min(0).max(720),
+    slotIntervalMinutes: z.number().int().min(15).max(180),
+    daysAhead: z.number().int().min(1).max(30),
+    defaultSlotCapacity: z.number().int().min(1).max(500),
+    pickupAddress: z.union([z.string().trim().max(300), z.null()]).optional().transform(value => value || null),
+    pickupInstructions: z.union([z.string().trim().max(500), z.null()]).optional().transform(value => value || null),
+  }).refine(value => value.deliveryEnabled || value.pickupEnabled, 'Keep at least one fulfilment method enabled')
+    .refine(value => value.asapEnabled || value.scheduledEnabled, 'Keep ASAP or scheduled ordering enabled'),
+  params: empty,
+  query: empty,
+});
+
+router.get('/fulfillment', async (_req, res, next) => {
+  try { res.json(await getFulfillmentAdminConfig()); }
+  catch (error) { next(error); }
+});
+
+router.patch('/fulfillment', validate(fulfillmentSettingsUpdate), async (req, res, next) => {
+  try {
+    const settings = await prisma.fulfillmentSetting.upsert({
+      where: { id: 'default' },
+      update: req.validated.body,
+      create: { id: 'default', ...req.validated.body },
+    });
+    await audit(req, 'FULFILLMENT_SETTINGS_UPDATED', 'FulfillmentSetting', settings.id, req.validated.body);
+    res.json(await getFulfillmentAdminConfig());
+  } catch (error) { next(error); }
+});
+
+const slotOverrideSchema = z.object({
+  body: z.object({
+    dateKey: z.string().trim().refine(isRealDateKey, 'Use a valid YYYY-MM-DD date'),
+    timeKey: hhmm,
+    fulfillmentType: z.enum(['DELIVERY', 'PICKUP']),
+    capacity: z.union([z.number().int().min(1).max(500), z.null()]).optional().default(null),
+    disabled: z.boolean().default(false),
+    note: z.union([z.string().trim().max(160), z.null()]).optional().transform(value => value || null),
+  }),
+  params: empty,
+  query: empty,
+});
+
+router.post('/fulfillment/slot-overrides', validate(slotOverrideSchema), async (req, res, next) => {
+  try {
+    const values = req.validated.body;
+    const override = await prisma.fulfillmentSlotOverride.upsert({
+      where: { dateKey_timeKey_fulfillmentType: { dateKey: values.dateKey, timeKey: values.timeKey, fulfillmentType: values.fulfillmentType } },
+      update: values,
+      create: values,
+    });
+    await audit(req, 'FULFILLMENT_SLOT_OVERRIDE_SAVED', 'FulfillmentSlotOverride', override.id, values);
+    res.status(201).json({ override });
+  } catch (error) { next(error); }
+});
+
+router.delete('/fulfillment/slot-overrides/:id', async (req, res, next) => {
+  try {
+    const existing = await prisma.fulfillmentSlotOverride.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw new AppError(404, 'SLOT_OVERRIDE_NOT_FOUND', 'Slot override not found');
+    await prisma.fulfillmentSlotOverride.delete({ where: { id: existing.id } });
+    await audit(req, 'FULFILLMENT_SLOT_OVERRIDE_REMOVED', 'FulfillmentSlotOverride', existing.id, { dateKey: existing.dateKey, timeKey: existing.timeKey, fulfillmentType: existing.fulfillmentType });
     res.status(204).end();
   } catch (error) { next(error); }
 });

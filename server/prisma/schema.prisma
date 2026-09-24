@@ -123,17 +123,25 @@ model Order {
   deliveryFeeCents Int
   deliveryZoneId String?
   deliveryZoneName String?
+  fulfillmentType String @default("DELIVERY")
+  fulfillmentMode String @default("ASAP")
+  scheduledForLocal String?
+  scheduledDateKey String?
+  scheduledTimeKey String?
+  schedulingTimezone String?
+  pickupAddressSnapshot String?
+  pickupInstructionsSnapshot String?
   totalCents Int
   couponCode String?
   firstName String
   lastName String
   email String
   phone String
-  street String
-  city String
-  state String
-  postalCode String
-  country String
+  street String?
+  city String?
+  state String?
+  postalCode String?
+  country String?
   notes String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -145,6 +153,7 @@ model Order {
   payment Payment?
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([fulfillmentMode, scheduledDateKey, scheduledTimeKey])
 }
 
 model Payment {
@@ -258,6 +267,37 @@ model DeliveryZone {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([active, sortOrder])
+}
+
+
+model FulfillmentSetting {
+  id String @id @default("default")
+  deliveryEnabled Boolean @default(true)
+  pickupEnabled Boolean @default(true)
+  asapEnabled Boolean @default(true)
+  scheduledEnabled Boolean @default(true)
+  deliveryLeadMinutes Int @default(30)
+  pickupLeadMinutes Int @default(15)
+  slotIntervalMinutes Int @default(30)
+  daysAhead Int @default(7)
+  defaultSlotCapacity Int @default(10)
+  pickupAddress String?
+  pickupInstructions String?
+  updatedAt DateTime @updatedAt
+}
+
+model FulfillmentSlotOverride {
+  id String @id @default(cuid())
+  dateKey String
+  timeKey String
+  fulfillmentType String
+  capacity Int?
+  disabled Boolean @default(false)
+  note String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([dateKey, timeKey, fulfillmentType])
+  @@index([dateKey, fulfillmentType])
 }
 
 model RestaurantSetting {

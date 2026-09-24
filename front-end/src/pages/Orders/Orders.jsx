@@ -78,13 +78,14 @@ export default function Orders({ onLogin }) {
           <div className="order-item-line"><span>{item.quantity}×</span><p>{item.productName}</p><strong>{formatCurrency(item.lineTotalCents / 100, order.payment?.currency)}</strong></div>
           {order.status === 'DELIVERED' && <ReviewEditor orderId={order.id} item={item} onChange={review => updateReview(order.id, item.id, review)} />}
         </div>)}</div>
-        {order.deliveryZoneName && <div className="order-delivery-zone"><Icon name="delivery" size={16} /><span>{order.deliveryZoneName} · {order.deliveryFeeCents === 0 ? 'Free delivery' : `${formatCurrency(order.deliveryFeeCents / 100, order.payment?.currency)} delivery`}</span></div>}
+        <div className="order-delivery-zone"><Icon name={order.fulfillmentType === 'PICKUP' ? 'store' : 'delivery'} size={16} /><span>{order.fulfillmentType === 'PICKUP' ? 'Pickup' : 'Delivery'} · {order.fulfillmentMode === 'SCHEDULED' ? formatScheduled(order.scheduledForLocal) : 'ASAP'}{order.deliveryZoneName ? ` · ${order.deliveryZoneName}` : ''}{order.fulfillmentType === 'DELIVERY' ? ` · ${order.deliveryFeeCents === 0 ? 'Free delivery' : `${formatCurrency(order.deliveryFeeCents / 100, order.payment?.currency)} delivery`}` : ''}</span></div>
+        {order.fulfillmentType === 'PICKUP' && (order.pickupAddressSnapshot || order.pickupInstructionsSnapshot) && <div className="order-pickup-meta"><strong>{order.pickupAddressSnapshot || 'Restaurant pickup'}</strong>{order.pickupInstructionsSnapshot && <small>{order.pickupInstructionsSnapshot}</small>}</div>}
         <div className="order-payment-meta"><span><Icon name={order.paymentMethod === 'ONLINE' ? 'card' : 'cash'} />{order.paymentMethod === 'MANUAL' ? `Manual · ${order.payment?.manualDestination?.provider || ''}` : order.paymentMethod === 'ONLINE' ? `Online · ${order.payment?.provider === 'DEMO' ? 'Demo gateway' : order.payment?.provider || 'Gateway'}` : 'Cash on delivery'}</span>{order.payment?.transactionId && <small>Transaction: {order.payment.transactionId}</small>}</div>
         {(order.pointsRedeemed > 0 || order.pointsEarned > 0) && <div className="order-points-meta">
           {order.pointsRedeemed > 0 && <span><Icon name="gift" size={16} />Used {order.pointsRedeemed} points · saved {formatCurrency(order.pointsDiscountCents / 100, order.payment?.currency)}</span>}
           {order.pointsEarned > 0 && <span className="earned">+{order.pointsEarned} points earned</span>}
         </div>}
-        <div className="order-card-foot"><span><Icon name="delivery" />{order.status === 'DELIVERED' ? 'Delivered' : order.status === 'CANCELLED' ? 'Order cancelled' : order.status === 'PENDING' ? 'Awaiting confirmation' : 'Delivery in progress'}</span><p>Total <strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></p></div>
+        <div className="order-card-foot"><span><Icon name={order.fulfillmentType === 'PICKUP' ? 'store' : 'delivery'} />{order.status === 'DELIVERED' ? (order.fulfillmentType === 'PICKUP' ? 'Picked up' : 'Delivered') : order.status === 'CANCELLED' ? 'Order cancelled' : order.status === 'READY_FOR_PICKUP' ? 'Ready for pickup' : order.status === 'PENDING' ? 'Awaiting confirmation' : order.fulfillmentType === 'PICKUP' ? 'Pickup order in progress' : 'Delivery in progress'}</span><p>Total <strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></p></div>
         {(order.paymentMethod === 'MANUAL' || (order.paymentMethod === 'ONLINE' && !['PAID', 'REFUNDED', 'REFUND_PENDING', 'REVIEW'].includes(order.paymentStatus) && !['CANCELLED', 'DELIVERED'].includes(order.status)) || (['PENDING', 'CONFIRMED'].includes(order.status) && !(order.paymentMethod !== 'COD' && (order.paymentStatus === 'PAID' || order.paymentStatus === 'REFUND_PENDING' || order.paymentStatus === 'REVIEW' || (order.payment?.provider === 'SSLCOMMERZ' && order.paymentStatus === 'PROCESSING'))))) && <div className="order-customer-actions">
           {order.paymentMethod === 'MANUAL' && <Link className="button button-primary" to={`/payment/manual/${order.id}`}><Icon name="cash" />{['PENDING','REJECTED'].includes(order.paymentStatus) && order.status !== 'CANCELLED' ? 'Submit payment details' : 'Payment details'}</Link>}
           {order.paymentMethod === 'ONLINE' && !['PAID', 'REFUNDED', 'REFUND_PENDING', 'REVIEW'].includes(order.paymentStatus) && !['CANCELLED', 'DELIVERED'].includes(order.status) && <button className="button button-primary" disabled={Boolean(busy)} onClick={() => pay(order)}><Icon name="card" />{busy === `pay:${order.id}` ? 'Opening payment…' : order.paymentStatus === 'PROCESSING' ? 'Check / continue payment' : order.paymentStatus === 'PENDING' ? 'Pay now' : 'Retry payment'}</button>}
@@ -133,4 +134,14 @@ function ReviewEditor({ orderId, item, onChange }) {
     {error && <p className="form-error">{error}</p>}
     <div className="review-editor-actions"><button type="button" className="button button-primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : item.review ? 'Update review' : 'Submit review'}</button>{item.review && <button type="button" className="button button-secondary" disabled={busy} onClick={remove}>Remove</button>}{!item.review && <button type="button" className="review-cancel" onClick={() => setOpen(false)}>Cancel</button>}</div>
   </div>;
+}
+
+
+function formatScheduled(value) {
+  if (!value) return 'Scheduled';
+  const [dateKey, timeKey] = value.split('T');
+  const [hour, minute] = timeKey.split(':').map(Number);
+  const time = `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
+  const date = new Date(`${dateKey}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${date} at ${time}`;
 }

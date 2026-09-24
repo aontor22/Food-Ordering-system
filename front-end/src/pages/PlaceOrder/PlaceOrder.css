@@ -44,3 +44,37 @@
 .delivery-pricing-note p { color: inherit; font-size: .75rem; line-height: 1.45; }
 .delivery-pricing-note.is-warning { border-color: #efd2bd; color: #855033; background: #fff6f0; }
 .delivery-pricing-note.is-free { border-color: #bfe0cd; color: #216643; background: #ecf8f1; }
+
+/* Step 05: fulfilment scheduling */
+.fulfillment-type-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+.fulfillment-type-card { position:relative; display:flex; align-items:center; gap:12px; width:100%; min-height:78px; padding:15px; border:1px solid #dfe6e2; border-radius:14px; color:#25352d; background:#fff; text-align:left; cursor:pointer; transition:.18s ease; }
+.fulfillment-type-card:hover { border-color:#f1aa8e; transform:translateY(-1px); }
+.fulfillment-type-card.is-selected { border-color:var(--brand); background:#fff6f2; box-shadow:0 0 0 2px rgba(255,76,36,.08); }
+.fulfillment-type-card.is-disabled { opacity:.48; cursor:not-allowed; transform:none; }
+.fulfillment-type-card > svg { flex:0 0 auto; color:var(--brand); }
+.fulfillment-type-card span { min-width:0; display:grid; gap:3px; }
+.fulfillment-type-card strong { font-size:.92rem; }
+.fulfillment-type-card small { color:#768078; font-size:.74rem; line-height:1.35; }
+.fulfillment-type-card i { margin-left:auto; width:18px; height:18px; border:2px solid #c7d0cb; border-radius:50%; }
+.fulfillment-type-card.is-selected i { border:5px solid var(--brand); }
+.fulfillment-mode-options { display:grid; gap:10px; }
+.fulfillment-mode { display:flex; align-items:center; gap:12px; padding:13px 14px; border:1px solid #e2e7e4; border-radius:13px; cursor:pointer; }
+.fulfillment-mode.is-selected { border-color:#f4a386; background:#fff7f3; }
+.fulfillment-mode.is-disabled { opacity:.5; cursor:not-allowed; }
+.fulfillment-mode input { width:17px; height:17px; accent-color:var(--brand); }
+.fulfillment-mode svg { color:var(--brand); }
+.fulfillment-mode div { display:grid; gap:2px; }
+.fulfillment-mode strong { font-size:.86rem; }
+.fulfillment-mode small { color:#77817b; font-size:.73rem; }
+.schedule-picker { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; padding:14px; border:1px solid #e7ece9; border-radius:14px; background:#fafcfb; }
+.pickup-details-card { display:flex; gap:14px; margin-bottom:16px; padding:16px; border:1px solid #d8e6de; border-radius:14px; color:#275840; background:#f4faf6; }
+.pickup-details-card svg { flex:0 0 auto; }
+.pickup-details-card h3 { margin-bottom:4px; font-size:.95rem; }
+.pickup-details-card p { font-size:.8rem; line-height:1.5; }
+.pickup-details-card small { display:block; margin-top:5px; color:#668073; line-height:1.45; }
+.fulfillment-summary { display:flex; align-items:center; gap:11px; padding:12px 13px; border:1px solid #e5eae7; border-radius:12px; background:#fbfcfb; }
+.fulfillment-summary svg { color:var(--brand); flex:0 0 auto; }
+.fulfillment-summary div { display:grid; gap:2px; }
+.fulfillment-summary strong { font-size:.82rem; }
+.fulfillment-summary small { color:#748079; font-size:.72rem; }
+@media (max-width:620px) { .fulfillment-type-options, .schedule-picker { grid-template-columns:1fr; } }

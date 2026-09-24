@@ -50,6 +50,24 @@ async function main() {
     });
   }
 
+  await prisma.fulfillmentSetting.upsert({
+    where: { id: 'default' },
+    update: {},
+    create: {
+      id: 'default',
+      deliveryEnabled: true,
+      pickupEnabled: true,
+      asapEnabled: true,
+      scheduledEnabled: true,
+      deliveryLeadMinutes: 30,
+      pickupLeadMinutes: 15,
+      slotIntervalMinutes: 30,
+      daysAhead: 7,
+      defaultSlotCapacity: 10,
+      pickupInstructions: 'Please show your order number at the restaurant counter.'
+    }
+  });
+
   const defaultDeliveryFeeCents = Math.max(0, Number(process.env.DELIVERY_FEE_CENTS || 200) || 0);
   const existingDeliveryZones = await prisma.deliveryZone.count();
   if (!existingDeliveryZones) {

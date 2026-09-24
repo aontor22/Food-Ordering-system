@@ -9,7 +9,8 @@ import { validate } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { getLoyaltySettings, getLoyaltySnapshot, restoreCancelledOrderPoints } from '../services/loyalty.js';
 import { getPaymentOptions, initiateOrderPayment, newPaymentTransactionId, serializePayment } from '../services/payment.js';
-import { assertStoreAcceptingOrders, getStoreAvailability } from '../services/store-availability.js';
+import { getStoreAvailability } from '../services/store-availability.js';
+import { resolveFulfillmentSelection } from '../services/fulfillment-scheduling.js';
 import { calculateZoneDelivery, resolveDeliveryZone, serializeDeliveryZone } from '../services/delivery-zones.js';
 
 const router = Router();
@@ -20,19 +21,31 @@ const pricingFields = {
   items: z.array(itemSchema).min(1).max(50),
   couponCode: z.string().trim().max(30).optional(),
   pointsToRedeem: z.number().int().nonnegative().max(1_000_000).default(0),
+  fulfillmentType: z.enum(['DELIVERY', 'PICKUP']).default('DELIVERY'),
   deliveryZoneId: z.string().trim().min(1).max(100).optional(),
 };
-const createSchema = z.object({ body: z.object({
+const deliverySchema = z.object({
+  firstName: z.string().trim().min(1).max(50), lastName: z.string().trim().min(1).max(50), email: z.email().max(254),
+  phone: z.string().trim().min(7).max(24), street: z.string().trim().max(150).optional(), city: z.string().trim().max(80).optional(),
+  state: z.string().trim().max(80).optional(), postalCode: z.string().trim().max(20).optional(), country: z.string().trim().max(80).optional(),
+  notes: z.string().trim().max(500).optional(),
+});
+const createBodySchema = z.object({
   ...pricingFields,
+  fulfillmentMode: z.enum(['ASAP', 'SCHEDULED']).default('ASAP'),
+  scheduledForLocal: z.string().trim().max(16).optional(),
   paymentMethod: z.enum(['COD', 'ONLINE', 'MANUAL']).default('COD'),
   manualChannelId: z.string().min(1).optional(),
-  delivery: z.object({
-    firstName: z.string().trim().min(1).max(50), lastName: z.string().trim().min(1).max(50), email: z.email().max(254),
-    phone: z.string().trim().min(7).max(24), street: z.string().trim().min(3).max(150), city: z.string().trim().min(2).max(80),
-    state: z.string().trim().min(2).max(80), postalCode: z.string().trim().min(2).max(20), country: z.string().trim().min(2).max(80),
-    notes: z.string().trim().max(500).optional(),
-  }),
-}), params: z.any(), query: z.any() });
+  delivery: deliverySchema,
+}).superRefine((value, ctx) => {
+  if (value.fulfillmentType === 'DELIVERY') {
+    for (const field of ['street', 'city', 'state', 'postalCode', 'country']) {
+      if (!value.delivery[field] || value.delivery[field].trim().length < 2) ctx.addIssue({ code: 'custom', path: ['delivery', field], message: `${field} is required for delivery` });
+    }
+  }
+  if (value.fulfillmentMode === 'SCHEDULED' && !value.scheduledForLocal) ctx.addIssue({ code: 'custom', path: ['scheduledForLocal'], message: 'Choose a scheduled time' });
+});
+const createSchema = z.object({ body: createBodySchema, params: z.any(), query: z.any() });
 const quoteSchema = z.object({ body: z.object({ ...pricingFields, postalCode: z.string().trim().max(20).optional() }), params: z.any(), query: z.any() });
 const reviewSchema = z.object({
   body: z.object({ rating: z.number().int().min(1).max(5), comment: z.string().trim().max(800).optional().transform(value => value || null) }),
@@ -84,17 +97,24 @@ async function calculatePricing(data, userId, db = prisma, { enforceMinimum = tr
   }
 
   const pointsDiscountCents = requestedPoints * settings.pointValueCents;
-  const deliveryZone = await resolveDeliveryZone(db, {
-    deliveryZoneId: data.deliveryZoneId,
-    postalCode: data.postalCode || data.delivery?.postalCode,
-  });
-  const deliveryRules = calculateZoneDelivery(deliveryZone, subtotalCents);
-  if (enforceMinimum && !deliveryRules.minimumOrderMet) {
-    throw new AppError(400, 'MINIMUM_ORDER_NOT_MET', `Minimum order for ${deliveryZone.name} has not been met`, {
-      deliveryZone: serializeDeliveryZone(deliveryZone),
-      minimumOrderCents: deliveryRules.minimumOrderCents,
-      minimumOrderRemainingCents: deliveryRules.minimumOrderRemainingCents,
+  let deliveryZone = null;
+  let deliveryRules = {
+    feeCents: 0, minimumOrderCents: 0, minimumOrderMet: true, minimumOrderRemainingCents: 0,
+    freeDeliveryThresholdCents: null, freeDelivery: true, freeDeliveryRemainingCents: 0,
+  };
+  if ((data.fulfillmentType || 'DELIVERY') === 'DELIVERY') {
+    deliveryZone = await resolveDeliveryZone(db, {
+      deliveryZoneId: data.deliveryZoneId,
+      postalCode: data.postalCode || data.delivery?.postalCode,
     });
+    deliveryRules = calculateZoneDelivery(deliveryZone, subtotalCents);
+    if (enforceMinimum && !deliveryRules.minimumOrderMet) {
+      throw new AppError(400, 'MINIMUM_ORDER_NOT_MET', `Minimum order for ${deliveryZone.name} has not been met`, {
+        deliveryZone: serializeDeliveryZone(deliveryZone),
+        minimumOrderCents: deliveryRules.minimumOrderCents,
+        minimumOrderRemainingCents: deliveryRules.minimumOrderRemainingCents,
+      });
+    }
   }
   const deliveryFeeCents = deliveryRules.feeCents;
   const totalCents = Math.max(0, subtotalCents - discountCents - pointsDiscountCents + deliveryFeeCents);
@@ -129,10 +149,11 @@ router.post('/quote', validate(quoteSchema), async (req, res, next) => {
         deliveryFeeCents: pricing.deliveryFeeCents,
         totalCents: pricing.totalCents,
         couponCode: pricing.coupon?.code || null,
-        deliveryZone: {
+        deliveryZone: pricing.deliveryZone ? {
           ...serializeDeliveryZone(pricing.deliveryZone),
           ...pricing.deliveryRules,
-        },
+        } : null,
+        fulfillmentType: req.validated.body.fulfillmentType || 'DELIVERY',
         loyalty: {
           enabled: pricing.settings.enabled,
           pointsBalance: pricing.pointsBalance,
@@ -150,7 +171,6 @@ router.post('/quote', validate(quoteSchema), async (req, res, next) => {
 router.post('/', validate(createSchema), async (req, res, next) => {
   try {
     const data = req.validated.body;
-    await assertStoreAcceptingOrders();
     const paymentOptions = await getPaymentOptions();
     const onlineOption = paymentOptions.methods.find(method => method.id === 'ONLINE');
     if (data.paymentMethod === 'ONLINE' && !onlineOption?.enabled) throw new AppError(503, 'ONLINE_PAYMENT_UNAVAILABLE', 'Online payment is not configured');
@@ -158,8 +178,8 @@ router.post('/', validate(createSchema), async (req, res, next) => {
     const preview = await calculatePricing(data, req.auth.sub);
     const orderNumber = `FO-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
     const order = await prisma.$transaction(async tx => {
-      // Re-check opening status, loyalty balance and pricing inside the transaction so a closure or another tab cannot create an invalid order.
-      await assertStoreAcceptingOrders(tx);
+      // Re-check schedule capacity, opening rules, loyalty balance and pricing inside a serializable transaction.
+      const fulfillment = await resolveFulfillmentSelection(tx, data);
       const pricing = await calculatePricing(data, req.auth.sub, tx);
       let manualDestination;
       if (data.paymentMethod === 'MANUAL') {
@@ -188,9 +208,20 @@ router.post('/', validate(createSchema), async (req, res, next) => {
           subtotalCents: pricing.subtotalCents, discountCents: pricing.discountCents,
           pointsRedeemed: pricing.pointsRedeemed, pointsDiscountCents: pricing.pointsDiscountCents,
           deliveryFeeCents: pricing.deliveryFeeCents,
-          deliveryZoneId: pricing.deliveryZone.id, deliveryZoneName: pricing.deliveryZone.name,
+          deliveryZoneId: pricing.deliveryZone?.id || null, deliveryZoneName: pricing.deliveryZone?.name || null,
+          fulfillmentType: fulfillment.fulfillmentType, fulfillmentMode: fulfillment.fulfillmentMode,
+          scheduledForLocal: fulfillment.scheduledForLocal, scheduledDateKey: fulfillment.scheduledDateKey,
+          scheduledTimeKey: fulfillment.scheduledTimeKey, schedulingTimezone: fulfillment.schedulingTimezone,
+          pickupAddressSnapshot: fulfillment.pickupAddressSnapshot, pickupInstructionsSnapshot: fulfillment.pickupInstructionsSnapshot,
           totalCents: pricing.totalCents,
-          couponCode: pricing.coupon?.code, ...data.delivery,
+          couponCode: pricing.coupon?.code,
+          firstName: data.delivery.firstName, lastName: data.delivery.lastName, email: data.delivery.email, phone: data.delivery.phone,
+          street: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.street : null,
+          city: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.city : null,
+          state: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.state : null,
+          postalCode: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.postalCode : null,
+          country: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.country : null,
+          notes: data.delivery.notes,
           items: { create: pricing.products.map(product => ({ productId: product.id, productName: product.name, unitPriceCents: product.priceCents, quantity: pricing.quantities.get(product.id), lineTotalCents: product.priceCents * pricing.quantities.get(product.id) })) },
           payment: { create: { transactionId: newPaymentTransactionId(), provider: data.paymentMethod === 'ONLINE' ? onlineOption.provider : data.paymentMethod, manualDestination, status: 'PENDING', amountCents: pricing.totalCents, currency: paymentOptions.currency } },
         },
@@ -207,9 +238,12 @@ router.post('/', validate(createSchema), async (req, res, next) => {
         });
       }
       return created;
-    });
+    }, { isolationLevel: 'Serializable' });
 
-    await audit(req, 'ORDER_CREATED', 'Order', order.id, { orderNumber, pointsRedeemed: order.pointsRedeemed });
+    await audit(req, 'ORDER_CREATED', 'Order', order.id, {
+      orderNumber, pointsRedeemed: order.pointsRedeemed,
+      fulfillmentType: order.fulfillmentType, fulfillmentMode: order.fulfillmentMode, scheduledForLocal: order.scheduledForLocal,
+    });
     let paymentSession;
     let paymentError;
     if (data.paymentMethod === 'ONLINE') {

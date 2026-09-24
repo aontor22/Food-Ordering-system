@@ -20,3 +20,7 @@
 
 .order-delivery-zone { display: flex; align-items: center; gap: 7px; margin: 10px 0; color: #59685f; font-size: .78rem; font-weight: 700; }
 .order-delivery-zone svg { color: var(--brand); }
+.status-ready_for_pickup { background:#f0eaff; color:#6a45a1; }
+.order-pickup-meta { display:grid; gap:3px; padding:10px 12px; border-radius:10px; background:#f7faf8; color:#425149; }
+.order-pickup-meta strong { font-size:.78rem; }
+.order-pickup-meta small { color:#768078; font-size:.71rem; line-height:1.45; }
