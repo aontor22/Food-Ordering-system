@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
-import { food_list as assetProducts } from '../../assets/assets';
 import { StoreContext } from '../../context/StoreContext';
 import { formatCurrency } from '../../lib/format';
 import Icon from '../../components/ui/Icon';
@@ -10,10 +9,8 @@ const emptyForm = { name: '', description: '', category: '', price: '', stock: '
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 function displayImage(product) {
-  const imageUrl = product.imageUrl || '';
-  if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
-  if (/^\/food_\d+\.(png|jpe?g|webp|avif)$/i.test(imageUrl)) return assetProducts.find(item => item._id === product.id)?.image || imageUrl;
-  return imageUrl || null;
+  const legacy = typeof product.imageUrl === 'string' && product.imageUrl.match(/^\/food_(\d+)\.(?:png|jpe?g|webp|avif)$/i);
+  return legacy ? `/seed-food/food_${legacy[1]}.webp` : product.imageUrl || null;
 }
 
 export default function AdminProducts() {

@@ -4,13 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { cloudinaryConfigured, destroyCloudinaryImage, uploadImageSource } from '../lib/cloudinary.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const assetFolder = path.resolve(here, '../../../front-end/src/assets');
+const assetFolder = path.resolve(here, '../../../front-end/public/seed-food');
 
 function localAssetFor(imageUrl) {
   if (typeof imageUrl !== 'string') return null;
-  const match = imageUrl.match(/^\/food_(\d+)\.(png|jpe?g|webp|avif)$/i);
+  const match = imageUrl.match(/^\/(?:seed-food\/)?food_(\d+)\.(?:png|jpe?g|webp|avif)$/i);
   if (!match) return null;
-  return path.join(assetFolder, `food_${match[1]}.${match[2].toLowerCase()}`);
+  return path.join(assetFolder, `food_${match[1]}.webp`);
 }
 
 function mimeFor(filePath) {

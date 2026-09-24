@@ -26,7 +26,7 @@ async function main() {
         priceCents: price * 100,
         stock: 100,
         description: 'Freshly prepared with quality ingredients',
-        imageUrl: `/food_${index + 1}.png`
+        imageUrl: `/seed-food/food_${index + 1}.webp`
       }
     });
   }

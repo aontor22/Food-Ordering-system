@@ -97,9 +97,14 @@ CLOUDINARY_FOLDER=tomato/products
 CLOUDINARY_AUTO_MIGRATE=false
 ```
 
-Run `npm run db:setup` after installing the update. Existing `/food_*.png` seed images can then be moved from **Admin → Products → Move images to Cloudinary**. You can alternatively set `CLOUDINARY_AUTO_MIGRATE=true` for one deployment; the server checks and migrates legacy product images in the background after startup and skips products that already have a Cloudinary public ID.
+Run `npm run db:setup` after installing the update. The repository keeps only lightweight WebP bootstrap images under `front-end/public/seed-food/`; these are used only until a seeded product is migrated. Existing historical `/food_*.png` rows are still recognized. Use **Admin → Products → Move images to Cloudinary**, or set `CLOUDINARY_AUTO_MIGRATE=true` for one deployment; the server migrates local product images in the background and skips products that already have a Cloudinary public ID. After migration, customers load product images from Cloudinary and PostgreSQL stores only the URL/public ID.
 
 New or replacement images are selected in Admin → Products. The file goes from the browser directly to Cloudinary; the backend only signs the upload and stores the returned URL/public ID. Replaced Cloudinary assets are deleted after the product update succeeds, and an uploaded asset is cleaned up if saving the product fails. Keep `CLOUDINARY_API_SECRET` server-side only.
+
+
+## Asset cleanup
+
+The frontend no longer bundles the old 32-product mock image catalog or legacy PNG UI icons. Seed product images are compact WebP files in `front-end/public/seed-food/` so a fresh database still has visible bootstrap images before Cloudinary migration. The hero and category artwork are also WebP. Duplicate public hero/Vite/Preact starter assets and the unused legacy Prisma initializer were removed. This keeps the repository and Vite bundle substantially smaller without removing runtime features.
 
 ## Store opening hours & closures
 

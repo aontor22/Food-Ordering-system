@@ -1,5 +1,4 @@
 import { createContext, useEffect, useMemo, useState } from 'react';
-import { food_list as fallbackFoods } from '../assets/assets';
 import { api, setAccessToken } from '../lib/api';
 import { detachPushOnLogout } from '../lib/push';
 
@@ -22,15 +21,18 @@ function saveGuestWishlist(ids) {
   localStorage.setItem(GUEST_WISHLIST_KEY, JSON.stringify(ids));
 }
 
+function productImageUrl(imageUrl) {
+  const legacy = typeof imageUrl === 'string' && imageUrl.match(/^\/food_(\d+)\.(?:png|jpe?g|webp|avif)$/i);
+  return legacy ? `/seed-food/food_${legacy[1]}.webp` : imageUrl || null;
+}
+
 function normalizeProducts(products) {
-  return products.map(product => {
-    const imageUrl = product.imageUrl || '';
-    const fallbackImage = /^\/food_\d+\.(png|jpe?g|webp|avif)$/i.test(imageUrl)
-      ? fallbackFoods.find(food => food._id === product.id)?.image
-      : null;
-    const image = /^https?:\/\//i.test(imageUrl) ? imageUrl : fallbackImage || imageUrl || null;
-    return { ...product, _id: product.id, image, price: product.price ?? product.priceCents / 100 };
-  });
+  return products.map(product => ({
+    ...product,
+    _id: product.id,
+    image: productImageUrl(product.imageUrl),
+    price: product.price ?? product.priceCents / 100,
+  }));
 }
 
 function productsFromWishlistResponse(data) {
@@ -39,7 +41,7 @@ function productsFromWishlistResponse(data) {
 
 export default function StoreContextProvider({ children }) {
   const [cartItems, setCartItems] = useState(loadCart);
-  const [food_list, setFoodList] = useState(fallbackFoods);
+  const [food_list, setFoodList] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
