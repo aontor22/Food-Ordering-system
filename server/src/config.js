@@ -27,3 +27,10 @@ const schema = z.object({
 
 export const config = schema.parse(process.env);
 export const isProduction = config.NODE_ENV === 'production';
+
+if (config.SSLCOMMERZ_LIVE && (!config.SSLCOMMERZ_STORE_ID || !config.SSLCOMMERZ_STORE_PASSWORD)) {
+  throw new Error('SSLCOMMERZ_LIVE=true requires SSLCOMMERZ_STORE_ID and SSLCOMMERZ_STORE_PASSWORD');
+}
+if (isProduction && config.SSLCOMMERZ_LIVE && !config.PUBLIC_API_URL.startsWith('https://')) {
+  throw new Error('Live SSLCOMMERZ requires an HTTPS PUBLIC_API_URL');
+}

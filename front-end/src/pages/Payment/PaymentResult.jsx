@@ -8,7 +8,8 @@ import './Payment.css';
 
 const copy = {
   pending: { icon: 'clock', kicker: 'Payment status', title: 'Awaiting verification', text: 'Check your order for the latest verified payment status.' },
-  refunded: { icon: 'check', kicker: 'Refund recorded', title: 'Payment refunded', text: 'A refund has been recorded for this order.' },
+  refunded: { icon: 'check', kicker: 'Refund completed', title: 'Payment refunded', text: 'The payment gateway has confirmed the refund for this order.' },
+  refund_pending: { icon: 'clock', kicker: 'Refund requested', title: 'Refund is processing', text: 'The gateway accepted the refund request. We are waiting for final confirmation.' },
   success: { icon: 'check', kicker: 'Payment verified', title: 'Payment successful', text: 'Your transaction was verified and your order is now confirmed.' },
   review: { icon: 'clock', kicker: 'Verification pending', title: 'Payment under review', text: 'The gateway received your payment but requested an additional risk review.' },
   failed: { icon: 'alert', kicker: 'Payment unsuccessful', title: 'Payment was not completed', text: 'Your order is saved. You can safely retry from My orders.' },
@@ -22,7 +23,7 @@ export default function PaymentResult() {
   const [order, setOrder] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const status = order?.paymentStatus === 'PAID' ? 'success' : order?.payment?.status === 'REVIEW' ? 'review' : order?.paymentStatus === 'REFUNDED' ? 'refunded' : order?.paymentStatus === 'FAILED' ? 'failed' : order?.paymentStatus === 'CANCELLED' ? 'cancelled' : 'pending';
+  const status = order?.paymentStatus === 'PAID' ? 'success' : order?.paymentStatus === 'REFUND_PENDING' ? 'refund_pending' : order?.payment?.status === 'REVIEW' ? 'review' : order?.paymentStatus === 'REFUNDED' ? 'refunded' : order?.paymentStatus === 'FAILED' ? 'failed' : order?.paymentStatus === 'CANCELLED' ? 'cancelled' : 'pending';
   const details = copy[status];
 
   useEffect(() => {
@@ -48,6 +49,6 @@ export default function PaymentResult() {
     {!user && !authLoading && <p>Sign in through My orders to view your verified result.</p>}
     {error && <p className="form-error" role="alert">{error}</p>}
     {(orderNumber || order) && <div className="payment-receipt compact"><div><span>Order</span><strong>{orderNumber || '—'}</strong></div>{order && <><div><span>Payment status</span><strong>{humanizeStatus(order.paymentStatus)}</strong></div><div><span>Amount</span><strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></div></>}</div>}
-    <div className="payment-actions">{order && order.paymentMethod === 'ONLINE' && !['PAID', 'REFUNDED', 'REVIEW'].includes(order.paymentStatus) && !['CANCELLED', 'DELIVERED'].includes(order.status) && <button className="button button-primary" onClick={retry} disabled={busy}>{busy ? 'Checking payment…' : order.paymentStatus === 'PROCESSING' ? 'Check / continue payment' : 'Retry payment'}</button>}<Link className="button button-primary" to="/orders">View my orders</Link><Link className="button button-secondary" to="/">Back to menu</Link></div>
+    <div className="payment-actions">{order && order.paymentMethod === 'ONLINE' && !['PAID', 'REFUNDED', 'REFUND_PENDING', 'REVIEW'].includes(order.paymentStatus) && !['CANCELLED', 'DELIVERED'].includes(order.status) && <button className="button button-primary" onClick={retry} disabled={busy}>{busy ? 'Checking payment…' : order.paymentStatus === 'PROCESSING' ? 'Check / continue payment' : 'Retry payment'}</button>}<Link className="button button-primary" to="/orders">View my orders</Link><Link className="button button-secondary" to="/">Back to menu</Link></div>
   </section>;
 }

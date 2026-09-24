@@ -1,34 +1,44 @@
-# Customer and admin payment update
+# Verification status
 
-Verified locally on 19 September 2026.
+Current release: Step 02 — PostgreSQL + SSLCOMMERZ production hardening.
 
-## Delivered
+## Implemented
 
-- Customer checkout offers COD and configured online payment, with a development-only demo.
-- Payment results use authenticated server data, not URL success flags. Orders expose payment status, retry/continue, and permitted cancellation.
-- Admin Payments lists transaction details, filters, cash received/refunded actions, and gateway status checks. Online payments cannot be manually marked paid.
-- Online fulfilment requires verified payment. Cancellation and cash settlement read current state within database transactions. Refunded cash cannot be collected again.
-- Gateway settlement validates transaction identity, amount, currency, and risk. Failure/cancel notifications trigger a server-to-server query. Duplicate settlement cannot downgrade paid status.
-- Existing COD orders are backfilled into the ledger on database setup. Re-running setup preserves the records.
-- Disabled accounts lose access immediately, including previously issued access tokens.
-- Manual payment channels are configurable from Admin → Payments; customer submissions require administrator review and never directly set paid status.
-- Reference reuse, foreign-order access, stale reviews, unverified fulfilment and under-review cancellation are blocked. Destination instructions are snapshotted on each order.
-- Mobile manual payment channels require BDT. Admin approval includes an explicit receipt-verification confirmation; manual refunds record already-returned funds.
+- PostgreSQL runtime with Prisma Migrate production deployment.
+- Customer COD, manual payment and SSLCOMMERZ hosted checkout.
+- SSLCOMMERZ success/IPN is never trusted by itself: the backend calls the Order Validation API and verifies transaction ID, amount and currency before marking paid.
+- Failed/cancelled browser callbacks query the provider before mutating payment state.
+- Provider timeouts stay processing instead of being guessed as failed.
+- Gateway risk metadata is stored. Risk-flagged verified payments enter `REVIEW`, block fulfilment, and require an admin decision.
+- Admin can accept a gateway-validated risk payment or send it into the gateway refund workflow.
+- SSLCOMMERZ full refund initiation uses the bank transaction reference plus a merchant-generated `refund_trans_id` and stores the returned refund reference.
+- Refund initiation sets `REFUND_PENDING`; only the refund-status query can move it to `REFUNDED`.
+- Payment/refund reconciliation is idempotent at the application-state layer and settled/refunded transactions cannot be downgraded by browser failure callbacks.
+- Public gateway callback routes use a separate higher rate limit so shared provider callback traffic is not constrained by the normal customer API limiter.
+- Merchant secrets remain server-side.
 
-## Verification
+## Static verification completed in this workspace
 
-- `npm test`: 18 integration tests, isolated temporary SQLite database; includes manual submission, approval, rejection/correction, duplication, currency, refund and ownership cases.
-- Gateway verification tests use mocked provider responses; no money charged.
-- `npm run build`: frontend production build verified after the manual payment update.
-- `npm audit --omit=dev`: zero reported production dependency vulnerabilities at check time.
-- Server JavaScript syntax checks passed.
-- Production smoke checks passed for `/admin/payments`, `/payment/result`, `/orders`, unknown API 404, unauthenticated payment rejection, and disabled production demo.
-- Visual browser verification was attempted but Chromium download timed out; no claim of completed visual/browser end-to-end testing.
+- All modified server/service/route/test JavaScript files passed `node --check`.
+- PostgreSQL migration SQL and Prisma schema changes were reviewed together for matching columns/indexes.
+- Gateway tests were extended with mocked risk acceptance and refund initiation/status cases. They do not call SSLCOMMERZ or charge/refund real money.
 
-## Deployment limits
+## Verification still required in your Codespace/Render environment
 
-Real SSLCOMMERZ credentials and public HTTPS callbacks must be configured and tested in the merchant sandbox before live use. Automated online refunds and operator risk-review resolution are not included. Ambiguous gateway sessions remain processing until verified; they are not assumed failed. The admin ledger shows the latest 250 payment records. This is implementation verification, not an independent penetration test.
+Dependency installation in this workspace timed out, so the complete dependency-backed suite was not rerun here. After copying the release, run:
 
-See README.md for upgrade commands, environment variables, and payment operation details.
+```bash
+npm install
+npm run db:setup
+npm test
+npm run build
+```
 
-Gateway protocol reference: https://developer.sslcommerz.com/doc/v4/
+Then complete the sandbox acceptance checklist in `SSLCOMMERZ_SETUP.md` before setting `SSLCOMMERZ_LIVE=true`.
+
+## Live deployment limits
+
+- Real merchant credentials, public HTTPS callbacks and sandbox/live merchant configuration are account-specific and cannot be validated without your SSLCOMMERZ account.
+- SSLCOMMERZ documents that live refund API use requires the merchant public IP to be registered with its live system.
+- A `REFUND_PENDING` payment should not be treated as completed until the provider query reports `refunded`.
+- This implementation verification is not a penetration test or payment-industry certification.

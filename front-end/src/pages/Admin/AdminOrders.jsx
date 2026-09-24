@@ -65,7 +65,7 @@ export default function AdminOrders() {
 function OrderRows({ order, expanded, onExpand, onStatus, busy }) {
   const availableTransitions = transitions[order.status].filter(nextStatus => {
     if (nextStatus === 'CANCELLED' && order.paymentMethod === 'MANUAL' && order.paymentStatus === 'REVIEW') return false;
-    if (nextStatus === 'CANCELLED' && order.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW'].includes(order.paymentStatus)) return false;
+    if (nextStatus === 'CANCELLED' && order.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW', 'REFUND_PENDING'].includes(order.paymentStatus)) return false;
     if (nextStatus === 'CANCELLED' && order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID') return false;
     if (nextStatus !== 'CANCELLED' && order.paymentMethod !== 'COD' && order.paymentStatus !== 'PAID') return false;
     return true;

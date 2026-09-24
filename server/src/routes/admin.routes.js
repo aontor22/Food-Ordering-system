@@ -6,7 +6,7 @@ import { AppError } from '../lib/errors.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
-import { serializePayment, reconcileSslCommerzPayment } from '../services/payment.js';
+import { approveSslCommerzRiskPayment, getGatewayConfiguration, requestSslCommerzRefund, reconcileSslCommerzPayment, reconcileSslCommerzRefund, serializePayment } from '../services/payment.js';
 import { validateChannel, reviewManualPayment, refundManualPayment } from '../services/manual-payment.js';
 import { config } from '../config.js';
 import { awardDeliveredOrderPoints, getLoyaltySettings, restoreCancelledOrderPoints } from '../services/loyalty.js';
@@ -172,7 +172,7 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
         throw new AppError(409, 'PAYMENT_REQUIRED', 'Payment must be verified before fulfilment can begin');
       }
       if (nextStatus === 'CANCELLED' && existing.paymentMethod === 'MANUAL' && existing.paymentStatus === 'REVIEW') throw new AppError(409, 'PAYMENT_UNDER_REVIEW', 'Review the submitted payment before cancelling');
-      if (nextStatus === 'CANCELLED' && existing.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW'].includes(existing.payment.status)) throw new AppError(409, 'PAYMENT_PROCESSING', 'Wait for gateway verification before cancelling');
+      if (nextStatus === 'CANCELLED' && existing.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW', 'REFUND_PENDING'].includes(existing.payment.status)) throw new AppError(409, 'PAYMENT_PROCESSING', 'Wait for gateway payment/refund verification before cancelling');
       const settleCod = nextStatus === 'DELIVERED' && existing.paymentMethod === 'COD' && existing.paymentStatus !== 'REFUNDED';
 
       if (nextStatus === 'CANCELLED') {
@@ -215,7 +215,7 @@ router.get('/payments', async (_req, res) => {
     orderBy: { createdAt: 'desc' },
     take: 250,
   });
-  res.json({ payments: payments.map(payment => ({ ...serializePayment(payment), order: payment.order })) });
+  res.json({ payments: payments.map(payment => ({ ...serializePayment(payment), order: payment.order })), gateway: getGatewayConfiguration() });
 });
 
 router.get('/payment-channels', async (_req, res) => {
@@ -251,9 +251,30 @@ router.post('/payments/:id/check', async (req, res, next) => {
     const payment = await prisma.payment.findUnique({ where: { id: req.params.id } });
     if (!payment) throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Payment not found');
     if (payment.provider !== 'SSLCOMMERZ') throw new AppError(409, 'NOT_GATEWAY_PAYMENT', 'This payment does not use SSLCOMMERZ');
-    await reconcileSslCommerzPayment(payment.transactionId);
-    await audit(req, 'PAYMENT_STATUS_CHECKED', 'Payment', payment.id);
+    if (payment.status === 'REFUND_PENDING') await reconcileSslCommerzRefund(payment.id);
+    else await reconcileSslCommerzPayment(payment.transactionId);
+    await audit(req, 'PAYMENT_STATUS_CHECKED', 'Payment', payment.id, { phase: payment.status === 'REFUND_PENDING' ? 'refund' : 'payment' });
     res.json({ payment: serializePayment(await prisma.payment.findUnique({ where: { id: payment.id } })) });
+  } catch (error) { next(error); }
+});
+
+router.post('/payments/:id/gateway-risk-approve', async (req, res, next) => {
+  try {
+    const payment = await approveSslCommerzRiskPayment(req.params.id);
+    await audit(req, 'GATEWAY_RISK_PAYMENT_ACCEPTED_BY_ADMIN', 'Payment', payment.id);
+    res.json({ payment: serializePayment(payment) });
+  } catch (error) { next(error); }
+});
+
+router.post('/payments/:id/gateway-refund', validate(z.object({
+  body: z.object({ reason: z.string().trim().min(5).max(255) }),
+  params: z.object({ id: z.string().min(1) }),
+  query: empty,
+})), async (req, res, next) => {
+  try {
+    const payment = await requestSslCommerzRefund(req.validated.params.id, req.validated.body.reason);
+    await audit(req, 'GATEWAY_REFUND_REQUESTED_BY_ADMIN', 'Payment', payment.id, { reason: req.validated.body.reason, amountCents: payment.refundAmountCents || payment.amountCents });
+    res.json({ payment: serializePayment(payment) });
   } catch (error) { next(error); }
 });
 

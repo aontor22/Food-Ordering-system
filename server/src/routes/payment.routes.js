@@ -37,7 +37,10 @@ router.post('/sslcommerz/success', async (req, res) => {
   try {
     const result = await validateSslCommerzPayment(req.body);
     res.redirect(303, paymentResult(result.review ? 'review' : 'success', result.order.orderNumber));
-  } catch { res.redirect(303, paymentResult('failed')); }
+  } catch (error) {
+    const uncertain = ['PAYMENT_VALIDATION_UNAVAILABLE', 'PAYMENT_STATUS_UNAVAILABLE'].includes(error?.code) || Number(error?.status) >= 500;
+    res.redirect(303, paymentResult(uncertain ? 'pending' : 'failed'));
+  }
 });
 
 router.post('/sslcommerz/fail', async (req, res) => {

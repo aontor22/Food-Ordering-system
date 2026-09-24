@@ -85,6 +85,8 @@ export const api = {
   reviewManualPayment: (id, body) => request(`/admin/payments/${id}/manual-review`, { method: 'POST', body: JSON.stringify(body) }),
   refundManualPayment: (id, body) => request(`/admin/payments/${id}/manual-refunded`, { method: 'POST', body: JSON.stringify(body) }),
   checkAdminPayment: id => request(`/admin/payments/${id}/check`, { method: 'POST' }),
+  approveAdminGatewayRiskPayment: id => request(`/admin/payments/${id}/gateway-risk-approve`, { method: 'POST' }),
+  refundAdminGatewayPayment: (id, body) => request(`/admin/payments/${id}/gateway-refund`, { method: 'POST', body: JSON.stringify(body) }),
   confirmAdminCashPayment: id => request(`/admin/payments/${id}/cash-received`, { method: 'POST' }),
   refundAdminCashPayment: id => request(`/admin/payments/${id}/cash-refunded`, { method: 'POST' }),
 };

@@ -155,7 +155,19 @@ model Payment {
   gatewaySessionId String?
   gatewayTransactionId String?
   validationId String?
+  gatewayRiskLevel Int?
+  gatewayRiskTitle String?
+  gatewayCardType String?
+  gatewayCardIssuer String?
+  lastGatewayCheckAt DateTime?
   failureReason String?
+  refundStatus String?
+  refundReferenceId String? @unique
+  refundTransactionId String? @unique
+  refundAmountCents Int?
+  refundReason String?
+  refundRequestedAt DateTime?
+  refundedAt DateTime?
   manualDestination String?
   manualSubmissions ManualPaymentSubmission[]
   attempts Int @default(0)

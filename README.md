@@ -18,8 +18,8 @@ A working Preact storefront and responsive restaurant admin dashboard with a Nod
 - Searchable/filterable catalog, redesigned cart and checkout, order confirmation, and customer order history
 - Sensitive authorization, cookie, and `Set-Cookie` headers redacted from request logs
 - Customer COD/online checkout, development demo payment, verified payment result, and retry from My orders
-- Admin Payments ledger with transaction filters, cash collection/refund records, and gateway-controlled online statuses
-- SSLCOMMERZ hosted checkout, validated success/IPN callbacks, and server-side failure/cancellation reconciliation
+- Admin Payments ledger with transaction filters, cash collection/refund records, gateway reconciliation, risk-review decisions, and SSLCOMMERZ refund tracking
+- SSLCOMMERZ hosted checkout, validated success/IPN callbacks, server-side failure/cancellation reconciliation, risk review, and full gateway refund workflow
 
 ## Quick start
 
@@ -52,7 +52,7 @@ npm test
 npm run build
 ```
 
-Tests use an isolated temporary PostgreSQL schema and include mocked provider responses for amount validation, risk review, replay/idempotency, failed-payment retry, and role/ownership checks. They do not charge money or call a live merchant account.
+Tests use an isolated temporary PostgreSQL schema and include mocked provider responses for amount validation, risk review, replay/idempotency, failed-payment retry, gateway refund initiation/status, and role/ownership checks. They do not charge money or call a live merchant account.
 
 
 ## PostgreSQL database
@@ -80,7 +80,7 @@ For real SSLCOMMERZ integration, set `SSLCOMMERZ_STORE_ID`, `SSLCOMMERZ_STORE_PA
 
 `PAYMENT_CURRENCY` and frontend `VITE_CURRENCY` must match (default USD; use BDT if your prices are in taka). Changing these variables does not convert stored prices. Test on the provider sandbox before setting `SSLCOMMERZ_LIVE=true`. Demo payments are always disabled with `NODE_ENV=production`; without gateway credentials, only COD is available.
 
-Gateway timeouts remain processing until verified; retry checks the provider before starting another attempt. Risk-review transactions block fulfilment. Online refund initiation and risk-review resolution are not automated in this release; reconcile them through the merchant dashboard and an operator workflow before release. No live payment was made during local verification. See the [official SSLCOMMERZ integration documentation](https://developer.sslcommerz.com/doc/v4/).
+Gateway timeouts remain processing until verified; retry checks the provider before starting another attempt. Risk-review transactions block fulfilment until an administrator either accepts the gateway-validated payment or refunds it. Paid SSLCOMMERZ transactions can be refunded from Admin → Payments; the system sends a full-refund request, records the gateway refund reference, keeps the payment in `REFUND_PENDING`, and only marks it `REFUNDED` after a status query confirms completion. Live refund API calls require the merchant public IP to be registered with SSLCOMMERZ. No live payment or refund is made by the test suite. See `SSLCOMMERZ_SETUP.md` and the [official SSLCOMMERZ integration documentation](https://developer.sslcommerz.com/doc/v4/).
 
 ## Cloudinary product images
 
@@ -109,7 +109,7 @@ New or replacement images are selected in Admin → Products. The file goes from
 | Catalog | `GET /api/products`, `/api/products/categories` |
 | Orders | `POST/GET /api/orders`, detail, and cancellation |
 | Payments | `GET /api/payments/options`, `POST /api/payments/orders/:orderId/initiate`, authenticated demo routes, SSLCOMMERZ callback routes |
-| Admin payments | `GET /api/admin/payments`, `POST /api/admin/payments/:id/cash-received`, `cash-refunded` |
+| Admin payments | `GET /api/admin/payments`; cash receive/refund; gateway status check; risk acceptance; SSLCOMMERZ refund request/status under `/api/admin/payments/:id/*` |
 | Manual customer payments | `GET /api/payments/manual/:orderId`, `POST /api/payments/manual/:orderId/submit` |
 | Manual admin operations | `GET/POST /api/admin/payment-channels`, `PATCH /api/admin/payment-channels/:id`, `POST /api/admin/payments/:id/manual-review`, `manual-refunded` |
 | Admin dashboard | `GET /api/admin/dashboard` |
@@ -127,7 +127,7 @@ New or replacement images are selected in Admin → Products. The file goes from
 3. Replace the seed admin password and never commit `.env` or database credentials.
 4. Use a managed PostgreSQL database; on Render, use the database Internal URL when the API and database are in the same region.
 5. Configure Cloudinary credentials for product image uploads; keep `CLOUDINARY_API_SECRET` only on the backend.
-6. Configure and validate SSLCOMMERZ sandbox callbacks, currency, and public HTTPS URLs before enabling live online payments. Complete merchant refund/review operations for your deployment.
+6. Configure and validate SSLCOMMERZ sandbox callbacks, currency, public HTTPS URLs, risk-review handling, and refund flow before enabling live online payments. Register the Render service public IP with SSLCOMMERZ if required for live refund API access.
 
 ## Structure
 

@@ -253,7 +253,7 @@ router.post('/:id/cancel', async (req, res, next) => {
       if (!['PENDING', 'CONFIRMED'].includes(order.status)) throw new AppError(409, 'CANNOT_CANCEL', 'This order can no longer be cancelled');
       if (order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID') throw new AppError(409, 'REFUND_REQUIRED', 'Prepaid orders must be refunded before cancellation');
       if (order.paymentMethod === 'MANUAL' && order.paymentStatus === 'REVIEW') throw new AppError(409, 'PAYMENT_UNDER_REVIEW', 'Wait for payment review before cancelling');
-      if (order.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW'].includes(order.payment.status)) throw new AppError(409, 'PAYMENT_PROCESSING', 'Wait for gateway verification before cancelling');
+      if (order.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW', 'REFUND_PENDING'].includes(order.payment.status)) throw new AppError(409, 'PAYMENT_PROCESSING', 'Wait for gateway payment/refund verification before cancelling');
 
       for (const item of order.items) await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
       if (order.payment) await tx.payment.updateMany({ where: { id: order.payment.id, status: { notIn: ['PAID', 'REFUNDED'] } }, data: { status: 'CANCELLED', failureReason: 'Order cancelled by customer' } });
