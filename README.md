@@ -20,6 +20,7 @@ A working Preact storefront and responsive restaurant admin dashboard with a Nod
 - Customer COD/online checkout, development demo payment, verified payment result, and retry from My orders
 - Admin Payments ledger with transaction filters, cash collection/refund records, gateway reconciliation, risk-review decisions, and SSLCOMMERZ refund tracking
 - SSLCOMMERZ hosted checkout, validated success/IPN callbacks, server-side failure/cancellation reconciliation, risk review, and full gateway refund workflow
+- Server-enforced restaurant opening hours, overnight schedules, emergency ordering pause, temporary closures, holiday closures, and customer-facing open/closed status
 
 ## Quick start
 
@@ -100,11 +101,18 @@ Run `npm run db:setup` after installing the update. Existing `/food_*.png` seed 
 
 New or replacement images are selected in Admin → Products. The file goes from the browser directly to Cloudinary; the backend only signs the upload and stores the returned URL/public ID. Replaced Cloudinary assets are deleted after the product update succeeds, and an uploaded asset is cleaned up if saving the product fails. Keep `CLOUDINARY_API_SECRET` server-side only.
 
+## Store opening hours & closures
+
+Admin → **Store hours** controls the restaurant timezone, weekly schedule, 24-hour/closed days, emergency **Accept new orders** switch, temporary closures, and full-day holiday/special closures. Customers can keep browsing the menu while the restaurant is closed, but Cart/Checkout clearly show the closure and the API rejects new orders server-side. Existing orders are never cancelled by a schedule change.
+
+The migration intentionally defaults all seven days to **Open 24 hours** so deploying this release cannot unexpectedly take an existing store offline. After deployment, configure your real schedule. See `STORE_HOURS_SETUP.md`.
+
 ## API map
 
 | Area | Endpoints |
 | --- | --- |
 | Health | `GET /api/health` |
+| Store status | `GET /api/store/status` |
 | Auth | `POST /api/auth/register`, `login`, `refresh`, `logout`; `GET /me` |
 | Catalog | `GET /api/products`, `/api/products/categories` |
 | Orders | `POST/GET /api/orders`, detail, and cancellation |
@@ -113,6 +121,7 @@ New or replacement images are selected in Admin → Products. The file goes from
 | Manual customer payments | `GET /api/payments/manual/:orderId`, `POST /api/payments/manual/:orderId/submit` |
 | Manual admin operations | `GET/POST /api/admin/payment-channels`, `PATCH /api/admin/payment-channels/:id`, `POST /api/admin/payments/:id/manual-review`, `manual-refunded` |
 | Admin dashboard | `GET /api/admin/dashboard` |
+| Admin store operations | `GET/PATCH /api/admin/store-operations`, `POST /api/admin/store-closures`, `DELETE /api/admin/store-closures/:id` |
 | Admin products | List, create, update, archive and restore under `/api/admin/products` |
 | Admin media | Cloudinary status/signature/cleanup/migration under `/api/admin/media` |
 | Admin orders | List and controlled status transitions under `/api/admin/orders` |

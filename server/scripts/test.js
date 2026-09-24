@@ -32,7 +32,7 @@ try {
     ['npm', ['run', 'db:generate']],
     ['npm', ['run', 'db:migrate']],
     ['npm', ['run', 'db:seed']],
-    [process.execPath, ['--test', '--test-concurrency=1', 'test/api.test.js', 'test/gateway.test.js', 'test/manual.test.js', 'test/loyalty-review.test.js', 'test/wishlist.test.js']]
+    [process.execPath, ['--test', '--test-concurrency=1', 'test/api.test.js', 'test/gateway.test.js', 'test/manual.test.js', 'test/loyalty-review.test.js', 'test/wishlist.test.js', 'test/store-availability.test.js']]
   ]) {
     const result = run(command, args, { shell: process.platform === 'win32' });
     status = result.status ?? 1;

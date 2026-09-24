@@ -242,6 +242,34 @@ model Review {
   @@index([userId, createdAt])
 }
 
+model RestaurantSetting {
+  id String @id @default("default")
+  timezone String @default("Asia/Dhaka")
+  acceptingOrders Boolean @default(true)
+  temporaryClosed Boolean @default(false)
+  temporaryClosedReason String?
+  temporaryClosedUntilLocal String?
+  updatedAt DateTime @updatedAt
+}
+
+model OpeningHour {
+  id String @id @default(cuid())
+  dayOfWeek Int @unique
+  isClosed Boolean @default(false)
+  open24Hours Boolean @default(true)
+  openMinute Int @default(0)
+  closeMinute Int @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model RestaurantClosure {
+  id String @id @default(cuid())
+  dateKey String @unique
+  reason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model AuditLog {
   id String @id @default(cuid())
   action String

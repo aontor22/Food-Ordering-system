@@ -46,6 +46,13 @@ export default function StoreContextProvider({ children }) {
   const [wishlistIds, setWishlistIds] = useState(loadGuestWishlist);
   const [accountWishlistProducts, setAccountWishlistProducts] = useState([]);
   const [wishlistBusy, setWishlistBusy] = useState([]);
+  const [storeStatus, setStoreStatus] = useState(null);
+
+  const refreshStoreStatus = async () => {
+    const data = await api.getStoreStatus();
+    setStoreStatus(data.store);
+    return data.store;
+  };
 
   const refreshProducts = async () => {
     const data = await api.getProducts();
@@ -72,9 +79,10 @@ export default function StoreContextProvider({ children }) {
   useEffect(() => {
     let active = true;
     (async () => {
-      const [productsResult, authResult] = await Promise.allSettled([api.getProducts(), api.refresh()]);
+      const [productsResult, authResult, storeResult] = await Promise.allSettled([api.getProducts(), api.refresh(), api.getStoreStatus()]);
       if (!active) return;
       if (productsResult.status === 'fulfilled') setFoodList(normalizeProducts(productsResult.value.products));
+      if (storeResult.status === 'fulfilled') setStoreStatus(storeResult.value.store);
       if (authResult.status === 'fulfilled') {
         setAccessToken(authResult.value.accessToken);
         setUser(authResult.value.user);
@@ -89,6 +97,11 @@ export default function StoreContextProvider({ children }) {
       if (active) setLoading(false);
     })();
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => { api.getStoreStatus().then(data => setStoreStatus(data.store)).catch(() => {}); }, 60_000);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => localStorage.setItem('cart', JSON.stringify(cartItems)), [cartItems]);
@@ -189,5 +202,6 @@ export default function StoreContextProvider({ children }) {
     createOrder, getOrders: api.getOrders, refreshProducts,
     wishlistProducts, wishlistIds, wishlistCount, wishlistBusy,
     isWishlisted, toggleWishlist, removeWishlistItem, refreshWishlist: loadAccountWishlist,
+    storeStatus, refreshStoreStatus,
   }}>{children}</StoreContext.Provider>;
 }

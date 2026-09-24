@@ -37,6 +37,19 @@ async function main() {
     create: { code: 'WELCOME10', percentOff: 10, minimumCents: 2000 }
   });
 
+  await prisma.restaurantSetting.upsert({
+    where: { id: 'default' },
+    update: {},
+    create: { id: 'default', timezone: 'Asia/Dhaka', acceptingOrders: true, temporaryClosed: false }
+  });
+  for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek += 1) {
+    await prisma.openingHour.upsert({
+      where: { dayOfWeek },
+      update: {},
+      create: { dayOfWeek, isClosed: false, open24Hours: true, openMinute: 0, closeMinute: 0 }
+    });
+  }
+
   const email = (process.env.ADMIN_EMAIL || 'admin@example.com').trim().toLowerCase();
   const configuredPassword = process.env.ADMIN_PASSWORD?.trim();
   const isProduction = process.env.NODE_ENV === 'production';

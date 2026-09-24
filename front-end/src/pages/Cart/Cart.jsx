@@ -8,7 +8,7 @@ import Icon from '../../components/ui/Icon';
 import './Cart.css';
 
 export default function Cart() {
-  const { cartProducts, setQuantity, removeItem, getTotalCartAmount, couponCode, setCouponCode } = useContext(StoreContext);
+  const { cartProducts, setQuantity, removeItem, getTotalCartAmount, couponCode, setCouponCode, storeStatus } = useContext(StoreContext);
   const [promo, setPromo] = useState(couponCode);
   const [promoMessage, setPromoMessage] = useState('');
   const navigate = useNavigate();
@@ -40,7 +40,8 @@ export default function Cart() {
         <div className="cart-list-footer"><Link className="text-link" to="/">← Continue shopping</Link><span>{cartProducts.length} selected {cartProducts.length === 1 ? 'dish' : 'dishes'}</span></div>
       </section>
       <div>
-        <OrderSummary subtotal={getTotalCartAmount()} action={{ onClick: () => navigate('/order') }}>
+        <OrderSummary subtotal={getTotalCartAmount()} action={{ onClick: () => navigate('/order') }} actionLabel={storeStatus && !storeStatus.isOpen ? 'Ordering unavailable' : 'Continue to checkout'} disabled={Boolean(storeStatus && !storeStatus.isOpen)}>
+          {storeStatus && !storeStatus.isOpen && <div className="cart-store-closed"><Icon name="clock" size={18} /><div><strong>{storeStatus.headline}</strong><p>{storeStatus.message}</p></div></div>}
           <form className="promo-form" onSubmit={applyPromo}>
             <label htmlFor="promo">Promo code</label>
             <div><input id="promo" value={promo} onChange={event => setPromo(event.target.value)} placeholder="e.g. WELCOME10" /><button>Apply</button></div>

@@ -34,6 +34,7 @@ export default function AdminDashboard() {
 
   return <>
     <AdminPageHeader eyebrow="Live operations" title="Everything at a glance" description={`${metrics.pendingOrders} orders currently require attention.`} action={<button className="button button-secondary" onClick={load}><Icon name="refresh" />Refresh</button>} />
+    {data.storeStatus && <Link to="/admin/store-operations" className={`dashboard-store-status ${data.storeStatus.isOpen ? 'is-open' : 'is-closed'}`}><span><Icon name={data.storeStatus.isOpen ? 'check' : 'clock'} /><strong>{data.storeStatus.headline}</strong></span><p>{data.storeStatus.message}</p><Icon name="arrow" /></Link>}
     <section className="admin-metrics" aria-label="Business metrics">
       {cards.map(card => <article className="admin-card metric-card" key={card.label}>
         <span className={`metric-icon ${card.tone}`}><Icon name={card.icon} size={23} /></span>

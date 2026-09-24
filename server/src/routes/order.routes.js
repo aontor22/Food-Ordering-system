@@ -9,6 +9,7 @@ import { validate } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { getLoyaltySettings, getLoyaltySnapshot, restoreCancelledOrderPoints } from '../services/loyalty.js';
 import { getPaymentOptions, initiateOrderPayment, newPaymentTransactionId, serializePayment } from '../services/payment.js';
+import { assertStoreAcceptingOrders, getStoreAvailability } from '../services/store-availability.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -99,8 +100,12 @@ router.get('/loyalty', async (req, res) => {
 
 router.post('/quote', validate(quoteSchema), async (req, res, next) => {
   try {
-    const pricing = await calculatePricing(req.validated.body, req.auth.sub);
+    const [pricing, store] = await Promise.all([
+      calculatePricing(req.validated.body, req.auth.sub),
+      getStoreAvailability(),
+    ]);
     res.json({
+      store,
       quote: {
         subtotalCents: pricing.subtotalCents,
         discountCents: pricing.discountCents,
@@ -126,6 +131,7 @@ router.post('/quote', validate(quoteSchema), async (req, res, next) => {
 router.post('/', validate(createSchema), async (req, res, next) => {
   try {
     const data = req.validated.body;
+    await assertStoreAcceptingOrders();
     const paymentOptions = await getPaymentOptions();
     const onlineOption = paymentOptions.methods.find(method => method.id === 'ONLINE');
     if (data.paymentMethod === 'ONLINE' && !onlineOption?.enabled) throw new AppError(503, 'ONLINE_PAYMENT_UNAVAILABLE', 'Online payment is not configured');
@@ -133,7 +139,8 @@ router.post('/', validate(createSchema), async (req, res, next) => {
     const preview = await calculatePricing(data, req.auth.sub);
     const orderNumber = `FO-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
     const order = await prisma.$transaction(async tx => {
-      // Re-check loyalty balance and pricing inside the transaction so two tabs cannot spend the same points.
+      // Re-check opening status, loyalty balance and pricing inside the transaction so a closure or another tab cannot create an invalid order.
+      await assertStoreAcceptingOrders(tx);
       const pricing = await calculatePricing(data, req.auth.sub, tx);
       let manualDestination;
       if (data.paymentMethod === 'MANUAL') {

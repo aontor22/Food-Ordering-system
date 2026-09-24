@@ -13,6 +13,7 @@ import orderRoutes from './routes/order.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import wishlistRoutes from './routes/wishlist.routes.js';
+import storeRoutes from './routes/store.routes.js';
 import { errorHandler, notFound } from './lib/errors.js';
 
 export const app = express();
@@ -35,6 +36,7 @@ app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeader
 app.use('/api/payments/sslcommerz', rateLimit({ windowMs: 15 * 60 * 1000, limit: 1200, standardHeaders: 'draft-8', legacyHeaders: false }));
 app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false }), authRoutes);
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.use('/api/store', storeRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/orders', orderRoutes);

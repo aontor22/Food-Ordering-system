@@ -12,6 +12,7 @@ import { config } from '../config.js';
 import { awardDeliveredOrderPoints, getLoyaltySettings, restoreCancelledOrderPoints } from '../services/loyalty.js';
 import { cloudinaryConfigured, cloudinaryFolder, createCloudinaryUploadSignature, destroyCloudinaryImage, optimizeCloudinaryUrl, ownsCloudinaryPublicId } from '../lib/cloudinary.js';
 import { migrateLegacyProductImages } from '../services/product-media.js';
+import { getStoreAvailability, getStoreOperationsConfig, isLocalDateTimeKey, isRealDateKey, isValidTimezone, saveStoreOperations, timeToMinute } from '../services/store-availability.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -358,6 +359,84 @@ router.patch('/users/:id', validate(userUpdate), async (req, res, next) => {
 });
 
 
+
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM time');
+const storeOperationsUpdate = z.object({
+  body: z.object({
+    timezone: z.string().trim().min(1).max(80).refine(isValidTimezone, 'Use a valid IANA timezone such as Asia/Dhaka'),
+    acceptingOrders: z.boolean(),
+    temporaryClosed: z.boolean(),
+    temporaryClosedReason: z.union([z.string().trim().max(160), z.null()]).optional().transform(value => value || null),
+    temporaryClosedUntilLocal: z.union([z.string().trim().max(16), z.null()]).optional().transform(value => value || null).refine(isLocalDateTimeKey, 'Temporary reopening time must be YYYY-MM-DDTHH:MM'),
+    hours: z.array(z.object({
+      dayOfWeek: z.number().int().min(0).max(6),
+      isClosed: z.boolean(),
+      open24Hours: z.boolean(),
+      openTime: hhmm,
+      closeTime: hhmm,
+    })).length(7).refine(items => new Set(items.map(item => item.dayOfWeek)).size === 7, 'Weekly hours must include each day exactly once'),
+  }),
+  params: empty,
+  query: empty,
+});
+
+router.get('/store-operations', async (_req, res, next) => {
+  try { res.json(await getStoreOperationsConfig()); }
+  catch (error) { next(error); }
+});
+
+router.patch('/store-operations', validate(storeOperationsUpdate), async (req, res, next) => {
+  try {
+    const values = req.validated.body;
+    const normalizedHours = values.hours.map(hour => {
+      const openMinute = timeToMinute(hour.openTime);
+      const closeMinute = timeToMinute(hour.closeTime);
+      if (!hour.isClosed && !hour.open24Hours && openMinute === closeMinute) {
+        throw new AppError(400, 'INVALID_OPENING_WINDOW', 'Opening and closing time cannot be the same unless Open 24 hours is enabled');
+      }
+      return { dayOfWeek: hour.dayOfWeek, isClosed: hour.isClosed, open24Hours: hour.open24Hours, openMinute, closeMinute };
+    });
+    await prisma.$transaction(async transaction => saveStoreOperations(transaction, { ...values, hours: normalizedHours }));
+    await audit(req, 'STORE_OPERATIONS_UPDATED', 'RestaurantSetting', 'default', {
+      timezone: values.timezone,
+      acceptingOrders: values.acceptingOrders,
+      temporaryClosed: values.temporaryClosed,
+      temporaryClosedUntilLocal: values.temporaryClosedUntilLocal,
+      hours: normalizedHours,
+    });
+    res.json(await getStoreOperationsConfig());
+  } catch (error) { next(error); }
+});
+
+router.post('/store-closures', validate(z.object({
+  body: z.object({
+    dateKey: z.string().trim().refine(isRealDateKey, 'Use a valid YYYY-MM-DD date'),
+    reason: z.union([z.string().trim().max(160), z.null()]).optional().transform(value => value || null),
+  }),
+  params: empty,
+  query: empty,
+})), async (req, res, next) => {
+  try {
+    const closure = await prisma.restaurantClosure.upsert({
+      where: { dateKey: req.validated.body.dateKey },
+      update: { reason: req.validated.body.reason },
+      create: req.validated.body,
+    });
+    await audit(req, 'STORE_CLOSURE_SAVED', 'RestaurantClosure', closure.id, { dateKey: closure.dateKey, reason: closure.reason });
+    res.status(201).json({ closure, ...(await getStoreOperationsConfig()) });
+  } catch (error) { next(error); }
+});
+
+router.delete('/store-closures/:id', async (req, res, next) => {
+  try {
+    const closure = await prisma.restaurantClosure.findUnique({ where: { id: req.params.id } });
+    if (!closure) throw new AppError(404, 'STORE_CLOSURE_NOT_FOUND', 'Closure not found');
+    await prisma.restaurantClosure.delete({ where: { id: closure.id } });
+    await audit(req, 'STORE_CLOSURE_REMOVED', 'RestaurantClosure', closure.id, { dateKey: closure.dateKey });
+    res.status(204).end();
+  } catch (error) { next(error); }
+});
+
 const loyaltyUpdate = z.object({
   body: z.object({
     enabled: z.boolean(),
@@ -491,7 +570,7 @@ router.get('/dashboard', async (_req, res) => {
   const sevenDaysAgo = new Date(startOfToday);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
-  const [customers, orders, products, wishlistSaves, revenue, todayOrders, pendingOrders, lowStock, recentOrders, statusGroups, deliveredThisWeek, topItems] = await Promise.all([
+  const [customers, orders, products, wishlistSaves, revenue, todayOrders, pendingOrders, lowStock, recentOrders, statusGroups, deliveredThisWeek, topItems, storeStatus] = await Promise.all([
     prisma.user.count({ where: { role: 'CUSTOMER' } }),
     prisma.order.count(),
     prisma.product.count({ where: { isAvailable: true } }),
@@ -504,6 +583,7 @@ router.get('/dashboard', async (_req, res) => {
     prisma.order.groupBy({ by: ['status'], _count: { status: true } }),
     prisma.order.findMany({ where: { status: 'DELIVERED', createdAt: { gte: sevenDaysAgo } }, select: { totalCents: true, createdAt: true } }),
     prisma.orderItem.groupBy({ by: ['productName'], _sum: { quantity: true, lineTotalCents: true }, orderBy: { _sum: { quantity: 'desc' } }, take: 5 }),
+    getStoreAvailability(),
   ]);
 
   const revenueByDay = Array.from({ length: 7 }, (_, index) => {
@@ -522,6 +602,7 @@ router.get('/dashboard', async (_req, res) => {
     ordersByStatus: statusGroups.map(group => ({ status: group.status, count: group._count.status })),
     revenueByDay,
     topProducts: topItems.map(item => ({ name: item.productName, quantity: item._sum.quantity || 0, revenueCents: item._sum.lineTotalCents || 0 })),
+    storeStatus,
   });
 });
 

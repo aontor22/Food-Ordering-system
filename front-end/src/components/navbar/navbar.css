@@ -46,3 +46,18 @@
 .wishlist-nav-button { min-width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; position: relative; border-radius: 50%; color: var(--ink); }
 .wishlist-nav-button:hover, .wishlist-nav-button.is-saved { background: var(--brand-soft); color: var(--brand); }
 .wishlist-nav-button span { position: absolute; top: -3px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border: 2px solid var(--canvas); border-radius: 999px; color: #fff; background: var(--brand); font-size: .67rem; font-weight: 800; }
+
+.store-status-strip { border-top: 1px solid rgba(233,230,223,.7); font-size: .76rem; }
+.store-status-strip.is-open { color: #236645; background: #eef8f2; }
+.store-status-strip.is-closed { color: #8a4b2e; background: #fff3ed; }
+.store-status-inner { min-height: 34px; display: flex; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.store-status-title { display: inline-flex; align-items: center; gap: 7px; font-weight: 800; white-space: nowrap; }
+.store-status-title i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(35,102,69,.09); }
+.store-status-strip.is-closed .store-status-title i { box-shadow: 0 0 0 3px rgba(138,75,46,.1); }
+.store-status-message { color: inherit; opacity: .86; }
+.store-status-time { color: inherit; opacity: .62; font-size: .69rem; }
+@media (max-width: 620px) {
+  .store-status-inner { min-height: 40px; align-items: flex-start; flex-direction: column; gap: 1px; padding-top: 6px; padding-bottom: 6px; text-align: left; }
+  .store-status-time { display: none; }
+  .store-status-message { line-height: 1.35; }
+}

@@ -18,3 +18,7 @@
 .promo-form small { color: var(--success); line-height: 1.45; }
 @media (max-width: 880px) { .cart-layout { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .cart-list { padding: 4px 16px; } .cart-row { grid-template-columns: 72px 1fr auto; gap: 13px; } .cart-row > img { width: 72px; height: 72px; } .cart-quantity { grid-column: 2; }.cart-line-total { grid-column: 3; grid-row: 2; }.remove-item { grid-column: 3; grid-row: 1; } .cart-list-footer span { display: none; } }
+.cart-store-closed { display: flex; align-items: flex-start; gap: 9px; margin: 16px 0 0; padding: 12px; border: 1px solid #efcbb9; border-radius: 12px; color: #8a4b2e; background: #fff4ee; }
+.cart-store-closed > svg { flex: 0 0 auto; margin-top: 1px; }
+.cart-store-closed strong { display: block; font-size: .78rem; }
+.cart-store-closed p { margin-top: 2px; font-size: .72rem; line-height: 1.45; }

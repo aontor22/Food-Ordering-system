@@ -6,7 +6,7 @@ import Icon from '../ui/Icon';
 import './navbar.css';
 
 export default function Navbar({ onLogin }) {
-  const { cartCount, wishlistCount, user, logout, searchQuery, setSearchQuery } = useContext(StoreContext);
+  const { cartCount, wishlistCount, user, logout, searchQuery, setSearchQuery, storeStatus } = useContext(StoreContext);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -75,5 +75,12 @@ export default function Navbar({ onLogin }) {
       <input autoFocus value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Search salads, pasta, desserts…" aria-label="Search dishes" />
       {searchQuery && <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear search"><Icon name="close" size={18} /></button>}
     </form>}
+    {storeStatus && <div className={`store-status-strip ${storeStatus.isOpen ? 'is-open' : 'is-closed'}`} role="status">
+      <div className="page-container store-status-inner">
+        <span className="store-status-title"><i />{storeStatus.headline}</span>
+        <span className="store-status-message">{storeStatus.message}</span>
+        <span className="store-status-time">{storeStatus.timezone}</span>
+      </div>
+    </div>}
   </header>;
 }

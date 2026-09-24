@@ -33,6 +33,7 @@ async function uploadProductImage(file) {
 
 export const api = {
   getProducts: () => request('/products'),
+  getStoreStatus: () => request('/store/status'),
   register: body => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: body => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   googleLogin: credential => request('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
@@ -55,6 +56,10 @@ export const api = {
   getDemoPayment: (transactionId, signature) => request(`/payments/demo/${transactionId}?signature=${encodeURIComponent(signature)}`),
   completeDemoPayment: (transactionId, body) => request(`/payments/demo/${transactionId}/complete`, { method: 'POST', body: JSON.stringify(body) }),
   getAdminDashboard: () => request('/admin/dashboard'),
+  getAdminStoreOperations: () => request('/admin/store-operations'),
+  updateAdminStoreOperations: body => request('/admin/store-operations', { method: 'PATCH', body: JSON.stringify(body) }),
+  saveAdminStoreClosure: body => request('/admin/store-closures', { method: 'POST', body: JSON.stringify(body) }),
+  deleteAdminStoreClosure: id => request(`/admin/store-closures/${id}`, { method: 'DELETE' }),
   getAdminProducts: () => request('/admin/products'),
   getAdminMedia: () => request('/admin/media'),
   uploadProductImage,

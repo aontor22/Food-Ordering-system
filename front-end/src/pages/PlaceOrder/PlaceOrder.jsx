@@ -11,7 +11,7 @@ import './PlaceOrder.css';
 const emptyForm = { firstName: '', lastName: '', email: '', street: '', city: '', state: '', postalCode: '', country: 'Bangladesh', phone: '', notes: '' };
 
 export default function PlaceOrder({ onLogin }) {
-  const { getTotalCartAmount, cartProducts, setCartItems, createOrder, user, couponCode } = useContext(StoreContext);
+  const { getTotalCartAmount, cartProducts, setCartItems, createOrder, user, couponCode, storeStatus, refreshStoreStatus } = useContext(StoreContext);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -51,6 +51,7 @@ export default function PlaceOrder({ onLogin }) {
   const submit = async event => {
     event.preventDefault();
     if (!user) { setError('Please sign in to place your order.'); return; }
+    if (storeStatus && !storeStatus.isOpen) { setError(storeStatus.message || 'The restaurant is not accepting orders right now.'); return; }
     if (quoteError) { setError(quoteError); return; }
     setBusy(true); setError('');
     try {
@@ -67,7 +68,7 @@ export default function PlaceOrder({ onLogin }) {
       if (paymentMethod === 'MANUAL') navigate(`/payment/manual/${order.id}`);
       else if (paymentMethod === 'ONLINE' && result.paymentUrl) window.location.assign(result.paymentUrl);
       else navigate(`/order-success/${order.orderNumber}`, { state: { order, paymentError: result.paymentError, loyalty: result.loyalty } });
-    } catch (requestError) { setError(requestError.message); }
+    } catch (requestError) { setError(requestError.message); refreshStoreStatus?.().catch(() => {}); }
     finally { setBusy(false); }
   };
 
@@ -80,6 +81,7 @@ export default function PlaceOrder({ onLogin }) {
 
   return <div className="checkout-page">
     <header className="page-title"><div className="section-kicker">Secure checkout</div><h1>Delivery details</h1><p>Tell us where to bring your order. Fields marked with * are required.</p></header>
+    {storeStatus && !storeStatus.isOpen && <div className="store-closed-checkout" role="alert"><Icon name="clock" /><div><strong>{storeStatus.headline}</strong><p>{storeStatus.message}</p></div></div>}
     <form className="checkout-layout" onSubmit={submit}>
       <section className="checkout-form surface-card">
         <div className="checkout-section-title"><span>1</span><div><h2>Contact information</h2><p>We’ll use this for order updates only.</p></div></div>
@@ -110,7 +112,7 @@ export default function PlaceOrder({ onLogin }) {
         {paymentMethod === 'MANUAL' && <div className="field" style={{ marginTop: '16px' }}><label htmlFor="manual-channel">Payment account</label><select id="manual-channel" required value={manualChannelId} onChange={event => setManualChannelId(event.target.value)}>{paymentOptions.manualChannels.map(channel => <option key={channel.id} value={channel.id}>{channel.label} · {channel.provider}</option>)}</select><p className="muted">Place your order to see the exact amount and payment instructions.</p></div>}
       </section>
       <div className="checkout-sidebar">
-        <OrderSummary subtotal={subtotal} discount={promoDiscount} pointsDiscount={pointsDiscount} delivery={delivery} total={total} action={{ type: 'submit' }} actionLabel={busy ? 'Processing…' : paymentMethod === 'MANUAL' ? 'Place order & view payment details' : paymentMethod === 'ONLINE' ? 'Continue to secure payment' : 'Place order'} disabled={busy || quoteLoading || Boolean(quoteError)}>
+        <OrderSummary subtotal={subtotal} discount={promoDiscount} pointsDiscount={pointsDiscount} delivery={delivery} total={total} action={{ type: 'submit' }} actionLabel={storeStatus && !storeStatus.isOpen ? 'Ordering unavailable' : busy ? 'Processing…' : paymentMethod === 'MANUAL' ? 'Place order & view payment details' : paymentMethod === 'ONLINE' ? 'Continue to secure payment' : 'Place order'} disabled={busy || quoteLoading || Boolean(quoteError) || Boolean(storeStatus && !storeStatus.isOpen)}>
           {user && loyalty && <section className={`loyalty-checkout ${loyalty.enabled ? '' : 'is-disabled'}`}>
             <div className="loyalty-checkout-head"><div><span><Icon name="gift" size={18} />Tomato Points</span><strong>{loyalty.pointsBalance} points</strong></div>{loyalty.enabled && loyalty.pointsPerOrder > 0 && <small>Earn {loyalty.pointsPerOrder} more after delivery</small>}</div>
             {!loyalty.enabled ? <p>Points are currently paused by the restaurant. Your balance is kept safely.</p> : loyalty.pointsBalance < loyalty.minimumRedeemPoints ? <p>You need at least <strong>{loyalty.minimumRedeemPoints}</strong> points to unlock a discount.</p> : <>
