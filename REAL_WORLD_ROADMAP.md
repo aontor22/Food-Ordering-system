@@ -8,7 +8,7 @@ Implemented sequentially so each release remains deployable and testable.
 - [x] 04 — Delivery zones, area-based fees, minimum order and free-delivery threshold
 - [x] 05 — Scheduled delivery / pickup time slots and capacity
 - [x] 06 — Live order timeline and customer-facing tracking
-- [ ] 07 — Order notifications (email/browser push foundation)
+- [x] 07 — Order notifications (email/browser push foundation)
 - [ ] 08 — PWA installability and offline fallback
 - [ ] 09 — Guest checkout and post-order account linking
 - [ ] 10 — Product variants, sizes, add-ons and special instructions

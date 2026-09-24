@@ -16,6 +16,7 @@ import { getStoreAvailability, getStoreOperationsConfig, isLocalDateTimeKey, isR
 import { findDeliveryPostalOverlap, listAllDeliveryZones, normalizePostalCodes, serializeDeliveryZone } from '../services/delivery-zones.js';
 import { getFulfillmentAdminConfig } from '../services/fulfillment-scheduling.js';
 import { etaUpdateData, openOrderSseStream, publishOrderChange, trackingEventData, trackingTimestampData } from '../services/order-tracking.js';
+import { notificationCapabilities, processPendingNotifications, retryNotificationDelivery, safeEnqueueOrderNotification } from '../services/notifications.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -245,6 +246,7 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
     });
     await audit(req, 'ORDER_STATUS_UPDATED', 'Order', order.id, { from: previousStatus, to: order.status, pointsAwarded, pointsRestored });
     publishOrderChange(order);
+    await safeEnqueueOrderNotification(order.id, order.status, {}, req.log);
     res.json({ order: { ...order, payment: serializePayment(order.payment) }, pointsAwarded, pointsRestored });
   } catch (error) { next(error); }
 });
@@ -269,6 +271,8 @@ router.patch('/orders/:id/eta', validate(etaUpdate), async (req, res, next) => {
     });
     await audit(req, 'ORDER_ETA_UPDATED', 'Order', order.id, { status: order.status, minutes: req.validated.body.minutes });
     publishOrderChange(order);
+    const latestEvent = order.trackingEvents?.at(-1);
+    await safeEnqueueOrderNotification(order.id, `ETA:${latestEvent?.id || Date.now()}`, { etaNote: latestEvent?.note || null }, req.log);
     res.json({ order: { ...order, payment: serializePayment(order.payment) } });
   } catch (error) { next(error); }
 });
@@ -302,8 +306,13 @@ router.patch('/payment-channels/:id', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 router.post('/payments/:id/manual-review', async (req, res, next) => {
-  try { res.json({ payment: await reviewManualPayment(req.params.id, req.body, req) }); }
-  catch (error) { next(error); }
+  try {
+    const payment = await reviewManualPayment(req.params.id, req.body, req);
+    const paymentLink = payment.status === 'PAID' ? await prisma.payment.findUnique({ where: { id: req.params.id }, select: { orderId: true } }) : null;
+    const order = paymentLink ? await prisma.order.findUnique({ where: { id: paymentLink.orderId } }) : null;
+    if (order?.status === 'CONFIRMED') await safeEnqueueOrderNotification(order.id, 'CONFIRMED', {}, req.log);
+    res.json({ payment });
+  } catch (error) { next(error); }
 });
 router.post('/payments/:id/manual-refunded', async (req, res, next) => {
   try { res.json({ payment: await refundManualPayment(req.params.id, req.body, req) }); }
@@ -317,6 +326,8 @@ router.post('/payments/:id/check', async (req, res, next) => {
     if (payment.provider !== 'SSLCOMMERZ') throw new AppError(409, 'NOT_GATEWAY_PAYMENT', 'This payment does not use SSLCOMMERZ');
     if (payment.status === 'REFUND_PENDING') await reconcileSslCommerzRefund(payment.id);
     else await reconcileSslCommerzPayment(payment.transactionId);
+    const linkedOrder = await prisma.order.findUnique({ where: { id: payment.orderId } });
+    if (linkedOrder?.status === 'CONFIRMED') await safeEnqueueOrderNotification(linkedOrder.id, 'CONFIRMED', {}, req.log);
     await audit(req, 'PAYMENT_STATUS_CHECKED', 'Payment', payment.id, { phase: payment.status === 'REFUND_PENDING' ? 'refund' : 'payment' });
     res.json({ payment: serializePayment(await prisma.payment.findUnique({ where: { id: payment.id } })) });
   } catch (error) { next(error); }
@@ -325,6 +336,8 @@ router.post('/payments/:id/check', async (req, res, next) => {
 router.post('/payments/:id/gateway-risk-approve', async (req, res, next) => {
   try {
     const payment = await approveSslCommerzRiskPayment(req.params.id);
+    const order = await prisma.order.findUnique({ where: { id: payment.orderId } });
+    if (order?.status === 'CONFIRMED') await safeEnqueueOrderNotification(order.id, 'CONFIRMED', {}, req.log);
     await audit(req, 'GATEWAY_RISK_PAYMENT_ACCEPTED_BY_ADMIN', 'Payment', payment.id);
     res.json({ payment: serializePayment(payment) });
   } catch (error) { next(error); }
@@ -827,6 +840,45 @@ router.get('/dashboard', async (_req, res) => {
     topProducts: topItems.map(item => ({ name: item.productName, quantity: item._sum.quantity || 0, revenueCents: item._sum.lineTotalCents || 0 })),
     storeStatus,
   });
+});
+
+
+router.get('/notifications', async (_req, res) => {
+  const [byStatus, byChannel, subscriptionCount, recent] = await Promise.all([
+    prisma.notificationDelivery.groupBy({ by: ['status'], _count: { _all: true } }),
+    prisma.notificationDelivery.groupBy({ by: ['channel'], _count: { _all: true } }),
+    prisma.pushSubscription.count(),
+    prisma.notificationDelivery.findMany({
+      include: { user: { select: { id: true, name: true, email: true } }, order: { select: { id: true, orderNumber: true } } },
+      orderBy: { createdAt: 'desc' }, take: 100,
+    }),
+  ]);
+  res.json({
+    capabilities: notificationCapabilities(),
+    subscriptionCount,
+    byStatus: Object.fromEntries(byStatus.map(row => [row.status, row._count._all])),
+    byChannel: Object.fromEntries(byChannel.map(row => [row.channel, row._count._all])),
+    recent,
+  });
+});
+
+router.post('/notifications/process', async (req, res, next) => {
+  try {
+    const result = await processPendingNotifications({ limit: 50 });
+    await audit(req, 'NOTIFICATION_QUEUE_PROCESSED', 'NotificationDelivery', null, result);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.post('/notifications/:id/retry', async (req, res, next) => {
+  try {
+    const existing = await prisma.notificationDelivery.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw new AppError(404, 'NOTIFICATION_NOT_FOUND', 'Notification delivery not found');
+    if (existing.status === 'SENT') throw new AppError(409, 'NOTIFICATION_ALREADY_SENT', 'This notification was already sent');
+    const delivery = await retryNotificationDelivery(existing.id);
+    await audit(req, 'NOTIFICATION_RETRY_QUEUED', 'NotificationDelivery', delivery.id, { channel: delivery.channel, eventType: delivery.eventType });
+    res.json({ delivery });
+  } catch (error) { next(error); }
 });
 
 export default router;

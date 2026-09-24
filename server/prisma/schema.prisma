@@ -25,6 +25,9 @@ model User {
   loyaltyTransactions LoyaltyTransaction[]
   wishlistItems WishlistItem[]
   auditLogs AuditLog[] @relation("ActorLogs")
+  notificationPreference NotificationPreference?
+  pushSubscriptions PushSubscription[]
+  notificationDeliveries NotificationDelivery[]
 }
 
 model Session {
@@ -161,6 +164,7 @@ model Order {
   loyaltyTransactions LoyaltyTransaction[]
   payment Payment?
   trackingEvents OrderTrackingEvent[]
+  notificationDeliveries NotificationDelivery[]
   @@index([userId, createdAt])
   @@index([status, createdAt])
   @@index([statusUpdatedAt])
@@ -352,6 +356,60 @@ model RestaurantClosure {
   reason String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+
+model NotificationPreference {
+  id String @id @default(cuid())
+  emailEnabled Boolean @default(true)
+  pushEnabled Boolean @default(false)
+  orderPlaced Boolean @default(true)
+  orderConfirmed Boolean @default(true)
+  orderPreparing Boolean @default(true)
+  orderReady Boolean @default(true)
+  orderDelivered Boolean @default(true)
+  orderCancelled Boolean @default(true)
+  etaUpdates Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId String @unique
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PushSubscription {
+  id String @id @default(cuid())
+  endpoint String @unique
+  p256dh String
+  auth String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, updatedAt])
+}
+
+model NotificationDelivery {
+  id String @id @default(cuid())
+  channel String
+  eventType String
+  status String @default("PENDING")
+  attempts Int @default(0)
+  payloadJson String
+  providerMessageId String?
+  lastError String?
+  nextAttemptAt DateTime @default(now())
+  sentAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId String
+  orderId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@unique([userId, orderId, eventType, channel])
+  @@index([status, nextAttemptAt])
+  @@index([userId, createdAt])
+  @@index([orderId, createdAt])
 }
 
 model AuditLog {

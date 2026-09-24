@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { config, isProduction } from '../config.js';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
+import { trackingEventData, trackingTimestampData } from './order-tracking.js';
 
 const publicApiUrl = config.PUBLIC_API_URL.replace(/\/$/, '');
 const hasSslCommerz = Boolean(config.SSLCOMMERZ_STORE_ID && config.SSLCOMMERZ_STORE_PASSWORD);
@@ -267,7 +268,7 @@ export async function completeDemoPayment(transactionId, userId, signature, outc
     });
     return transaction.order.update({
       where: { id: payment.orderId },
-      data: { paymentStatus, ...(outcome === 'success' && session.order.status === 'PENDING' ? { status: 'CONFIRMED' } : {}) },
+      data: { paymentStatus, ...(outcome === 'success' && session.order.status === 'PENDING' ? { status: 'CONFIRMED', ...trackingTimestampData('CONFIRMED', session.order), trackingEvents: { create: trackingEventData('CONFIRMED', { actorType: 'SYSTEM', actorLabel: 'Payment verified', note: 'Payment verified and order confirmed.' }) } } : {}) },
       include: { items: true, payment: true },
     });
   });
@@ -324,7 +325,7 @@ export async function validateSslCommerzPayment(input) {
     });
     const order = await transaction.order.update({
       where: { id: payment.orderId },
-      data: { paymentStatus: status, ...(!review && payment.order.status === 'PENDING' ? { status: 'CONFIRMED' } : {}) },
+      data: { paymentStatus: status, ...(!review && payment.order.status === 'PENDING' ? { status: 'CONFIRMED', ...trackingTimestampData('CONFIRMED', payment.order), trackingEvents: { create: trackingEventData('CONFIRMED', { actorType: 'SYSTEM', actorLabel: 'Payment verified', note: 'Online payment verified and order confirmed.' }) } } : {}) },
     });
     await transaction.auditLog.create({
       data: {
@@ -419,7 +420,7 @@ export async function approveSslCommerzRiskPayment(paymentId) {
     if (!changed.count) throw new AppError(409, 'PAYMENT_CHANGED', 'Payment changed before the review decision was recorded');
     await tx.order.update({
       where: { id: payment.orderId },
-      data: { paymentStatus: 'PAID', ...(payment.order.status === 'PENDING' ? { status: 'CONFIRMED' } : {}) },
+      data: { paymentStatus: 'PAID', ...(payment.order.status === 'PENDING' ? { status: 'CONFIRMED', ...trackingTimestampData('CONFIRMED', payment.order), trackingEvents: { create: trackingEventData('CONFIRMED', { actorType: 'ADMIN', actorLabel: 'Payment review', note: 'Verified gateway payment accepted and order confirmed.' }) } } : {}) },
     });
     await tx.auditLog.create({
       data: {

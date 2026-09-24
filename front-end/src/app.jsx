@@ -8,6 +8,7 @@ import Cart from './pages/Cart/Cart';
 import PlaceOrder from './pages/PlaceOrder/PlaceOrder';
 import Orders from './pages/Orders/Orders';
 import Wishlist from './pages/Wishlist/Wishlist';
+import Notifications from './pages/Notifications/Notifications';
 import OrderSuccess from './pages/OrderSuccess/OrderSuccess';
 import EmptyState from './components/ui/EmptyState';
 import AdminGuard from './components/admin/AdminGuard';
@@ -24,6 +25,7 @@ import AdminLoyalty from './pages/Admin/AdminLoyalty';
 import AdminStoreOperations from './pages/Admin/AdminStoreOperations';
 import AdminDeliveryZones from './pages/Admin/AdminDeliveryZones';
 import AdminFulfillment from './pages/Admin/AdminFulfillment';
+import AdminNotifications from './pages/Admin/AdminNotifications';
 import PaymentDemo from './pages/Payment/PaymentDemo';
 import PaymentResult from './pages/Payment/PaymentResult';
 import ManualPayment from './pages/Payment/ManualPayment';
@@ -54,6 +56,7 @@ export default function App() {
         <Route path="store-operations" element={<AdminStoreOperations />} />
         <Route path="delivery-zones" element={<AdminDeliveryZones />} />
         <Route path="fulfillment" element={<AdminFulfillment />} />
+        <Route path="notifications" element={<AdminNotifications />} />
         <Route path="coupons" element={<AdminCoupons />} />
         <Route path="activity" element={<AdminActivity />} />
         <Route path="*" element={<AdminDashboard />} />
@@ -67,6 +70,7 @@ export default function App() {
         <Route path="/order" element={<PlaceOrder onLogin={() => setShowLogin(true)} />} />
         <Route path="/orders" element={<Orders onLogin={() => setShowLogin(true)} />} />
         <Route path="/wishlist" element={<Wishlist />} />
+        <Route path="/notifications" element={<Notifications />} />
         <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
         <Route path="/payment/demo/:transactionId" element={<PaymentDemo onLogin={() => setShowLogin(true)} />} />
         <Route path="/payment/result" element={<PaymentResult />} />

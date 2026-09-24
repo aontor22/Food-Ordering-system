@@ -14,6 +14,7 @@ import adminRoutes from './routes/admin.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import wishlistRoutes from './routes/wishlist.routes.js';
 import storeRoutes from './routes/store.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
 import { errorHandler, notFound } from './lib/errors.js';
 
 export const app = express();
@@ -39,6 +40,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Da
 app.use('/api/store', storeRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);

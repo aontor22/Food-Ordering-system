@@ -1,6 +1,7 @@
 import { createContext, useEffect, useMemo, useState } from 'react';
 import { food_list as fallbackFoods } from '../assets/assets';
 import { api, setAccessToken } from '../lib/api';
+import { detachPushOnLogout } from '../lib/push';
 
 export const StoreContext = createContext(null);
 const GUEST_WISHLIST_KEY = 'tomato_guest_wishlist';
@@ -187,6 +188,7 @@ export default function StoreContextProvider({ children }) {
   const wishlistCount = wishlistIds.length;
 
   const logout = async () => {
+    await detachPushOnLogout();
     await api.logout();
     setAccessToken(null);
     setUser(null);

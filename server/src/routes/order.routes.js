@@ -13,6 +13,7 @@ import { getStoreAvailability } from '../services/store-availability.js';
 import { resolveFulfillmentSelection } from '../services/fulfillment-scheduling.js';
 import { calculateZoneDelivery, resolveDeliveryZone, serializeDeliveryZone } from '../services/delivery-zones.js';
 import { openOrderSseStream, publishOrderChange, trackingEventData, trackingTimestampData } from '../services/order-tracking.js';
+import { safeEnqueueOrderNotification } from '../services/notifications.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -247,6 +248,7 @@ router.post('/', validate(createSchema), async (req, res, next) => {
       fulfillmentType: order.fulfillmentType, fulfillmentMode: order.fulfillmentMode, scheduledForLocal: order.scheduledForLocal,
     });
     publishOrderChange(order);
+    await safeEnqueueOrderNotification(order.id, 'PENDING', {}, req.log);
     let paymentSession;
     let paymentError;
     if (data.paymentMethod === 'ONLINE') {
@@ -357,6 +359,7 @@ router.post('/:id/cancel', async (req, res, next) => {
     });
     await audit(req, 'ORDER_CANCELLED', 'Order', updated.id, { pointsRestored: updated.pointsRedeemed || 0 });
     publishOrderChange(updated);
+    await safeEnqueueOrderNotification(updated.id, 'CANCELLED', {}, req.log);
     res.json({ order: serializeOrder(updated), loyalty: { ...(await getLoyaltySnapshot(req.auth.sub)), currency: config.PAYMENT_CURRENCY } });
   } catch (error) { next(error); }
 });

@@ -22,7 +22,17 @@ const schema = z.object({
   ENABLE_DEMO_PAYMENTS: z.enum(['true', 'false']).default('true').transform(value => value === 'true'),
   SSLCOMMERZ_STORE_ID: z.string().trim().optional(),
   SSLCOMMERZ_STORE_PASSWORD: z.string().trim().optional(),
-  SSLCOMMERZ_LIVE: z.enum(['true', 'false']).default('false').transform(value => value === 'true')
+  SSLCOMMERZ_LIVE: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
+  SMTP_HOST: z.string().trim().optional().transform(value => value || undefined),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  SMTP_SECURE: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
+  SMTP_USER: z.string().trim().optional().transform(value => value || undefined),
+  SMTP_PASS: z.string().optional().transform(value => value || undefined),
+  EMAIL_FROM: z.string().trim().optional().transform(value => value || undefined),
+  EMAIL_FROM_NAME: z.string().trim().max(80).default('Tomato Restaurant'),
+  VAPID_PUBLIC_KEY: z.string().trim().optional().transform(value => value || undefined),
+  VAPID_PRIVATE_KEY: z.string().trim().optional().transform(value => value || undefined),
+  VAPID_SUBJECT: z.string().trim().refine(value => value.startsWith('mailto:') || /^https?:\/\//i.test(value), 'VAPID_SUBJECT must be a mailto: address or HTTP(S) URL').default('mailto:admin@example.com')
 });
 
 export const config = schema.parse(process.env);
@@ -33,4 +43,11 @@ if (config.SSLCOMMERZ_LIVE && (!config.SSLCOMMERZ_STORE_ID || !config.SSLCOMMERZ
 }
 if (isProduction && config.SSLCOMMERZ_LIVE && !config.PUBLIC_API_URL.startsWith('https://')) {
   throw new Error('Live SSLCOMMERZ requires an HTTPS PUBLIC_API_URL');
+}
+
+if (Boolean(config.VAPID_PUBLIC_KEY) !== Boolean(config.VAPID_PRIVATE_KEY)) {
+  throw new Error('VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY must be configured together');
+}
+if (config.SMTP_HOST && !config.EMAIL_FROM) {
+  throw new Error('SMTP_HOST requires EMAIL_FROM');
 }

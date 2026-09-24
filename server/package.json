@@ -15,7 +15,8 @@
     "db:dev": "prisma migrate dev",
     "db:status": "prisma migrate status",
     "db:studio": "prisma studio",
-    "db:import:sqlite": "node scripts/import-sqlite.js"
+    "db:import:sqlite": "node scripts/import-sqlite.js",
+    "push:keys": "node scripts/generate-vapid-keys.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -32,7 +33,9 @@
     "jsonwebtoken": "^9.0.2",
     "pino-http": "^10.5.0",
     "prisma": "^6.12.0",
-    "zod": "^4.1.11"
+    "zod": "^4.1.11",
+    "nodemailer": "^7.0.6",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "supertest": "^7.1.4"

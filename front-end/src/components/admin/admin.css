@@ -206,3 +206,15 @@
 .order-tracking-admin { grid-column:1/-1; }.order-tracking-admin > h4 { margin-bottom:7px; }
 .eta-admin-control { display:grid; gap:7px; margin-top:13px; padding-top:12px; border-top:1px solid #e9ecea; }.eta-admin-control > strong { font-size:.72rem; color:#4d5a52; }.eta-admin-control > div { display:flex; flex-wrap:wrap; gap:6px; }.eta-admin-control button { min-width:44px; padding:6px 8px; border:1px solid #e3e7e4; border-radius:8px; color:#5c675f; background:#fff; font-size:.68rem; font-weight:800; }.eta-admin-control button:hover:not(:disabled) { border-color:#ef8a64; color:#d65528; background:#fff6f2; }
 @media (max-width:700px) { .admin-live-actions { align-items:stretch; flex-direction:column; }.admin-live-state { align-self:flex-start; } }
+
+
+/* Step 07: customer notification operations */
+.notification-admin-metrics { grid-template-columns: repeat(5,minmax(0,1fr)); }
+.notification-admin-channel-counts { display:flex; gap:7px; flex-wrap:wrap; }.notification-admin-channel-counts span { padding:6px 9px; border-radius:999px; color:#5d6962; background:#f1f3f2; font-size:.67rem; font-weight:800; }
+.notification-admin-table td { vertical-align:top; }.notification-admin-error { max-width:260px; margin-top:5px; overflow:hidden; color:#a13a31; font-size:.67rem; line-height:1.35; text-overflow:ellipsis; white-space:nowrap; }.admin-mini-button { min-height:32px; padding:0 12px; font-size:.7rem; }
+.status-sent { color:#247a52; background:#eaf7f0; }.status-sending { color:#2766a6; background:#eaf3fb; }.status-retry { color:#945b13; background:#fff1df; }.status-skipped { color:#6a6570; background:#f1eff3; }.status-failed { color:#a13a31; background:#fcecea; }
+@media (max-width:1180px) { .notification-admin-metrics { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width:760px) { .notification-admin-metrics { grid-template-columns:1fr 1fr; } }
+@media (max-width:520px) { .notification-admin-metrics { grid-template-columns:1fr; } }
+
+.admin-alert.error { margin-bottom:18px; padding:12px 14px; border:1px solid #f0c9c4; border-radius:11px; color:#9d342d; background:#fff0ee; font-size:.8rem; font-weight:700; }

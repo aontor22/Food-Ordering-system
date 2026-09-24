@@ -63,6 +63,7 @@ export default function Navbar({ onLogin }) {
             {user.role === 'ADMIN' && <Link to="/admin"><Icon name="dashboard" />Admin dashboard</Link>}
             <Link to="/orders"><Icon name="orders" />My orders</Link>
             <Link to="/wishlist"><Icon name="heart" />Wishlist {wishlistCount ? `(${wishlistCount})` : ''}</Link>
+            <Link to="/notifications"><Icon name="bell" />Notifications</Link>
             {user.role !== 'ADMIN' && <Link to="/orders"><Icon name="gift" />{user.pointsBalance || 0} Tomato Points</Link>}
             <button onClick={logout}><Icon name="logout" />Sign out</button>
           </div>}

@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
 import { serializePayment } from './payment.js';
 import { config } from '../config.js';
+import { trackingEventData, trackingTimestampData } from './order-tracking.js';
 
 export const channelSchema = z.object({
   provider: z.enum(['BKASH', 'NAGAD', 'ROCKET', 'BANK']),
@@ -82,7 +83,7 @@ export async function reviewManualPayment(paymentId, input, req) {
     const approved = data.decision === 'APPROVE';
     await tx.manualPaymentSubmission.update({ where: { id: submission.id }, data: { status: approved ? 'APPROVED' : 'REJECTED', reviewNote: data.note, reviewedBy: req.auth.sub, reviewedAt: new Date() } });
     const updated = await tx.payment.update({ where: { id: paymentId }, data: { status: approved ? 'PAID' : 'REJECTED', failureReason: approved ? null : data.note, ...(approved ? { paidAt: new Date(), gatewayTransactionId: submission.reference } : {}) } });
-    await tx.order.update({ where: { id: payment.orderId }, data: { paymentStatus: updated.status, ...(approved ? { status: 'CONFIRMED' } : {}) } });
+    await tx.order.update({ where: { id: payment.orderId }, data: { paymentStatus: updated.status, ...(approved ? { status: 'CONFIRMED', ...trackingTimestampData('CONFIRMED', payment.order), trackingEvents: { create: trackingEventData('CONFIRMED', { actorType: 'ADMIN', actorLabel: req.auth.email || 'Restaurant team', note: 'Manual payment verified and order confirmed.' }) } } : {}) } });
     await event(tx, req, approved ? 'MANUAL_PAYMENT_APPROVED' : 'MANUAL_PAYMENT_REJECTED', payment.id, { submissionId: submission.id, note: data.note });
     return serializePayment(updated);
   });

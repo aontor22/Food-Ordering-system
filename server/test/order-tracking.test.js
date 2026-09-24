@@ -53,12 +53,15 @@ test('new order starts with a persisted customer-visible tracking event', async 
   assert.equal(response.body.order.status, 'PENDING');
   assert.equal(response.body.order.trackingEvents.length, 1);
   assert.equal(response.body.order.trackingEvents[0].title, 'Order placed');
+  const queued = await prisma.notificationDelivery.findMany({ where: { orderId } });
+  assert.ok(queued.some(item => item.eventType === 'PENDING' && item.channel === 'EMAIL'));
 });
 
 test('admin status changes create timeline events and preparation ETA', async () => {
   let response = await request(app).patch(`/api/admin/orders/${orderId}/status`).set('Authorization', `Bearer ${adminToken}`).send({ status: 'CONFIRMED' });
   assert.equal(response.status, 200);
   assert.ok(response.body.order.confirmedAt);
+  assert.ok(await prisma.notificationDelivery.findFirst({ where: { orderId, eventType: 'CONFIRMED', channel: 'EMAIL' } }));
 
   response = await request(app).patch(`/api/admin/orders/${orderId}/status`).set('Authorization', `Bearer ${adminToken}`).send({ status: 'PREPARING', estimateMinutes: 20 });
   assert.equal(response.status, 200);

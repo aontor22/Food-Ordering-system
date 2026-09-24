@@ -107,6 +107,13 @@ Admin → **Store hours** controls the restaurant timezone, weekly schedule, 24-
 
 The migration intentionally defaults all seven days to **Open 24 hours** so deploying this release cannot unexpectedly take an existing store offline. After deployment, configure your real schedule. See `STORE_HOURS_SETUP.md`.
 
+
+## Order notifications
+
+Step 07 adds transactional email and browser Web Push for order lifecycle events. Customer preferences live at **Account → Notifications**; delivery health and retries live at **Admin → Notifications**. The API uses a PostgreSQL outbox (`NotificationDelivery`) so provider failures do not roll back valid order operations.
+
+For email, configure backend-only generic SMTP variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME`). For browser push, run `npm run push:keys -w server` and configure `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` on Render. Never place SMTP credentials or the VAPID private key in Vercel/frontend variables. See `NOTIFICATIONS_SETUP.md` and `STEP_07_VERIFICATION.md`.
+
 ## API map
 
 | Area | Endpoints |
@@ -115,12 +122,14 @@ The migration intentionally defaults all seven days to **Open 24 hours** so depl
 | Store status | `GET /api/store/status` |
 | Auth | `POST /api/auth/register`, `login`, `refresh`, `logout`; `GET /me` |
 | Catalog | `GET /api/products`, `/api/products/categories` |
-| Orders | `POST/GET /api/orders`, detail, and cancellation |
+| Orders | `POST/GET /api/orders`, detail, cancellation, and live tracking |
+| Customer notifications | `GET /api/notifications`, preferences, push subscriptions, test delivery |
 | Payments | `GET /api/payments/options`, `POST /api/payments/orders/:orderId/initiate`, authenticated demo routes, SSLCOMMERZ callback routes |
 | Admin payments | `GET /api/admin/payments`; cash receive/refund; gateway status check; risk acceptance; SSLCOMMERZ refund request/status under `/api/admin/payments/:id/*` |
 | Manual customer payments | `GET /api/payments/manual/:orderId`, `POST /api/payments/manual/:orderId/submit` |
 | Manual admin operations | `GET/POST /api/admin/payment-channels`, `PATCH /api/admin/payment-channels/:id`, `POST /api/admin/payments/:id/manual-review`, `manual-refunded` |
 | Admin dashboard | `GET /api/admin/dashboard` |
+| Admin notifications | Delivery monitor, queue processing and retry under `/api/admin/notifications` |
 | Admin store operations | `GET/PATCH /api/admin/store-operations`, `POST /api/admin/store-closures`, `DELETE /api/admin/store-closures/:id` |
 | Admin products | List, create, update, archive and restore under `/api/admin/products` |
 | Admin media | Cloudinary status/signature/cleanup/migration under `/api/admin/media` |
@@ -137,6 +146,7 @@ The migration intentionally defaults all seven days to **Open 24 hours** so depl
 4. Use a managed PostgreSQL database; on Render, use the database Internal URL when the API and database are in the same region.
 5. Configure Cloudinary credentials for product image uploads; keep `CLOUDINARY_API_SECRET` only on the backend.
 6. Configure and validate SSLCOMMERZ sandbox callbacks, currency, public HTTPS URLs, risk-review handling, and refund flow before enabling live online payments. Register the Render service public IP with SSLCOMMERZ if required for live refund API access.
+7. Configure SMTP and/or VAPID Web Push, verify test notifications, and monitor Admin → Notifications before relying on customer messaging.
 
 ## Structure
 

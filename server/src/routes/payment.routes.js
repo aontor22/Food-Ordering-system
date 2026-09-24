@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { getManualOrder, submitManualPayment } from '../services/manual-payment.js';
+import { safeEnqueueOrderNotification } from '../services/notifications.js';
 import {
   completeDemoPayment,
   reconcileSslCommerzPayment,
@@ -25,9 +26,11 @@ router.post('/sslcommerz/ipn', async (req, res, next) => {
   try {
     if (req.body.val_id) {
       const result = await validateSslCommerzPayment(req.body);
+      if (result.paid && result.order?.status === 'CONFIRMED') await safeEnqueueOrderNotification(result.order.id, 'CONFIRMED', {}, req.log);
       res.json({ received: true, status: result.review ? 'REVIEW' : 'PAID' });
     } else {
       const order = await reconcileSslCommerzPayment(String(req.body.tran_id || ''));
+      if (order?.status === 'CONFIRMED') await safeEnqueueOrderNotification(order.id, 'CONFIRMED', {}, req.log);
       res.json({ received: Boolean(order), status: order?.paymentStatus });
     }
   } catch (error) { next(error); }
@@ -36,6 +39,7 @@ router.post('/sslcommerz/ipn', async (req, res, next) => {
 router.post('/sslcommerz/success', async (req, res) => {
   try {
     const result = await validateSslCommerzPayment(req.body);
+    if (result.paid && result.order?.status === 'CONFIRMED') await safeEnqueueOrderNotification(result.order.id, 'CONFIRMED', {}, req.log);
     res.redirect(303, paymentResult(result.review ? 'review' : 'success', result.order.orderNumber));
   } catch (error) {
     const uncertain = ['PAYMENT_VALIDATION_UNAVAILABLE', 'PAYMENT_STATUS_UNAVAILABLE'].includes(error?.code) || Number(error?.status) >= 500;
@@ -89,6 +93,7 @@ router.post('/demo/:transactionId/complete', validate(z.object({
   try {
     const order = await completeDemoPayment(req.validated.params.transactionId, req.auth.sub, req.validated.body.signature, req.validated.body.outcome);
     await audit(req, req.validated.body.outcome === 'success' ? 'PAYMENT_PAID' : 'PAYMENT_ATTEMPT_ENDED', 'Payment', order.payment.id, { outcome: req.validated.body.outcome, provider: 'DEMO' });
+    if (req.validated.body.outcome === 'success' && order.status === 'CONFIRMED') await safeEnqueueOrderNotification(order.id, 'CONFIRMED', {}, req.log);
     res.json({ order: { ...order, payment: serializePayment(order.payment) } });
   } catch (error) { next(error); }
 });
