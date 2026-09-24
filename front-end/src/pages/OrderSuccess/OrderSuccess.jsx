@@ -31,6 +31,8 @@ export default function OrderSuccess() {
       <div><span>Payment</span><strong>{isOnline ? 'Online payment' : 'Cash on delivery'}</strong></div>
       <div><span>Order total</span><strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></div>
       <div><span>Payment status</span><strong>{humanizeStatus(order.paymentStatus)}</strong></div>
+      {order.deliveryZoneName && <div><span>Delivery area</span><strong>{order.deliveryZoneName}</strong></div>}
+      {order.deliveryZoneName && <div><span>Delivery fee</span><strong>{order.deliveryFeeCents === 0 ? 'Free' : formatCurrency(order.deliveryFeeCents / 100, order.payment?.currency)}</strong></div>}
       {order.pointsRedeemed > 0 && <div><span>Points used</span><strong>{order.pointsRedeemed} · saved {formatCurrency(order.pointsDiscountCents / 100, order.payment?.currency)}</strong></div>}
       {loyalty && <div><span>Points balance</span><strong>{loyalty.pointsBalance}</strong></div>}
     </div>}

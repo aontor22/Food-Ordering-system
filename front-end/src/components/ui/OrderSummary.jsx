@@ -2,7 +2,7 @@ import { formatCurrency } from '../../lib/format';
 
 export default function OrderSummary({
   subtotal,
-  delivery = subtotal > 0 ? 2 : 0,
+  delivery = null,
   discount = 0,
   pointsDiscount = 0,
   total,
@@ -11,7 +11,8 @@ export default function OrderSummary({
   disabled = false,
   children,
 }) {
-  const calculatedTotal = Math.max(0, subtotal - discount - pointsDiscount + delivery);
+  const deliveryKnown = delivery !== null && delivery !== undefined;
+  const calculatedTotal = Math.max(0, subtotal - discount - pointsDiscount + (deliveryKnown ? delivery : 0));
   return (
     <aside className="order-summary surface-card">
       <div className="section-kicker">Your order</div>
@@ -20,8 +21,8 @@ export default function OrderSummary({
         <div><span>Subtotal</span><strong>{formatCurrency(subtotal)}</strong></div>
         {discount > 0 && <div className="summary-discount"><span>Promo discount</span><strong>−{formatCurrency(discount)}</strong></div>}
         {pointsDiscount > 0 && <div className="summary-discount"><span>Points discount</span><strong>−{formatCurrency(pointsDiscount)}</strong></div>}
-        <div><span>Delivery fee</span><strong>{formatCurrency(delivery)}</strong></div>
-        <div className="summary-total"><span>Total</span><strong>{formatCurrency(total ?? calculatedTotal)}</strong></div>
+        <div><span>Delivery fee</span><strong>{deliveryKnown ? formatCurrency(delivery) : 'At checkout'}</strong></div>
+        <div className="summary-total"><span>{deliveryKnown ? 'Total' : 'Food total'}</span><strong>{formatCurrency(total ?? calculatedTotal)}</strong></div>
       </div>
       {children}
       {action && <button className="button button-primary button-full" type={action.type || 'button'} onClick={action.onClick} disabled={disabled}>{actionLabel}</button>}

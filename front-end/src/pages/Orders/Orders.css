@@ -17,3 +17,6 @@
 @media (max-width: 560px) { .points-wallet { grid-template-columns: auto 1fr; }.points-wallet > small { grid-column: 2; }.review-editor, .review-start { margin-left: 0; }.review-editor-actions { flex-direction: column; }.review-editor-actions .button { width: 100%; } }
 .payment-refund_pending { background:#e8f1ff; color:#245c9e; }
 .payment-refunded { background:#f3eefb; color:#7452a8; }
+
+.order-delivery-zone { display: flex; align-items: center; gap: 7px; margin: 10px 0; color: #59685f; font-size: .78rem; font-weight: 700; }
+.order-delivery-zone svg { color: var(--brand); }

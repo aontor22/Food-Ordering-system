@@ -22,28 +22,48 @@ export default function PlaceOrder({ onLogin }) {
   const [quote, setQuote] = useState(null);
   const [quoteError, setQuoteError] = useState('');
   const [quoteLoading, setQuoteLoading] = useState(false);
+  const [deliveryZones, setDeliveryZones] = useState([]);
+  const [deliveryZoneId, setDeliveryZoneId] = useState('');
+  const [deliveryZonesError, setDeliveryZonesError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => { if (user?.email) setForm(previous => ({ ...previous, email: user.email })); }, [user]);
   useEffect(() => { api.getPaymentOptions().then(setPaymentOptions).catch(() => setPaymentOptions(null)); }, []);
+  useEffect(() => {
+    let active = true;
+    api.getDeliveryZones().then(data => {
+      if (!active) return;
+      setDeliveryZones(data.zones || []);
+      setDeliveryZoneId(previous => previous || data.zones?.[0]?.id || '');
+      setDeliveryZonesError(data.zones?.length ? '' : 'Delivery is not configured right now.');
+    }).catch(requestError => { if (active) setDeliveryZonesError(requestError.message); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const postalCode = form.postalCode.trim().toUpperCase();
+    if (!postalCode || !deliveryZones.length) return;
+    const matches = deliveryZones.filter(zone => (zone.postalCodes || []).includes(postalCode));
+    if (matches.length === 1 && matches[0].id !== deliveryZoneId) setDeliveryZoneId(matches[0].id);
+  }, [form.postalCode, deliveryZones, deliveryZoneId]);
 
   const orderItems = useMemo(() => cartProducts.map(item => ({ productId: item._id, quantity: item.quantity })), [cartProducts]);
   const orderItemKey = useMemo(() => orderItems.map(item => `${item.productId}:${item.quantity}`).join('|'), [orderItems]);
 
   useEffect(() => {
-    if (!user || !orderItems.length) { setQuote(null); setQuoteError(''); return undefined; }
+    if (!user || !orderItems.length || !deliveryZoneId) { setQuote(null); setQuoteError(''); return undefined; }
     let active = true;
     const timer = setTimeout(async () => {
       setQuoteLoading(true); setQuoteError('');
       try {
-        const data = await api.quoteOrder({ items: orderItems, ...(couponCode && { couponCode }), pointsToRedeem: Number(pointsToRedeem) || 0 });
+        const data = await api.quoteOrder({ items: orderItems, ...(couponCode && { couponCode }), pointsToRedeem: Number(pointsToRedeem) || 0, deliveryZoneId, postalCode: form.postalCode.trim() || undefined });
         if (active) setQuote(data.quote);
       } catch (requestError) {
         if (active) setQuoteError(requestError.message);
       } finally { if (active) setQuoteLoading(false); }
     }, 220);
     return () => { active = false; clearTimeout(timer); };
-  }, [user, orderItemKey, couponCode, pointsToRedeem]);
+  }, [user, orderItemKey, couponCode, pointsToRedeem, deliveryZoneId, form.postalCode]);
 
   if (!cartProducts.length) return <EmptyState icon="🥡" title="Nothing to check out yet" text="Choose your favourites before starting checkout." />;
 
@@ -52,13 +72,16 @@ export default function PlaceOrder({ onLogin }) {
     event.preventDefault();
     if (!user) { setError('Please sign in to place your order.'); return; }
     if (storeStatus && !storeStatus.isOpen) { setError(storeStatus.message || 'The restaurant is not accepting orders right now.'); return; }
+    if (!deliveryZoneId) { setError('Please select your delivery area.'); return; }
     if (quoteError) { setError(quoteError); return; }
+    if (quote?.deliveryZone && !quote.deliveryZone.minimumOrderMet) { setError(`Minimum order for ${quote.deliveryZone.name} has not been met.`); return; }
     setBusy(true); setError('');
     try {
       const result = await createOrder({
         items: orderItems,
         paymentMethod,
         pointsToRedeem: Number(pointsToRedeem) || 0,
+        deliveryZoneId,
         ...(paymentMethod === 'MANUAL' && { manualChannelId }),
         ...(couponCode && { couponCode }),
         delivery: form,
@@ -76,8 +99,10 @@ export default function PlaceOrder({ onLogin }) {
   const subtotal = quote ? quote.subtotalCents / 100 : getTotalCartAmount();
   const promoDiscount = quote ? quote.discountCents / 100 : 0;
   const pointsDiscount = quote ? quote.pointsDiscountCents / 100 : 0;
-  const delivery = quote ? quote.deliveryFeeCents / 100 : (subtotal > 0 ? 2 : 0);
+  const selectedDeliveryZone = deliveryZones.find(zone => zone.id === deliveryZoneId);
+  const delivery = quote ? quote.deliveryFeeCents / 100 : (subtotal > 0 ? (selectedDeliveryZone?.feeCents || 0) / 100 : 0);
   const total = quote ? quote.totalCents / 100 : undefined;
+  const minimumOrderBlocked = Boolean(quote?.deliveryZone && !quote.deliveryZone.minimumOrderMet);
 
   return <div className="checkout-page">
     <header className="page-title"><div className="section-kicker">Secure checkout</div><h1>Delivery details</h1><p>Tell us where to bring your order. Fields marked with * are required.</p></header>
@@ -92,7 +117,8 @@ export default function PlaceOrder({ onLogin }) {
           <div className="field"><label htmlFor="phone">Phone number *</label><input id="phone" name="phone" value={form.phone} onChange={update} required type="tel" autoComplete="tel" placeholder="e.g. 01700 000000" /></div>
         </div>
         <div className="checkout-divider" />
-        <div className="checkout-section-title"><span>2</span><div><h2>Delivery address</h2><p>Double-check your address before ordering.</p></div></div>
+        <div className="checkout-section-title"><span>2</span><div><h2>Delivery address</h2><p>Select your service area so the server can calculate the correct delivery fee.</p></div></div>
+        <div className="field delivery-zone-field"><label htmlFor="deliveryZone">Delivery area *</label><select id="deliveryZone" value={deliveryZoneId} onChange={event => setDeliveryZoneId(event.target.value)} required disabled={!deliveryZones.length}><option value="" disabled>{deliveryZones.length ? 'Select delivery area' : 'No delivery zones available'}</option>{deliveryZones.map(zone => <option key={zone.id} value={zone.id}>{zone.name} · {zone.feeCents === 0 ? 'Free delivery' : formatCurrency(zone.feeCents / 100, zone.currency)}</option>)}</select>{deliveryZonesError && <p className="form-error">{deliveryZonesError}</p>}{deliveryZoneId && <DeliveryZoneHint zone={deliveryZones.find(zone => zone.id === deliveryZoneId)} />}</div>
         <div className="field"><label htmlFor="street">Street address *</label><input id="street" name="street" value={form.street} onChange={update} required autoComplete="street-address" /></div>
         <div className="field-grid">
           <div className="field"><label htmlFor="city">City *</label><input id="city" name="city" value={form.city} onChange={update} required autoComplete="address-level2" /></div>
@@ -112,7 +138,7 @@ export default function PlaceOrder({ onLogin }) {
         {paymentMethod === 'MANUAL' && <div className="field" style={{ marginTop: '16px' }}><label htmlFor="manual-channel">Payment account</label><select id="manual-channel" required value={manualChannelId} onChange={event => setManualChannelId(event.target.value)}>{paymentOptions.manualChannels.map(channel => <option key={channel.id} value={channel.id}>{channel.label} · {channel.provider}</option>)}</select><p className="muted">Place your order to see the exact amount and payment instructions.</p></div>}
       </section>
       <div className="checkout-sidebar">
-        <OrderSummary subtotal={subtotal} discount={promoDiscount} pointsDiscount={pointsDiscount} delivery={delivery} total={total} action={{ type: 'submit' }} actionLabel={storeStatus && !storeStatus.isOpen ? 'Ordering unavailable' : busy ? 'Processing…' : paymentMethod === 'MANUAL' ? 'Place order & view payment details' : paymentMethod === 'ONLINE' ? 'Continue to secure payment' : 'Place order'} disabled={busy || quoteLoading || Boolean(quoteError) || Boolean(storeStatus && !storeStatus.isOpen)}>
+        <OrderSummary subtotal={subtotal} discount={promoDiscount} pointsDiscount={pointsDiscount} delivery={delivery} total={total} action={{ type: 'submit' }} actionLabel={storeStatus && !storeStatus.isOpen ? 'Ordering unavailable' : busy ? 'Processing…' : paymentMethod === 'MANUAL' ? 'Place order & view payment details' : paymentMethod === 'ONLINE' ? 'Continue to secure payment' : 'Place order'} disabled={busy || quoteLoading || Boolean(quoteError) || Boolean(deliveryZonesError) || !deliveryZoneId || minimumOrderBlocked || Boolean(storeStatus && !storeStatus.isOpen)}>
           {user && loyalty && <section className={`loyalty-checkout ${loyalty.enabled ? '' : 'is-disabled'}`}>
             <div className="loyalty-checkout-head"><div><span><Icon name="gift" size={18} />Tomato Points</span><strong>{loyalty.pointsBalance} points</strong></div>{loyalty.enabled && loyalty.pointsPerOrder > 0 && <small>Earn {loyalty.pointsPerOrder} more after delivery</small>}</div>
             {!loyalty.enabled ? <p>Points are currently paused by the restaurant. Your balance is kept safely.</p> : loyalty.pointsBalance < loyalty.minimumRedeemPoints ? <p>You need at least <strong>{loyalty.minimumRedeemPoints}</strong> points to unlock a discount.</p> : <>
@@ -122,6 +148,7 @@ export default function PlaceOrder({ onLogin }) {
             </>}
           </section>}
           <div className="payment-card"><Icon name={paymentMethod === 'COD' ? 'check' : 'lock'} /><div><strong>{paymentMethod === 'MANUAL' ? 'Manual payment verification' : paymentMethod === 'ONLINE' ? 'Server-verified payment' : 'Cash on delivery'}</strong><small>{paymentMethod === 'MANUAL' ? 'The restaurant verifies your submitted transaction' : paymentMethod === 'ONLINE' ? 'Payment status is updated only after verification' : 'Pay when your food arrives'}</small></div></div>
+          {quote?.deliveryZone && <div className={`delivery-pricing-note ${minimumOrderBlocked ? 'is-warning' : quote.deliveryZone.freeDelivery ? 'is-free' : ''}`}><Icon name="delivery" size={18} /><div><strong>{quote.deliveryZone.name}</strong>{minimumOrderBlocked ? <p>Add {formatCurrency(quote.deliveryZone.minimumOrderRemainingCents / 100, quote.deliveryZone.currency)} more in food to reach the {formatCurrency(quote.deliveryZone.minimumOrderCents / 100, quote.deliveryZone.currency)} minimum.</p> : quote.deliveryZone.freeDelivery ? <p>Free delivery unlocked for this order.</p> : quote.deliveryZone.freeDeliveryRemainingCents > 0 ? <p>Add {formatCurrency(quote.deliveryZone.freeDeliveryRemainingCents / 100, quote.deliveryZone.currency)} more in food to unlock free delivery.</p> : <p>Delivery fee calculated for this area.</p>}</div></div>}
           {couponCode && <p className="coupon-notice">Promo code <strong>{couponCode}</strong> {quote?.couponCode ? 'applied.' : 'will be verified now.'}</p>}
           {quoteLoading && <p className="quote-note">Updating secure total…</p>}
           {quoteError && <p className="form-error" role="alert">{quoteError}</p>}
@@ -132,4 +159,9 @@ export default function PlaceOrder({ onLogin }) {
       </div>
     </form>
   </div>;
+}
+
+function DeliveryZoneHint({ zone }) {
+  if (!zone) return null;
+  return <div className="delivery-zone-hint"><Icon name="delivery" size={16} /><div>{zone.description && <p>{zone.description}</p>}<small>{zone.minimumOrderCents > 0 ? `Minimum order ${formatCurrency(zone.minimumOrderCents / 100, zone.currency)}` : 'No minimum order'}{zone.freeDeliveryThresholdCents ? ` · Free delivery from ${formatCurrency(zone.freeDeliveryThresholdCents / 100, zone.currency)}` : ''}{zone.postalCodes?.length ? ` · Postal codes: ${zone.postalCodes.join(', ')}` : ''}</small></div></div>;
 }

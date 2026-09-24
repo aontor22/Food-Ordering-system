@@ -13,6 +13,7 @@ import { awardDeliveredOrderPoints, getLoyaltySettings, restoreCancelledOrderPoi
 import { cloudinaryConfigured, cloudinaryFolder, createCloudinaryUploadSignature, destroyCloudinaryImage, optimizeCloudinaryUrl, ownsCloudinaryPublicId } from '../lib/cloudinary.js';
 import { migrateLegacyProductImages } from '../services/product-media.js';
 import { getStoreAvailability, getStoreOperationsConfig, isLocalDateTimeKey, isRealDateKey, isValidTimezone, saveStoreOperations, timeToMinute } from '../services/store-availability.js';
+import { findDeliveryPostalOverlap, listAllDeliveryZones, normalizePostalCodes, serializeDeliveryZone } from '../services/delivery-zones.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -433,6 +434,93 @@ router.delete('/store-closures/:id', async (req, res, next) => {
     if (!closure) throw new AppError(404, 'STORE_CLOSURE_NOT_FOUND', 'Closure not found');
     await prisma.restaurantClosure.delete({ where: { id: closure.id } });
     await audit(req, 'STORE_CLOSURE_REMOVED', 'RestaurantClosure', closure.id, { dateKey: closure.dateKey });
+    res.status(204).end();
+  } catch (error) { next(error); }
+});
+
+
+const deliveryZoneFields = {
+  name: z.string().trim().min(2).max(80),
+  description: z.union([z.string().trim().max(240), z.null()]).optional().transform(value => value || null),
+  postalCodes: z.array(z.string().trim().min(1).max(20)).max(100).default([]),
+  feeCents: z.number().int().nonnegative().max(100_000_000),
+  minimumOrderCents: z.number().int().nonnegative().max(100_000_000),
+  freeDeliveryThresholdCents: z.union([z.number().int().nonnegative().max(100_000_000), z.null()]).optional().transform(value => value === 0 ? null : value ?? null),
+  active: z.boolean(),
+  sortOrder: z.number().int().min(0).max(10_000).default(0),
+};
+const deliveryZoneCreate = z.object({ body: z.object(deliveryZoneFields), params: empty, query: empty });
+const deliveryZoneUpdate = z.object({
+  body: z.object(deliveryZoneFields).partial().refine(value => Object.keys(value).length > 0, 'At least one field is required'),
+  params: z.object({ id: z.string().min(1) }), query: empty,
+});
+
+function normalizeDeliveryZoneData(values, existing = null) {
+  const merged = { ...(existing || {}), ...values };
+  if (merged.freeDeliveryThresholdCents != null && merged.freeDeliveryThresholdCents < merged.minimumOrderCents) {
+    throw new AppError(400, 'INVALID_FREE_DELIVERY_THRESHOLD', 'Free-delivery threshold cannot be lower than the minimum order');
+  }
+  const data = { ...values };
+  if ('postalCodes' in values) data.postalCodes = normalizePostalCodes(values.postalCodes.join(',')) || null;
+  return data;
+}
+
+async function ensureZoneCanBeDisabled(id, nextActive) {
+  if (nextActive !== false) return;
+  const activeCount = await prisma.deliveryZone.count({ where: { active: true, id: { not: id } } });
+  if (!activeCount) throw new AppError(409, 'LAST_DELIVERY_ZONE', 'Keep at least one delivery zone active. Pause ordering from Store hours if delivery should stop.');
+}
+
+async function ensurePostalCodesUnique(postalCodes, id = null, active = true) {
+  if (!active || !postalCodes?.length) return;
+  const overlap = await findDeliveryPostalOverlap(prisma, postalCodes, id);
+  if (overlap) throw new AppError(409, 'POSTAL_CODE_OVERLAP', `Postal code ${overlap.postalCode} is already assigned to ${overlap.zone.name}`);
+}
+
+router.get('/delivery-zones', async (_req, res, next) => {
+  try {
+    const zones = await listAllDeliveryZones();
+    res.json({
+      currency: config.PAYMENT_CURRENCY,
+      zones,
+      stats: { total: zones.length, active: zones.filter(zone => zone.active).length, postalMapped: zones.filter(zone => zone.postalCodes.length).length },
+    });
+  } catch (error) { next(error); }
+});
+
+router.post('/delivery-zones', validate(deliveryZoneCreate), async (req, res, next) => {
+  try {
+    const values = req.validated.body;
+    await ensurePostalCodesUnique(values.postalCodes, null, values.active);
+    const data = normalizeDeliveryZoneData(values);
+    const zone = await prisma.deliveryZone.create({ data });
+    await audit(req, 'DELIVERY_ZONE_CREATED', 'DeliveryZone', zone.id, { name: zone.name, feeCents: zone.feeCents, minimumOrderCents: zone.minimumOrderCents });
+    res.status(201).json({ zone: serializeDeliveryZone(zone) });
+  } catch (error) { next(error); }
+});
+
+router.patch('/delivery-zones/:id', validate(deliveryZoneUpdate), async (req, res, next) => {
+  try {
+    const existing = await prisma.deliveryZone.findUnique({ where: { id: req.validated.params.id } });
+    if (!existing) throw new AppError(404, 'DELIVERY_ZONE_NOT_FOUND', 'Delivery zone not found');
+    const nextActive = req.validated.body.active ?? existing.active;
+    await ensureZoneCanBeDisabled(existing.id, nextActive);
+    const nextPostalCodes = req.validated.body.postalCodes ?? String(existing.postalCodes || '').split(',').filter(Boolean);
+    await ensurePostalCodesUnique(nextPostalCodes, existing.id, nextActive);
+    const data = normalizeDeliveryZoneData(req.validated.body, existing);
+    const zone = await prisma.deliveryZone.update({ where: { id: existing.id }, data });
+    await audit(req, 'DELIVERY_ZONE_UPDATED', 'DeliveryZone', zone.id, { name: zone.name, active: zone.active, feeCents: zone.feeCents, minimumOrderCents: zone.minimumOrderCents });
+    res.json({ zone: serializeDeliveryZone(zone) });
+  } catch (error) { next(error); }
+});
+
+router.delete('/delivery-zones/:id', async (req, res, next) => {
+  try {
+    const existing = await prisma.deliveryZone.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw new AppError(404, 'DELIVERY_ZONE_NOT_FOUND', 'Delivery zone not found');
+    await ensureZoneCanBeDisabled(existing.id, false);
+    const zone = await prisma.deliveryZone.update({ where: { id: existing.id }, data: { active: false } });
+    await audit(req, 'DELIVERY_ZONE_ARCHIVED', 'DeliveryZone', zone.id, { name: zone.name });
     res.status(204).end();
   } catch (error) { next(error); }
 });

@@ -32,3 +32,15 @@
 .store-closed-checkout > svg { flex: 0 0 auto; margin-top: 1px; }
 .store-closed-checkout strong { display: block; margin-bottom: 3px; }
 .store-closed-checkout p { font-size: .82rem; line-height: 1.5; }
+
+.delivery-zone-field select { width: 100%; }
+.delivery-zone-hint { display: flex; align-items: flex-start; gap: 9px; margin-top: 8px; padding: 11px 12px; border: 1px solid #e2e8e4; border-radius: 11px; color: #52635a; background: #f8faf9; }
+.delivery-zone-hint > svg { flex: 0 0 auto; margin-top: 1px; color: var(--brand); }
+.delivery-zone-hint p { margin: 0 0 3px; font-size: .78rem; line-height: 1.45; }
+.delivery-zone-hint small { color: #748078; font-size: .72rem; line-height: 1.45; }
+.delivery-pricing-note { display: flex; align-items: flex-start; gap: 10px; margin: 12px 0; padding: 12px 13px; border: 1px solid #d8e7de; border-radius: 12px; color: #35634a; background: #f2faf5; }
+.delivery-pricing-note > svg { flex: 0 0 auto; margin-top: 1px; }
+.delivery-pricing-note strong { display: block; margin-bottom: 2px; font-size: .8rem; }
+.delivery-pricing-note p { color: inherit; font-size: .75rem; line-height: 1.45; }
+.delivery-pricing-note.is-warning { border-color: #efd2bd; color: #855033; background: #fff6f0; }
+.delivery-pricing-note.is-free { border-color: #bfe0cd; color: #216643; background: #ecf8f1; }

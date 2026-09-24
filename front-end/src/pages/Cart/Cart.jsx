@@ -40,7 +40,8 @@ export default function Cart() {
         <div className="cart-list-footer"><Link className="text-link" to="/">← Continue shopping</Link><span>{cartProducts.length} selected {cartProducts.length === 1 ? 'dish' : 'dishes'}</span></div>
       </section>
       <div>
-        <OrderSummary subtotal={getTotalCartAmount()} action={{ onClick: () => navigate('/order') }} actionLabel={storeStatus && !storeStatus.isOpen ? 'Ordering unavailable' : 'Continue to checkout'} disabled={Boolean(storeStatus && !storeStatus.isOpen)}>
+        <OrderSummary subtotal={getTotalCartAmount()} delivery={null} action={{ onClick: () => navigate('/order') }} actionLabel={storeStatus && !storeStatus.isOpen ? 'Ordering unavailable' : 'Continue to checkout'} disabled={Boolean(storeStatus && !storeStatus.isOpen)}>
+          <p className="cart-delivery-note"><Icon name="delivery" size={17} />Delivery fee and minimum order are calculated after you choose your delivery area.</p>
           {storeStatus && !storeStatus.isOpen && <div className="cart-store-closed"><Icon name="clock" size={18} /><div><strong>{storeStatus.headline}</strong><p>{storeStatus.message}</p></div></div>}
           <form className="promo-form" onSubmit={applyPromo}>
             <label htmlFor="promo">Promo code</label>

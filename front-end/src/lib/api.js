@@ -34,6 +34,7 @@ async function uploadProductImage(file) {
 export const api = {
   getProducts: () => request('/products'),
   getStoreStatus: () => request('/store/status'),
+  getDeliveryZones: () => request('/store/delivery-zones'),
   register: body => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: body => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   googleLogin: credential => request('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
@@ -60,6 +61,10 @@ export const api = {
   updateAdminStoreOperations: body => request('/admin/store-operations', { method: 'PATCH', body: JSON.stringify(body) }),
   saveAdminStoreClosure: body => request('/admin/store-closures', { method: 'POST', body: JSON.stringify(body) }),
   deleteAdminStoreClosure: id => request(`/admin/store-closures/${id}`, { method: 'DELETE' }),
+  getAdminDeliveryZones: () => request('/admin/delivery-zones'),
+  createAdminDeliveryZone: body => request('/admin/delivery-zones', { method: 'POST', body: JSON.stringify(body) }),
+  updateAdminDeliveryZone: (id, body) => request(`/admin/delivery-zones/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  archiveAdminDeliveryZone: id => request(`/admin/delivery-zones/${id}`, { method: 'DELETE' }),
   getAdminProducts: () => request('/admin/products'),
   getAdminMedia: () => request('/admin/media'),
   uploadProductImage,

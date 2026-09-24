@@ -22,6 +22,7 @@ import AdminPayments from './pages/Admin/AdminPayments';
 import AdminReviews from './pages/Admin/AdminReviews';
 import AdminLoyalty from './pages/Admin/AdminLoyalty';
 import AdminStoreOperations from './pages/Admin/AdminStoreOperations';
+import AdminDeliveryZones from './pages/Admin/AdminDeliveryZones';
 import PaymentDemo from './pages/Payment/PaymentDemo';
 import PaymentResult from './pages/Payment/PaymentResult';
 import ManualPayment from './pages/Payment/ManualPayment';
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="reviews" element={<AdminReviews />} />
         <Route path="loyalty" element={<AdminLoyalty />} />
         <Route path="store-operations" element={<AdminStoreOperations />} />
+        <Route path="delivery-zones" element={<AdminDeliveryZones />} />
         <Route path="coupons" element={<AdminCoupons />} />
         <Route path="activity" element={<AdminActivity />} />
         <Route path="*" element={<AdminDashboard />} />

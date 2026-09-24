@@ -5,7 +5,7 @@ Implemented sequentially so each release remains deployable and testable.
 - [x] 01 — PostgreSQL production database + Prisma migrations + legacy SQLite import helper
 - [x] 02 — Real payment gateway hardening (SSLCOMMERZ production flow alongside manual/COD)
 - [x] 03 — Restaurant opening hours + temporary/holiday closure + accepting-orders control
-- [ ] 04 — Delivery zones, area-based fees, minimum order and free-delivery threshold
+- [x] 04 — Delivery zones, area-based fees, minimum order and free-delivery threshold
 - [ ] 05 — Scheduled delivery / pickup time slots and capacity
 - [ ] 06 — Live order timeline and customer-facing tracking
 - [ ] 07 — Order notifications (email/browser push foundation)

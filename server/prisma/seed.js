@@ -50,6 +50,23 @@ async function main() {
     });
   }
 
+  const defaultDeliveryFeeCents = Math.max(0, Number(process.env.DELIVERY_FEE_CENTS || 200) || 0);
+  const existingDeliveryZones = await prisma.deliveryZone.count();
+  if (!existingDeliveryZones) {
+    await prisma.deliveryZone.create({
+      data: {
+        id: 'default-delivery-zone',
+        name: 'Standard delivery',
+        description: 'Default delivery area. Configure your real delivery zones from the admin panel.',
+        feeCents: defaultDeliveryFeeCents,
+        minimumOrderCents: 0,
+        freeDeliveryThresholdCents: null,
+        active: true,
+        sortOrder: 0,
+      },
+    });
+  }
+
   const email = (process.env.ADMIN_EMAIL || 'admin@example.com').trim().toLowerCase();
   const configuredPassword = process.env.ADMIN_PASSWORD?.trim();
   const isProduction = process.env.NODE_ENV === 'production';

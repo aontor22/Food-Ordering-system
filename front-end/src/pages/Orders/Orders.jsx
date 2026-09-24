@@ -78,6 +78,7 @@ export default function Orders({ onLogin }) {
           <div className="order-item-line"><span>{item.quantity}×</span><p>{item.productName}</p><strong>{formatCurrency(item.lineTotalCents / 100, order.payment?.currency)}</strong></div>
           {order.status === 'DELIVERED' && <ReviewEditor orderId={order.id} item={item} onChange={review => updateReview(order.id, item.id, review)} />}
         </div>)}</div>
+        {order.deliveryZoneName && <div className="order-delivery-zone"><Icon name="delivery" size={16} /><span>{order.deliveryZoneName} · {order.deliveryFeeCents === 0 ? 'Free delivery' : `${formatCurrency(order.deliveryFeeCents / 100, order.payment?.currency)} delivery`}</span></div>}
         <div className="order-payment-meta"><span><Icon name={order.paymentMethod === 'ONLINE' ? 'card' : 'cash'} />{order.paymentMethod === 'MANUAL' ? `Manual · ${order.payment?.manualDestination?.provider || ''}` : order.paymentMethod === 'ONLINE' ? `Online · ${order.payment?.provider === 'DEMO' ? 'Demo gateway' : order.payment?.provider || 'Gateway'}` : 'Cash on delivery'}</span>{order.payment?.transactionId && <small>Transaction: {order.payment.transactionId}</small>}</div>
         {(order.pointsRedeemed > 0 || order.pointsEarned > 0) && <div className="order-points-meta">
           {order.pointsRedeemed > 0 && <span><Icon name="gift" size={16} />Used {order.pointsRedeemed} points · saved {formatCurrency(order.pointsDiscountCents / 100, order.payment?.currency)}</span>}

@@ -10,6 +10,7 @@ import { audit } from '../services/audit.js';
 import { getLoyaltySettings, getLoyaltySnapshot, restoreCancelledOrderPoints } from '../services/loyalty.js';
 import { getPaymentOptions, initiateOrderPayment, newPaymentTransactionId, serializePayment } from '../services/payment.js';
 import { assertStoreAcceptingOrders, getStoreAvailability } from '../services/store-availability.js';
+import { calculateZoneDelivery, resolveDeliveryZone, serializeDeliveryZone } from '../services/delivery-zones.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -19,6 +20,7 @@ const pricingFields = {
   items: z.array(itemSchema).min(1).max(50),
   couponCode: z.string().trim().max(30).optional(),
   pointsToRedeem: z.number().int().nonnegative().max(1_000_000).default(0),
+  deliveryZoneId: z.string().trim().min(1).max(100).optional(),
 };
 const createSchema = z.object({ body: z.object({
   ...pricingFields,
@@ -31,7 +33,7 @@ const createSchema = z.object({ body: z.object({
     notes: z.string().trim().max(500).optional(),
   }),
 }), params: z.any(), query: z.any() });
-const quoteSchema = z.object({ body: z.object(pricingFields), params: z.any(), query: z.any() });
+const quoteSchema = z.object({ body: z.object({ ...pricingFields, postalCode: z.string().trim().max(20).optional() }), params: z.any(), query: z.any() });
 const reviewSchema = z.object({
   body: z.object({ rating: z.number().int().min(1).max(5), comment: z.string().trim().max(800).optional().transform(value => value || null) }),
   params: z.object({ orderId: z.string().min(1), itemId: z.string().min(1) }),
@@ -44,7 +46,7 @@ function quantitiesFrom(items) {
   return quantities;
 }
 
-async function calculatePricing(data, userId, db = prisma) {
+async function calculatePricing(data, userId, db = prisma, { enforceMinimum = true } = {}) {
   const quantities = quantitiesFrom(data.items);
   const ids = [...quantities.keys()];
   const products = await db.product.findMany({ where: { id: { in: ids }, isAvailable: true } });
@@ -82,11 +84,24 @@ async function calculatePricing(data, userId, db = prisma) {
   }
 
   const pointsDiscountCents = requestedPoints * settings.pointValueCents;
-  const deliveryFeeCents = subtotalCents ? config.DELIVERY_FEE_CENTS : 0;
+  const deliveryZone = await resolveDeliveryZone(db, {
+    deliveryZoneId: data.deliveryZoneId,
+    postalCode: data.postalCode || data.delivery?.postalCode,
+  });
+  const deliveryRules = calculateZoneDelivery(deliveryZone, subtotalCents);
+  if (enforceMinimum && !deliveryRules.minimumOrderMet) {
+    throw new AppError(400, 'MINIMUM_ORDER_NOT_MET', `Minimum order for ${deliveryZone.name} has not been met`, {
+      deliveryZone: serializeDeliveryZone(deliveryZone),
+      minimumOrderCents: deliveryRules.minimumOrderCents,
+      minimumOrderRemainingCents: deliveryRules.minimumOrderRemainingCents,
+    });
+  }
+  const deliveryFeeCents = deliveryRules.feeCents;
   const totalCents = Math.max(0, subtotalCents - discountCents - pointsDiscountCents + deliveryFeeCents);
   return {
     quantities, products, coupon, subtotalCents, discountCents, pointsRedeemed: requestedPoints,
     pointsDiscountCents, deliveryFeeCents, totalCents, settings, pointsBalance: user.pointsBalance, maxRedeemPoints,
+    deliveryZone, deliveryRules,
   };
 }
 
@@ -101,7 +116,7 @@ router.get('/loyalty', async (req, res) => {
 router.post('/quote', validate(quoteSchema), async (req, res, next) => {
   try {
     const [pricing, store] = await Promise.all([
-      calculatePricing(req.validated.body, req.auth.sub),
+      calculatePricing(req.validated.body, req.auth.sub, prisma, { enforceMinimum: false }),
       getStoreAvailability(),
     ]);
     res.json({
@@ -114,6 +129,10 @@ router.post('/quote', validate(quoteSchema), async (req, res, next) => {
         deliveryFeeCents: pricing.deliveryFeeCents,
         totalCents: pricing.totalCents,
         couponCode: pricing.coupon?.code || null,
+        deliveryZone: {
+          ...serializeDeliveryZone(pricing.deliveryZone),
+          ...pricing.deliveryRules,
+        },
         loyalty: {
           enabled: pricing.settings.enabled,
           pointsBalance: pricing.pointsBalance,
@@ -168,7 +187,9 @@ router.post('/', validate(createSchema), async (req, res, next) => {
           orderNumber, userId: req.auth.sub, paymentMethod: data.paymentMethod,
           subtotalCents: pricing.subtotalCents, discountCents: pricing.discountCents,
           pointsRedeemed: pricing.pointsRedeemed, pointsDiscountCents: pricing.pointsDiscountCents,
-          deliveryFeeCents: pricing.deliveryFeeCents, totalCents: pricing.totalCents,
+          deliveryFeeCents: pricing.deliveryFeeCents,
+          deliveryZoneId: pricing.deliveryZone.id, deliveryZoneName: pricing.deliveryZone.name,
+          totalCents: pricing.totalCents,
           couponCode: pricing.coupon?.code, ...data.delivery,
           items: { create: pricing.products.map(product => ({ productId: product.id, productName: product.name, unitPriceCents: product.priceCents, quantity: pricing.quantities.get(product.id), lineTotalCents: product.priceCents * pricing.quantities.get(product.id) })) },
           payment: { create: { transactionId: newPaymentTransactionId(), provider: data.paymentMethod === 'ONLINE' ? onlineOption.provider : data.paymentMethod, manualDestination, status: 'PENDING', amountCents: pricing.totalCents, currency: paymentOptions.currency } },
