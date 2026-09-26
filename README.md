@@ -161,3 +161,7 @@ server/prisma/   PostgreSQL schema, migrations, and seed
 server/src/      Routes, middleware, services, and app bootstrap
 server/test/     API integration tests
 ```
+
+## Progressive Web App (Step 08)
+
+The storefront is installable as a PWA on supported browsers. The production build injects its final hashed Vite assets into the service-worker precache list, provides an offline fallback, preserves browser push notifications, and shows an in-app update prompt when a newer deployment is ready. See `PWA_SETUP.md` and `STEP_08_VERIFICATION.md`.

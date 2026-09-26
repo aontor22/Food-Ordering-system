@@ -1,10 +1,15 @@
 .app-promo { min-height: 420px; margin-top: 86px; padding: 54px 8%; position: relative; overflow: hidden; display: flex; align-items: center; border-radius: var(--radius-lg); background: #1f2522; color: #fff; }
 .app-promo::before { content: ''; position: absolute; width: 380px; height: 380px; right: -80px; top: -110px; border-radius: 50%; background: var(--brand); opacity: .92; }
-.app-promo-copy { max-width: 570px; position: relative; z-index: 1; }
+.app-promo-copy { max-width: 590px; position: relative; z-index: 1; }
 .app-promo h2 { font-size: clamp(2.4rem, 5vw, 4.3rem); line-height: 1.05; letter-spacing: -.06em; }
-.app-promo-copy > p { max-width: 500px; color: #bec4c1; line-height: 1.7; margin: 18px 0 28px; }
-.app-badges { display: flex; gap: 12px; }.app-badges img { width: 148px; transition: transform .2s; }.app-badges img:hover { transform: translateY(-3px); }
+.app-promo-copy > p { max-width: 530px; color: #bec4c1; line-height: 1.7; margin: 18px 0 28px; }
+.pwa-install-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+.pwa-install-actions > span:not(.pwa-installed-pill) { color: #aeb5b1; font-size: .8rem; }
+.pwa-install-button { min-height: 50px; padding-inline: 23px; background: #fff; color: #161a18; box-shadow: 0 14px 32px rgba(0,0,0,.2); }
+.pwa-install-button:hover { background: #fff4ef; color: var(--brand-dark); }
+.pwa-installed-pill { min-height: 48px; display: inline-flex; align-items: center; gap: 9px; padding: 0 18px; border-radius: 999px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); font-weight: 700; }
+.app-promo-copy > .pwa-install-feedback { margin: 14px 0 0; color: #fff; font-size: .82rem; }
 .phone-card { position: absolute; right: 9%; bottom: -55px; width: 250px; height: 390px; padding: 28px 20px; border: 7px solid #111; border-radius: 36px; background: #fff9f4; color: var(--ink); transform: rotate(6deg); box-shadow: 0 25px 60px rgba(0,0,0,.35); }
 .phone-top { width: 70px; height: 14px; margin: -23px auto 18px; border-radius: 0 0 12px 12px; background: #111; }.mini-brand { color: var(--brand); font-weight: 800; }.phone-card > p { font-family: 'Manrope'; font-size: 1.35rem; font-weight: 800; margin: 15px 0; }.mini-search { display: flex; align-items: center; gap: 7px; padding: 10px; border-radius: 10px; background: #fff; color: var(--muted); font-size: .72rem; }.mini-food { height: 160px; margin-top: 14px; border-radius: 15px; overflow: hidden; }.mini-food img { width: 100%; height: 100%; object-fit: cover; }
 @media (max-width: 780px) { .app-promo { padding: 46px 28px; }.app-promo-copy { max-width: 70%; }.phone-card { right: -40px; } }
-@media (max-width: 600px) { .app-promo { min-height: auto; padding: 44px 24px; }.app-promo-copy { max-width: 100%; }.phone-card { display: none; }.app-badges img { width: 132px; } }
+@media (max-width: 600px) { .app-promo { min-height: auto; padding: 44px 24px; }.app-promo-copy { max-width: 100%; }.phone-card { display: none; }.pwa-install-button, .pwa-installed-pill { width: 100%; justify-content: center; }.pwa-install-actions > span:not(.pwa-installed-pill) { width: 100%; text-align: center; } }
