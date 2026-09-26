@@ -1,6 +1,6 @@
 # Food Ordering System — Full Stack
 
-A working Preact storefront and responsive restaurant admin dashboard with a Node.js/Express API, relational SQLite database, secure authentication, inventory-aware ordering, coupons, and audited management workflows.
+A working Preact storefront and responsive restaurant admin dashboard with a Node.js/Express API, PostgreSQL database, secure authentication, inventory-aware ordering, coupons, and audited management workflows.
 
 ## Included
 
@@ -18,8 +18,9 @@ A working Preact storefront and responsive restaurant admin dashboard with a Nod
 - Searchable/filterable catalog, redesigned cart and checkout, order confirmation, and customer order history
 - Sensitive authorization, cookie, and `Set-Cookie` headers redacted from request logs
 - Customer COD/online checkout, development demo payment, verified payment result, and retry from My orders
-- Admin Payments ledger with transaction filters, cash collection/refund records, and gateway-controlled online statuses
-- SSLCOMMERZ hosted checkout, validated success/IPN callbacks, and server-side failure/cancellation reconciliation
+- Admin Payments ledger with transaction filters, cash collection/refund records, gateway reconciliation, risk-review decisions, and SSLCOMMERZ refund tracking
+- SSLCOMMERZ hosted checkout, validated success/IPN callbacks, server-side failure/cancellation reconciliation, risk review, and full gateway refund workflow
+- Server-enforced restaurant opening hours, overnight schedules, emergency ordering pause, temporary closures, holiday closures, and customer-facing open/closed status
 
 ## Quick start
 
@@ -29,6 +30,7 @@ Requires Node.js 22+ (Node 24 recommended).
 npm install
 cp server/.env.example server/.env
 cp front-end/.env.example front-end/.env
+docker compose up -d db
 npm run db:setup
 npm run dev
 ```
@@ -51,11 +53,27 @@ npm test
 npm run build
 ```
 
-Tests use a temporary SQLite database and include mocked provider responses for amount validation, risk review, replay/idempotency, failed-payment retry, and role/ownership checks. They do not charge money or call a live merchant account.
+Tests use an isolated temporary PostgreSQL schema and include mocked provider responses for amount validation, risk review, replay/idempotency, failed-payment retry, gateway refund initiation/status, and role/ownership checks. They do not charge money or call a live merchant account.
+
+
+## PostgreSQL database
+
+The runtime database is PostgreSQL. For local development, `docker compose up -d db` starts PostgreSQL 16 and the example `DATABASE_URL` connects to it. Production deploys use `prisma migrate deploy`; do not use `prisma migrate dev` against production. On Render, create Render Postgres in the same region as the API and set `DATABASE_URL` to its Internal Database URL. See `POSTGRESQL_SETUP.md` for the exact setup and optional legacy SQLite import.
 
 ## Payments and upgrading
 
-After copying updated files into an existing project, keep your existing `.env` and database, stop the server, then run `npm install`, `npm run db:setup`, and `npm run dev`. The initializer adds the Payment table and backfills existing COD orders without deleting orders/users. Back up your SQLite database before upgrading. Do not mix the bundled initializer with `prisma migrate deploy` against an already initialized database without first baselining migrations.
+### Manual payments (no SSLCOMMERZ account needed)
+
+1. For bKash/Nagad/Rocket, set `PAYMENT_CURRENCY=BDT` in `server/.env` and `VITE_CURRENCY=BDT` in `front-end/.env`. Restart development servers (or rebuild the production frontend). Check product prices and `DELIVERY_FEE_CENTS`: 6000 means ৳60 with BDT. Currency changes do not convert prices or historical orders. Mobile channels cannot be enabled while the store uses USD.
+2. Run `npm run db:setup` after installing or deploying. It generates Prisma Client, applies pending PostgreSQL migrations, and seeds missing defaults without resetting existing rows.
+3. Sign in as admin → **Payments → Manual payment accounts & instructions**. Add a provider (bKash/Nagad/Rocket/Bank), label, actual merchant/account number, and instructions. Enable and save it. No fictitious recipient is preconfigured.
+4. Customer selects **Manual payment** and an account at checkout, places the order, then sees the exact amount/currency and receiving instructions. After paying through the chosen channel, they submit the transaction ID, sender identifier and optional note. No PIN, OTP or password is requested.
+5. The order remains pending with payment **Awaiting verification**. Admin → Payments → **Review & approve** shows the amount, recipient, sender and transaction ID. Verify these against the receiving account, add a note and confirm receipt before approving. Only then does the order become confirmed/paid. Rejection requires a customer-visible reason and permits a corrected reference.
+6. Duplicate transaction references are blocked (including case/separator variants). A rejected reference remains reserved to prevent reuse: the customer should contact the restaurant if the original reference was correct, not pay again simply to resubmit. Under-review and paid manual orders cannot be cancelled until review/refund is handled. **Record refund** only records money already returned; it does not transfer money.
+
+Channel edits affect new orders. Existing orders retain their original destination and instructions. No gateway setup credentials are required for this manual workflow; any provider/account charges are separate. Customer details and review history are restricted to the owner and administrators.
+
+Database changes are now managed by Prisma Migrate on PostgreSQL. After copying updated files, set a PostgreSQL `DATABASE_URL`, then run `npm install`, `npm run db:setup`, and `npm run dev`. `db:setup` generates Prisma Client, applies only pending migrations, and runs the idempotent seed. If you need to preserve data from a local legacy SQLite file, follow `POSTGRESQL_SETUP.md` and run the included `db:import:sqlite` helper after creating the PostgreSQL schema.
 
 At checkout choose **Cash on delivery** or **Online payment (demo)**. The demo lets you test success/failure/cancel without charging money. My orders shows payment status and offers retry. Open `/admin/payments` as an administrator to view the ledger. **Cash received** records money already collected, and **Mark refunded** records cash already returned; these buttons do not transfer money. Delivery also records COD collection. Online orders cannot enter fulfilment until verified paid.
 
@@ -63,20 +81,63 @@ For real SSLCOMMERZ integration, set `SSLCOMMERZ_STORE_ID`, `SSLCOMMERZ_STORE_PA
 
 `PAYMENT_CURRENCY` and frontend `VITE_CURRENCY` must match (default USD; use BDT if your prices are in taka). Changing these variables does not convert stored prices. Test on the provider sandbox before setting `SSLCOMMERZ_LIVE=true`. Demo payments are always disabled with `NODE_ENV=production`; without gateway credentials, only COD is available.
 
-Gateway timeouts remain processing until verified; retry checks the provider before starting another attempt. Risk-review transactions block fulfilment. Online refund initiation and risk-review resolution are not automated in this release; reconcile them through the merchant dashboard and an operator workflow before release. No live payment was made during local verification. See the [official SSLCOMMERZ integration documentation](https://developer.sslcommerz.com/doc/v4/).
+Gateway timeouts remain processing until verified; retry checks the provider before starting another attempt. Risk-review transactions block fulfilment until an administrator either accepts the gateway-validated payment or refunds it. Paid SSLCOMMERZ transactions can be refunded from Admin → Payments; the system sends a full-refund request, records the gateway refund reference, keeps the payment in `REFUND_PENDING`, and only marks it `REFUNDED` after a status query confirms completion. Live refund API calls require the merchant public IP to be registered with SSLCOMMERZ. No live payment or refund is made by the test suite. See `SSLCOMMERZ_SETUP.md` and the [official SSLCOMMERZ integration documentation](https://developer.sslcommerz.com/doc/v4/).
+
+## Cloudinary product images
+
+Product image files can be stored on Cloudinary instead of the application database or Render filesystem. The browser uploads image bytes directly to Cloudinary using a short-lived signature generated by the authenticated admin API; the Cloudinary API secret never reaches the browser. PostgreSQL stores only `imageUrl` and `imagePublicId`; image bytes remain on Cloudinary.
+
+Set these backend environment variables on Render (and in `server/.env` for local development):
+
+```env
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+CLOUDINARY_FOLDER=tomato/products
+CLOUDINARY_AUTO_MIGRATE=false
+```
+
+Run `npm run db:setup` after installing the update. The repository keeps only lightweight WebP bootstrap images under `front-end/public/seed-food/`; these are used only until a seeded product is migrated. Existing historical `/food_*.png` rows are still recognized. Use **Admin → Products → Move images to Cloudinary**, or set `CLOUDINARY_AUTO_MIGRATE=true` for one deployment; the server migrates local product images in the background and skips products that already have a Cloudinary public ID. After migration, customers load product images from Cloudinary and PostgreSQL stores only the URL/public ID.
+
+New or replacement images are selected in Admin → Products. The file goes from the browser directly to Cloudinary; the backend only signs the upload and stores the returned URL/public ID. Replaced Cloudinary assets are deleted after the product update succeeds, and an uploaded asset is cleaned up if saving the product fails. Keep `CLOUDINARY_API_SECRET` server-side only.
+
+
+## Asset cleanup
+
+The frontend no longer bundles the old 32-product mock image catalog or legacy PNG UI icons. Seed product images are compact WebP files in `front-end/public/seed-food/` so a fresh database still has visible bootstrap images before Cloudinary migration. The hero and category artwork are also WebP. Duplicate public hero/Vite/Preact starter assets and the unused legacy Prisma initializer were removed. This keeps the repository and Vite bundle substantially smaller without removing runtime features.
+
+## Store opening hours & closures
+
+Admin → **Store hours** controls the restaurant timezone, weekly schedule, 24-hour/closed days, emergency **Accept new orders** switch, temporary closures, and full-day holiday/special closures. Customers can keep browsing the menu while the restaurant is closed, but Cart/Checkout clearly show the closure and the API rejects new orders server-side. Existing orders are never cancelled by a schedule change.
+
+The migration intentionally defaults all seven days to **Open 24 hours** so deploying this release cannot unexpectedly take an existing store offline. After deployment, configure your real schedule. See `STORE_HOURS_SETUP.md`.
+
+
+## Order notifications
+
+Step 07 adds transactional email and browser Web Push for order lifecycle events. Customer preferences live at **Account → Notifications**; delivery health and retries live at **Admin → Notifications**. The API uses a PostgreSQL outbox (`NotificationDelivery`) so provider failures do not roll back valid order operations.
+
+For email, configure backend-only generic SMTP variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME`). For browser push, run `npm run push:keys -w server` and configure `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` on Render. Never place SMTP credentials or the VAPID private key in Vercel/frontend variables. See `NOTIFICATIONS_SETUP.md` and `STEP_07_VERIFICATION.md`.
 
 ## API map
 
 | Area | Endpoints |
 | --- | --- |
 | Health | `GET /api/health` |
+| Store status | `GET /api/store/status` |
 | Auth | `POST /api/auth/register`, `login`, `refresh`, `logout`; `GET /me` |
 | Catalog | `GET /api/products`, `/api/products/categories` |
-| Orders | `POST/GET /api/orders`, detail, and cancellation |
+| Orders | `POST/GET /api/orders`, detail, cancellation, and live tracking |
+| Customer notifications | `GET /api/notifications`, preferences, push subscriptions, test delivery |
 | Payments | `GET /api/payments/options`, `POST /api/payments/orders/:orderId/initiate`, authenticated demo routes, SSLCOMMERZ callback routes |
-| Admin payments | `GET /api/admin/payments`, `POST /api/admin/payments/:id/cash-received`, `cash-refunded` |
+| Admin payments | `GET /api/admin/payments`; cash receive/refund; gateway status check; risk acceptance; SSLCOMMERZ refund request/status under `/api/admin/payments/:id/*` |
+| Manual customer payments | `GET /api/payments/manual/:orderId`, `POST /api/payments/manual/:orderId/submit` |
+| Manual admin operations | `GET/POST /api/admin/payment-channels`, `PATCH /api/admin/payment-channels/:id`, `POST /api/admin/payments/:id/manual-review`, `manual-refunded` |
 | Admin dashboard | `GET /api/admin/dashboard` |
+| Admin notifications | Delivery monitor, queue processing and retry under `/api/admin/notifications` |
+| Admin store operations | `GET/PATCH /api/admin/store-operations`, `POST /api/admin/store-closures`, `DELETE /api/admin/store-closures/:id` |
 | Admin products | List, create, update, archive and restore under `/api/admin/products` |
+| Admin media | Cloudinary status/signature/cleanup/migration under `/api/admin/media` |
 | Admin orders | List and controlled status transitions under `/api/admin/orders` |
 | Admin customers | Account list and active-state management under `/api/admin/users` |
 | Admin coupons | List, create, update and disable under `/api/admin/coupons` |
@@ -86,15 +147,21 @@ Gateway timeouts remain processing until verified; retry checks the provider bef
 
 1. Generate two different random JWT secrets of at least 32 characters.
 2. Set exact HTTPS frontend origin(s) in `CLIENT_ORIGIN`.
-3. Replace the seed admin password and never commit `.env` or `dev.db`.
-4. Use HTTPS and persistent SQLite storage. For multi-instance scale, migrate Prisma to PostgreSQL.
-5. Configure and validate SSLCOMMERZ sandbox callbacks, currency, and public HTTPS URLs before enabling live online payments. Complete merchant refund/review operations for your deployment.
+3. Replace the seed admin password and never commit `.env` or database credentials.
+4. Use a managed PostgreSQL database; on Render, use the database Internal URL when the API and database are in the same region.
+5. Configure Cloudinary credentials for product image uploads; keep `CLOUDINARY_API_SECRET` only on the backend.
+6. Configure and validate SSLCOMMERZ sandbox callbacks, currency, public HTTPS URLs, risk-review handling, and refund flow before enabling live online payments. Register the Render service public IP with SSLCOMMERZ if required for live refund API access.
+7. Configure SMTP and/or VAPID Web Push, verify test notifications, and monitor Admin → Notifications before relying on customer messaging.
 
 ## Structure
 
 ```text
 front-end/       Preact/Vite storefront, admin workspace, and API client
-server/prisma/   Schema, migration, initializer, and seed
+server/prisma/   PostgreSQL schema, migrations, and seed
 server/src/      Routes, middleware, services, and app bootstrap
 server/test/     API integration tests
 ```
+
+## Progressive Web App (Step 08)
+
+The storefront is installable as a PWA on supported browsers. The production build injects its final hashed Vite assets into the service-worker precache list, provides an offline fallback, preserves browser push notifications, and shows an in-app update prompt when a newer deployment is ready. See `PWA_SETUP.md` and `STEP_08_VERIFICATION.md`.

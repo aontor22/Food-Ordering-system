@@ -1,0 +1,1274 @@
+/*
+  Cross-device responsive layer.
+  Imported after all feature styles so component behavior stays unchanged while
+  layouts adapt cleanly from 320px phones to large desktop displays.
+*/
+
+:root {
+  --page-gutter: max(20px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+}
+
+html,
+body,
+#root,
+.app-shell,
+.page-main {
+  width: 100%;
+  min-width: 0;
+}
+
+html,
+body {
+  overflow-x: clip;
+}
+
+body {
+  min-width: 0;
+}
+
+.page-container {
+  width: min(1180px, calc(100% - (var(--page-gutter) * 2)));
+}
+
+main,
+section,
+article,
+header,
+footer,
+nav,
+aside,
+div,
+form,
+fieldset,
+label {
+  min-width: 0;
+}
+
+h1,
+h2,
+h3,
+p,
+small,
+strong,
+span,
+a,
+button,
+label,
+li,
+td,
+th {
+  overflow-wrap: anywhere;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+input,
+textarea,
+select,
+button {
+  max-width: 100%;
+}
+
+/* Keep long API/order identifiers from forcing a page wider than the viewport. */
+.form-error,
+.summary-note,
+.payment-failure,
+.audit-metadata,
+.manual-account,
+.order-payment-meta,
+.public-review,
+.review-copy-cell {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ---------- Main navigation ---------- */
+.navbar {
+  position: relative;
+  min-width: 0;
+}
+
+.brand {
+  flex: 0 0 auto;
+}
+
+.navbar-actions {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.account-dropdown {
+  width: max-content;
+  max-width: min(300px, calc(100vw - 24px));
+}
+
+.mobile-nav-signin {
+  display: none !important;
+}
+
+.nav-search input {
+  min-width: 0;
+}
+
+/* ---------- Hero / home ---------- */
+.hero {
+  min-height: clamp(500px, 48vw, 570px);
+}
+
+.hero-content {
+  min-height: inherit;
+}
+
+.hero-actions {
+  max-width: 100%;
+}
+
+/* ---------- Categories / products ---------- */
+.category-list {
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+}
+
+.category-card {
+  scroll-snap-align: start;
+}
+
+.food-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+}
+
+.food-card-media {
+  height: auto;
+  aspect-ratio: 4 / 3;
+}
+
+.food-card-heading > * {
+  min-width: 0;
+}
+
+.food-card-heading h3 {
+  overflow-wrap: anywhere;
+}
+
+.food-card-footer,
+.food-card-meta {
+  min-width: 0;
+}
+
+.food-reviews-modal,
+.auth-modal,
+.admin-modal {
+  max-height: calc(100dvh - 40px);
+}
+
+.food-reviews-body {
+  max-height: calc(100dvh - 170px);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ---------- Cart / checkout / orders ---------- */
+.cart-layout,
+.checkout-layout {
+  min-width: 0;
+}
+
+.cart-row > *,
+.order-item-line > *,
+.order-items-preview > div > * {
+  min-width: 0;
+}
+
+.cart-item-copy h2,
+.cart-item-copy p,
+.order-item-line p,
+.order-items-preview p {
+  overflow-wrap: anywhere;
+}
+
+.order-summary {
+  max-width: 100%;
+}
+
+.payment-option > div,
+.loyalty-checkout-head > div {
+  min-width: 0;
+}
+
+/* ---------- Wishlist ---------- */
+.wishlist-card,
+.wishlist-copy,
+.wishlist-copy > div:first-child > * {
+  min-width: 0;
+}
+
+.wishlist-copy h2,
+.wishlist-copy p {
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Footer / app banner ---------- */
+.app-badges {
+  flex-wrap: wrap;
+}
+
+.footer-inner > * {
+  min-width: 0;
+}
+
+.footer a,
+.footer li {
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Admin ---------- */
+.admin-app,
+.admin-workspace,
+.admin-content,
+.admin-card,
+.admin-grid,
+.metric-card,
+.admin-page-header > *,
+.admin-topbar > * {
+  min-width: 0;
+}
+
+.admin-sidebar {
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.admin-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.admin-table {
+  min-width: max-content;
+}
+
+.admin-table th,
+.admin-table td {
+  max-width: 420px;
+}
+
+.admin-table .review-copy-cell {
+  min-width: 260px;
+  max-width: 420px;
+}
+
+.admin-toolbar,
+.admin-header-actions,
+.admin-table-actions,
+.order-actions,
+.product-image-actions {
+  min-width: 0;
+}
+
+.admin-search {
+  min-width: min(240px, 100%);
+}
+
+.admin-modal {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.revenue-chart {
+  min-width: 0;
+}
+
+.revenue-bar span,
+.revenue-bar small {
+  white-space: nowrap;
+}
+
+/* ---------- Tablet ---------- */
+@media (max-width: 1024px) {
+  :root {
+    --page-gutter: max(18px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+  }
+
+  .section {
+    padding-top: 60px;
+  }
+
+  .hero-content {
+    width: min(650px, 72%);
+    padding-left: 44px;
+    padding-right: 28px;
+  }
+
+  .footer-inner {
+    gap: 40px 28px;
+  }
+
+  .order-summary {
+    padding: 24px;
+  }
+
+  .admin-content {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+/* ---------- Mobile navigation / tablet portrait ---------- */
+@media (max-width: 900px) {
+  html {
+    scroll-padding-top: 88px;
+  }
+
+  .navbar-links {
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    max-height: calc(100dvh - 92px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .account-dropdown {
+    right: 0;
+  }
+
+  .hero {
+    min-height: clamp(480px, 72vw, 540px);
+  }
+
+  .hero-content {
+    min-height: inherit;
+    width: min(650px, 88%);
+  }
+
+  .hero h1 {
+    font-size: clamp(2.8rem, 8vw, 4.7rem);
+  }
+
+  .wishlist-card {
+    grid-template-columns: minmax(150px, 190px) minmax(0, 1fr);
+  }
+
+  .wishlist-image {
+    min-height: 190px;
+  }
+
+  .cart-layout,
+  .checkout-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .order-summary {
+    position: static;
+  }
+
+  .admin-sidebar {
+    padding-bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ---------- Phones / small tablets ---------- */
+@media (max-width: 768px) {
+  :root {
+    --page-gutter: max(14px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+  }
+
+  /* Prevent Safari from zooming the viewport when a form control receives focus. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  .page-main {
+    padding-bottom: 34px;
+  }
+
+  .section {
+    padding-top: 48px;
+  }
+
+  .page-title {
+    padding: 38px 0 22px;
+  }
+
+  .section-heading,
+  .dishes-toolbar {
+    margin-bottom: 22px;
+  }
+
+  .button {
+    min-height: 44px;
+  }
+
+  .hero {
+    margin-top: 14px;
+    border-radius: 24px;
+  }
+
+  .hero-content {
+    width: 100%;
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .hero-content > p {
+    max-width: 500px;
+  }
+
+  .hero-rating {
+    right: 20px;
+    bottom: 20px;
+  }
+
+  .benefit-strip {
+    margin-top: 18px;
+  }
+
+  .food-grid {
+    gap: 16px;
+  }
+
+  .food-card:hover {
+    transform: none;
+  }
+
+  .app-promo {
+    margin-top: 64px;
+  }
+
+  .footer {
+    margin-top: 70px;
+    padding-top: 54px;
+  }
+
+  .payment-page,
+  .success-page {
+    width: 100%;
+  }
+
+  .admin-topbar {
+    min-height: 72px;
+  }
+
+  .admin-topbar > div:first-of-type {
+    min-width: 0;
+  }
+
+  .admin-topbar h1 {
+    font-size: 1.05rem;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-content {
+    padding: 22px 14px 40px;
+  }
+
+  .admin-card-header {
+    align-items: flex-start;
+  }
+
+  .metric-card {
+    padding: 17px;
+  }
+
+  .revenue-chart {
+    gap: 6px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+/* ---------- Phones ---------- */
+@media (max-width: 600px) {
+  .brand img {
+    width: 104px;
+  }
+
+  .navbar {
+    gap: 10px;
+  }
+
+  .navbar-actions {
+    gap: 2px;
+  }
+
+  .navbar .icon-button,
+  .cart-button,
+  .wishlist-nav-button {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+  }
+
+  .account-trigger {
+    padding: 3px;
+  }
+
+  .avatar {
+    width: 38px;
+    height: 38px;
+  }
+
+  .nav-search {
+    min-height: 58px;
+  }
+
+  .hero {
+    min-height: 500px;
+    background-position: 62% center;
+  }
+
+  .hero-overlay {
+    background: linear-gradient(0deg, rgba(39, 17, 8, .88) 0%, rgba(39, 17, 8, .58) 52%, rgba(39, 17, 8, .20) 100%);
+  }
+
+  .hero-content {
+    min-height: inherit;
+    justify-content: flex-end;
+    padding: 110px 22px 36px;
+  }
+
+  .hero h1 {
+    margin: 14px 0;
+    font-size: clamp(2.5rem, 13vw, 3.5rem);
+    line-height: 1;
+  }
+
+  .hero-content > p {
+    font-size: .94rem;
+    line-height: 1.6;
+  }
+
+  .hero-actions {
+    width: 100%;
+    margin-top: 22px;
+  }
+
+  .hero-primary {
+    flex: 1;
+  }
+
+  .hero-actions > span {
+    display: none;
+  }
+
+  .hero-rating {
+    left: 18px;
+    right: auto;
+    top: 18px;
+    bottom: auto;
+  }
+
+  .category-list {
+    margin-right: calc(var(--page-gutter) * -1);
+    padding-right: var(--page-gutter);
+  }
+
+  .food-card-body {
+    padding: 16px;
+  }
+
+  .food-card-heading {
+    gap: 8px;
+  }
+
+  .food-card-body > p {
+    min-height: 0;
+  }
+
+  .food-reviews-overlay,
+  .auth-overlay,
+  .admin-modal-overlay {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .food-reviews-modal,
+  .auth-modal,
+  .admin-modal {
+    max-height: 94dvh;
+  }
+
+  .food-reviews-modal > header,
+  .food-reviews-body {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .public-review > div {
+    flex-wrap: wrap;
+  }
+
+  .app-promo {
+    padding: 38px 20px;
+    border-radius: 22px;
+  }
+
+  .app-promo h2 {
+    font-size: clamp(2rem, 11vw, 3.1rem);
+  }
+
+  .app-badges img {
+    width: min(140px, calc(50% - 6px));
+  }
+
+  .footer-inner {
+    gap: 34px 24px;
+  }
+
+  .cart-list {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .cart-row {
+    grid-template-columns: 70px minmax(0, 1fr) 38px;
+    gap: 12px;
+  }
+
+  .cart-row > img {
+    width: 70px;
+    height: 70px;
+  }
+
+  .cart-line-total {
+    min-width: 0;
+    text-align: right;
+  }
+
+  .promo-form > div {
+    min-width: 0;
+  }
+
+  .checkout-form {
+    padding: 22px 18px;
+  }
+
+  .payment-option {
+    grid-template-columns: 24px minmax(0, 1fr) 18px;
+    padding: 15px;
+  }
+
+  .wishlist-page {
+    padding-bottom: 50px;
+  }
+
+  .wishlist-card {
+    grid-template-columns: 1fr;
+  }
+
+  .wishlist-image {
+    width: 100%;
+    min-height: 0;
+    height: auto;
+    aspect-ratio: 16 / 10;
+  }
+
+  .wishlist-copy {
+    padding: 18px;
+  }
+
+  .order-card {
+    padding: 18px;
+  }
+
+  .order-item-line,
+  .order-items-preview > div {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+  }
+
+  .points-wallet {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .points-wallet > small {
+    grid-column: 2;
+    white-space: normal;
+  }
+
+  .admin-page-header > .admin-header-actions,
+  .admin-page-header > .button {
+    width: 100%;
+  }
+
+  .admin-card-header {
+    flex-wrap: wrap;
+  }
+
+  .admin-toolbar,
+  .admin-header-actions {
+    width: 100%;
+  }
+
+  .admin-toolbar select,
+  .admin-search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .manual-channel-list article {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .manual-channel-list article .button,
+  .manual-channel-list article button {
+    width: 100%;
+  }
+
+  .toggle-field {
+    align-items: flex-start;
+  }
+
+  .order-detail {
+    padding: 18px;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+/* ---------- Compact phones (<= 480px) ---------- */
+@media (max-width: 480px) {
+  :root {
+    --page-gutter: max(12px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+  }
+
+  .brand img {
+    width: 94px;
+  }
+
+  .sign-in {
+    display: none;
+  }
+
+  .mobile-nav-signin {
+    display: flex !important;
+  }
+
+  .navbar .icon-button,
+  .cart-button,
+  .wishlist-nav-button {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .navbar-links {
+    border-radius: 15px;
+  }
+
+  .nav-search {
+    gap: 8px;
+  }
+
+  .nav-search input {
+    font-size: .96rem;
+  }
+
+  .page-title h1,
+  .wishlist-hero h1 {
+    font-size: clamp(2rem, 11vw, 2.7rem);
+  }
+
+  .hero {
+    min-height: 470px;
+    border-radius: 20px;
+  }
+
+  .hero-content {
+    padding: 105px 18px 28px;
+  }
+
+  .hero-badge {
+    padding: 7px 10px;
+    font-size: .74rem;
+  }
+
+  .hero-rating {
+    left: 14px;
+    top: 14px;
+    padding: 9px 12px;
+  }
+
+  .hero-primary {
+    width: 100%;
+  }
+
+  .section-heading h2,
+  .dishes-toolbar h2 {
+    font-size: clamp(1.65rem, 9vw, 2.1rem);
+  }
+
+  .food-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .food-card-media {
+    aspect-ratio: 16 / 10;
+  }
+
+  .food-card-heading {
+    align-items: flex-start;
+  }
+
+  .food-card-footer {
+    align-items: flex-end;
+  }
+
+  .food-card-meta {
+    gap: 5px;
+  }
+
+  .app-badges {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .app-badges img {
+    width: min(150px, 100%);
+  }
+
+  .footer-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-brand,
+  .footer-inner > div:last-child {
+    grid-column: auto;
+  }
+
+  .footer-bottom {
+    align-items: flex-start;
+  }
+
+  .cart-row {
+    grid-template-columns: 64px minmax(0, 1fr) 36px;
+    gap: 10px;
+  }
+
+  .cart-row > img {
+    width: 64px;
+    height: 64px;
+  }
+
+  .cart-quantity {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .cart-line-total {
+    grid-column: 3;
+    grid-row: 2;
+    align-self: center;
+  }
+
+  .remove-item {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .cart-list-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .promo-form > div {
+    align-items: stretch;
+  }
+
+  .promo-form button {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .checkout-section-title {
+    align-items: flex-start;
+  }
+
+  .checkout-section-title > span {
+    flex-basis: 34px;
+    width: 34px;
+    height: 34px;
+  }
+
+  .loyalty-checkout-head {
+    flex-direction: column;
+  }
+
+  .loyalty-checkout-head small {
+    max-width: none;
+    text-align: left;
+  }
+
+  .points-redeem-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .points-redeem-row button {
+    min-height: 42px;
+  }
+
+  .wishlist-hero {
+    gap: 14px;
+  }
+
+  .wishlist-hero > strong {
+    align-self: flex-start;
+  }
+
+  .wishlist-copy > div:first-child {
+    flex-wrap: wrap;
+  }
+
+  .wishlist-actions {
+    flex-direction: column;
+  }
+
+  .wishlist-actions .button,
+  .wishlist-quantity {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .order-card-head,
+  .order-card-foot,
+  .order-payment-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .order-statuses {
+    justify-content: flex-start;
+  }
+
+  .order-item-line,
+  .order-items-preview > div {
+    grid-template-columns: 26px minmax(0, 1fr);
+  }
+
+  .order-item-line strong,
+  .order-items-preview > div strong {
+    grid-column: 2;
+  }
+
+  .order-payment-meta small {
+    width: 100%;
+    text-align: left;
+  }
+
+  .order-card-foot p {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .order-customer-actions,
+  .review-editor-actions {
+    flex-direction: column;
+  }
+
+  .order-customer-actions .button,
+  .review-editor-actions .button {
+    width: 100%;
+  }
+
+  .review-editor,
+  .review-start {
+    margin-left: 0;
+  }
+
+  .payment-page,
+  .success-page {
+    margin-top: 28px;
+    margin-bottom: 28px;
+    padding: 30px 16px;
+  }
+
+  .payment-page-icon,
+  .success-check {
+    width: 68px;
+    height: 68px;
+  }
+
+  .manual-instructions {
+    padding: 16px;
+  }
+
+  .manual-instructions .manual-account {
+    font-size: 1.05rem;
+  }
+
+  .auth-modal {
+    padding: 30px 18px max(24px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .auth-close {
+    right: 14px;
+    top: 14px;
+  }
+
+  .auth-modal h2 {
+    font-size: 1.65rem;
+    padding-right: 36px;
+  }
+
+  .auth-divider {
+    gap: 9px;
+    font-size: .72rem;
+  }
+
+  .admin-topbar {
+    gap: 10px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .admin-profile > span {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+  }
+
+  .admin-content {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .admin-page-header {
+    margin-bottom: 18px;
+  }
+
+  .admin-page-header p {
+    font-size: .84rem;
+    line-height: 1.5;
+  }
+
+  .admin-metrics,
+  .payment-metrics,
+  .loyalty-metrics {
+    gap: 10px;
+  }
+
+  .metric-card {
+    gap: 12px;
+    padding: 15px;
+  }
+
+  .metric-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .metric-card strong {
+    font-size: 1.35rem;
+  }
+
+  .admin-modal > header,
+  .admin-form {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .admin-form {
+    gap: 14px;
+  }
+
+  .toggle-field {
+    gap: 12px;
+  }
+
+  .revenue-chart {
+    height: 200px;
+    gap: 4px;
+  }
+
+  .revenue-bar > div {
+    width: min(28px, 78%);
+  }
+
+  .revenue-bar small {
+    display: none;
+  }
+
+  .loyalty-settings-card .admin-card-header {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .media-notice,
+  .loyalty-example {
+    padding: 12px;
+  }
+}
+
+/* ---------- Very small phones (320–360px) ---------- */
+@media (max-width: 360px) {
+  .brand img {
+    width: 84px;
+  }
+
+  .navbar .icon-button,
+  .cart-button,
+  .wishlist-nav-button {
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+  }
+
+  .navbar-actions {
+    gap: 0;
+  }
+
+  .hero {
+    min-height: 450px;
+  }
+
+  .hero-content {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+
+  .hero h1 {
+    font-size: 2.35rem;
+  }
+
+  .hero-rating {
+    font-size: .88rem;
+  }
+
+  .hero-rating > span {
+    font-size: 1.25rem;
+  }
+
+  .food-card-body {
+    padding: 14px;
+  }
+
+  .food-card-heading {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .food-card-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .add-button,
+  .quantity-control {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cart-row {
+    grid-template-columns: 58px minmax(0, 1fr) 34px;
+    gap: 8px;
+  }
+
+  .cart-row > img {
+    width: 58px;
+    height: 58px;
+  }
+
+  .cart-item-copy h2 {
+    font-size: .98rem;
+  }
+
+  .checkout-form,
+  .order-card,
+  .wishlist-copy {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .payment-option {
+    gap: 9px;
+    padding: 13px;
+  }
+
+  .points-wallet {
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .points-wallet-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .admin-menu-toggle,
+  .admin-profile > span {
+    flex: 0 0 auto;
+  }
+
+  .admin-topbar h1 {
+    font-size: .98rem;
+  }
+
+  .admin-card {
+    border-radius: 14px;
+  }
+
+  .admin-content {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+/* Short landscape phones: reduce vertical hero/modal pressure. */
+@media (max-height: 600px) and (orientation: landscape) and (max-width: 950px) {
+  .hero,
+  .hero-content {
+    min-height: 390px;
+  }
+
+  .hero-content {
+    justify-content: center;
+    padding-top: 32px;
+    padding-bottom: 32px;
+  }
+
+  .hero-rating {
+    display: none;
+  }
+
+  .auth-modal,
+  .food-reviews-modal,
+  .admin-modal {
+    max-height: 96dvh;
+  }
+}
+
+/* Touch devices should never rely on tiny click targets. */
+@media (pointer: coarse) {
+  .food-wishlist,
+  .food-reviews-modal > header button,
+  .remove-item,
+  .wishlist-quantity button,
+  .quantity-control button,
+  .admin-icon-action {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}

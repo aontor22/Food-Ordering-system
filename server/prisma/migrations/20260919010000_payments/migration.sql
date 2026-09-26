@@ -11,10 +11,10 @@ CREATE TABLE "Payment" (
   "validationId" TEXT,
   "failureReason" TEXT,
   "attempts" INTEGER NOT NULL DEFAULT 0,
-  "lastAttemptAt" DATETIME,
-  "paidAt" DATETIME,
-  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" DATETIME NOT NULL,
+  "lastAttemptAt" TIMESTAMP(3),
+  "paidAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
   "orderId" TEXT NOT NULL,
   CONSTRAINT "Payment_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );

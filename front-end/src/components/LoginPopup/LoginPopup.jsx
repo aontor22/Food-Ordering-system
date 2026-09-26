@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState } from 'react';
 import { StoreContext } from '../../context/StoreContext';
 import Icon from '../ui/Icon';
+import GoogleSignInButton from './GoogleSignInButton';
 import './LoginPopup.css';
 
 export default function LoginPopup({ onClose }) {
@@ -8,7 +9,8 @@ export default function LoginPopup({ onClose }) {
   const [values, setValues] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const { authenticate } = useContext(StoreContext);
+  const { authenticate, authenticateWithGoogle } = useContext(StoreContext);
+  const googleEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim());
 
   useEffect(() => {
     document.body.classList.add('modal-open');
@@ -23,6 +25,15 @@ export default function LoginPopup({ onClose }) {
     event.preventDefault(); setError(''); setBusy(true);
     try {
       await authenticate(mode, mode === 'login' ? { email: values.email, password: values.password } : values);
+      onClose();
+    } catch (requestError) { setError(requestError.message); }
+    finally { setBusy(false); }
+  };
+
+  const googleSignIn = async credential => {
+    setError(''); setBusy(true);
+    try {
+      await authenticateWithGoogle(credential);
       onClose();
     } catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
@@ -43,6 +54,10 @@ export default function LoginPopup({ onClose }) {
         {mode === 'register' && <label className="terms-check"><input type="checkbox" required /><span>I agree to the terms of use and privacy policy.</span></label>}
         <button className="button button-primary button-full" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}</button>
       </form>
+      {googleEnabled && <>
+        <div className="auth-divider" aria-hidden="true"><span>or continue with</span></div>
+        <GoogleSignInButton disabled={busy} onCredential={googleSignIn} onError={requestError => setError(requestError.message)} />
+      </>}
       <p className="auth-switch">{mode === 'login' ? 'New to Tomato?' : 'Already have an account?'} <button onClick={switchMode}>{mode === 'login' ? 'Create an account' : 'Sign in'}</button></p>
     </section>
   </div>;

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -12,13 +12,22 @@ model User {
   name String
   email String @unique
   passwordHash String
+  googleSub String? @unique
+  avatarUrl String?
   role String @default("CUSTOMER")
   isActive Boolean @default(true)
+  pointsBalance Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   sessions Session[]
   orders Order[]
+  reviews Review[]
+  loyaltyTransactions LoyaltyTransaction[]
+  wishlistItems WishlistItem[]
   auditLogs AuditLog[] @relation("ActorLogs")
+  notificationPreference NotificationPreference?
+  pushSubscriptions PushSubscription[]
+  notificationDeliveries NotificationDelivery[]
 }
 
 model Session {
@@ -41,13 +50,30 @@ model Product {
   description String
   category String
   imageUrl String?
+  imagePublicId String?
   priceCents Int
   stock Int @default(100)
   isAvailable Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   orderItems OrderItem[]
+  reviews Review[]
+  wishlistItems WishlistItem[]
   @@index([category, isAvailable])
+  @@index([imagePublicId])
+}
+
+
+model WishlistItem {
+  id String @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId String
+  productId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@unique([userId, productId])
+  @@index([userId, createdAt])
+  @@index([productId, createdAt])
 }
 
 model Coupon {
@@ -60,6 +86,30 @@ model Coupon {
   createdAt DateTime @default(now())
 }
 
+model LoyaltySetting {
+  id String @id @default("default")
+  enabled Boolean @default(true)
+  pointsPerOrder Int @default(5)
+  minimumRedeemPoints Int @default(50)
+  pointValueCents Int @default(100)
+  updatedAt DateTime @updatedAt
+}
+
+model LoyaltyTransaction {
+  id String @id @default(cuid())
+  type String
+  points Int
+  balanceAfter Int
+  note String?
+  createdAt DateTime @default(now())
+  userId String
+  orderId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@unique([orderId, type])
+  @@index([userId, createdAt])
+}
+
 model Order {
   id String @id @default(cuid())
   orderNumber String @unique
@@ -68,27 +118,72 @@ model Order {
   paymentStatus String @default("PENDING")
   subtotalCents Int
   discountCents Int @default(0)
+  pointsRedeemed Int @default(0)
+  pointsDiscountCents Int @default(0)
+  pointsEarned Int @default(0)
+  pointsAwardedAt DateTime?
+  pointsRestoredAt DateTime?
   deliveryFeeCents Int
+  deliveryZoneId String?
+  deliveryZoneName String?
+  fulfillmentType String @default("DELIVERY")
+  fulfillmentMode String @default("ASAP")
+  scheduledForLocal String?
+  scheduledDateKey String?
+  scheduledTimeKey String?
+  schedulingTimezone String?
+  pickupAddressSnapshot String?
+  pickupInstructionsSnapshot String?
+  statusUpdatedAt DateTime @default(now())
+  confirmedAt DateTime?
+  preparingAt DateTime?
+  readyAt DateTime?
+  outForDeliveryAt DateTime?
+  deliveredAt DateTime?
+  cancelledAt DateTime?
+  estimatedReadyAt DateTime?
+  estimatedDeliveryAt DateTime?
   totalCents Int
   couponCode String?
   firstName String
   lastName String
   email String
   phone String
-  street String
-  city String
-  state String
-  postalCode String
-  country String
+  street String?
+  city String?
+  state String?
+  postalCode String?
+  country String?
   notes String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   userId String
   user User @relation(fields: [userId], references: [id])
   items OrderItem[]
+  reviews Review[]
+  loyaltyTransactions LoyaltyTransaction[]
   payment Payment?
+  trackingEvents OrderTrackingEvent[]
+  notificationDeliveries NotificationDelivery[]
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([statusUpdatedAt])
+  @@index([fulfillmentMode, scheduledDateKey, scheduledTimeKey])
+}
+
+
+model OrderTrackingEvent {
+  id String @id @default(cuid())
+  kind String @default("STATUS")
+  status String
+  title String
+  note String?
+  actorType String @default("SYSTEM")
+  actorLabel String?
+  createdAt DateTime @default(now())
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@index([orderId, createdAt])
 }
 
 model Payment {
@@ -101,7 +196,21 @@ model Payment {
   gatewaySessionId String?
   gatewayTransactionId String?
   validationId String?
+  gatewayRiskLevel Int?
+  gatewayRiskTitle String?
+  gatewayCardType String?
+  gatewayCardIssuer String?
+  lastGatewayCheckAt DateTime?
   failureReason String?
+  refundStatus String?
+  refundReferenceId String? @unique
+  refundTransactionId String? @unique
+  refundAmountCents Int?
+  refundReason String?
+  refundRequestedAt DateTime?
+  refundedAt DateTime?
+  manualDestination String?
+  manualSubmissions ManualPaymentSubmission[]
   attempts Int @default(0)
   lastAttemptAt DateTime?
   paidAt DateTime?
@@ -110,6 +219,35 @@ model Payment {
   orderId String @unique
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   @@index([status, createdAt])
+}
+
+model ManualPaymentChannel {
+  id String @id @default(cuid())
+  provider String
+  label String
+  account String
+  instructions String
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ManualPaymentSubmission {
+  id String @id @default(cuid())
+  reference String
+  referenceKey String @unique
+  sender String
+  note String?
+  amountCents Int
+  currency String
+  status String @default("SUBMITTED")
+  reviewNote String?
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+  paymentId String
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  @@index([paymentId, createdAt])
 }
 
 model OrderItem {
@@ -122,7 +260,156 @@ model OrderItem {
   productId String
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
+  review Review?
   @@index([orderId])
+}
+
+model Review {
+  id String @id @default(cuid())
+  rating Int
+  comment String?
+  status String @default("PUBLISHED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId String
+  productId String
+  orderId String
+  orderItemId String @unique
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  @@index([productId, status, createdAt])
+  @@index([userId, createdAt])
+}
+
+
+model DeliveryZone {
+  id String @id @default(cuid())
+  name String @unique
+  description String?
+  postalCodes String?
+  feeCents Int @default(0)
+  minimumOrderCents Int @default(0)
+  freeDeliveryThresholdCents Int?
+  active Boolean @default(true)
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([active, sortOrder])
+}
+
+
+model FulfillmentSetting {
+  id String @id @default("default")
+  deliveryEnabled Boolean @default(true)
+  pickupEnabled Boolean @default(true)
+  asapEnabled Boolean @default(true)
+  scheduledEnabled Boolean @default(true)
+  deliveryLeadMinutes Int @default(30)
+  pickupLeadMinutes Int @default(15)
+  slotIntervalMinutes Int @default(30)
+  daysAhead Int @default(7)
+  defaultSlotCapacity Int @default(10)
+  pickupAddress String?
+  pickupInstructions String?
+  updatedAt DateTime @updatedAt
+}
+
+model FulfillmentSlotOverride {
+  id String @id @default(cuid())
+  dateKey String
+  timeKey String
+  fulfillmentType String
+  capacity Int?
+  disabled Boolean @default(false)
+  note String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([dateKey, timeKey, fulfillmentType])
+  @@index([dateKey, fulfillmentType])
+}
+
+model RestaurantSetting {
+  id String @id @default("default")
+  timezone String @default("Asia/Dhaka")
+  acceptingOrders Boolean @default(true)
+  temporaryClosed Boolean @default(false)
+  temporaryClosedReason String?
+  temporaryClosedUntilLocal String?
+  updatedAt DateTime @updatedAt
+}
+
+model OpeningHour {
+  id String @id @default(cuid())
+  dayOfWeek Int @unique
+  isClosed Boolean @default(false)
+  open24Hours Boolean @default(true)
+  openMinute Int @default(0)
+  closeMinute Int @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model RestaurantClosure {
+  id String @id @default(cuid())
+  dateKey String @unique
+  reason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+model NotificationPreference {
+  id String @id @default(cuid())
+  emailEnabled Boolean @default(true)
+  pushEnabled Boolean @default(false)
+  orderPlaced Boolean @default(true)
+  orderConfirmed Boolean @default(true)
+  orderPreparing Boolean @default(true)
+  orderReady Boolean @default(true)
+  orderDelivered Boolean @default(true)
+  orderCancelled Boolean @default(true)
+  etaUpdates Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId String @unique
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PushSubscription {
+  id String @id @default(cuid())
+  endpoint String @unique
+  p256dh String
+  auth String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, updatedAt])
+}
+
+model NotificationDelivery {
+  id String @id @default(cuid())
+  channel String
+  eventType String
+  status String @default("PENDING")
+  attempts Int @default(0)
+  payloadJson String
+  providerMessageId String?
+  lastError String?
+  nextAttemptAt DateTime @default(now())
+  sentAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId String
+  orderId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@unique([userId, orderId, eventType, channel])
+  @@index([status, nextAttemptAt])
+  @@index([userId, createdAt])
+  @@index([orderId, createdAt])
 }
 
 model AuditLog {

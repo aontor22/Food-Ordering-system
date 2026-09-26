@@ -19,3 +19,62 @@
 .back-to-cart { text-align: center; color: var(--muted); font-weight: 700; font-size: .88rem; }
 @media (max-width: 900px) { .checkout-layout { grid-template-columns: 1fr; } }
 @media (max-width: 580px) { .checkout-form { padding: 22px 18px; }.payment-options { grid-template-columns: 1fr; } }
+
+.loyalty-checkout { display: grid; gap: 10px; margin: 18px 0; padding: 15px; border: 1px solid #f0d9c8; border-radius: 14px; background: #fff8f3; }
+.loyalty-checkout.is-disabled { border-color: var(--line); background: #f7f8f7; }
+.loyalty-checkout-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.loyalty-checkout-head > div { display: grid; gap: 2px; }.loyalty-checkout-head span { display: flex; align-items: center; gap: 6px; color: var(--brand); font-size: .78rem; font-weight: 800; }.loyalty-checkout-head strong { font-size: 1.05rem; }.loyalty-checkout-head small { max-width: 120px; color: var(--success); font-size: .7rem; line-height: 1.4; text-align: right; }
+.loyalty-checkout p, .loyalty-checkout > small { color: var(--muted); font-size: .76rem; line-height: 1.5; }.loyalty-checkout label { font-size: .78rem; font-weight: 800; }
+.points-redeem-row { display: flex; gap: 8px; }.points-redeem-row input { width: 100%; min-width: 0; padding: 10px 11px; border: 1px solid var(--line); border-radius: 10px; outline: 0; }.points-redeem-row input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }.points-redeem-row button { flex: 0 0 auto; padding: 0 12px; border: 0; border-radius: 10px; background: var(--ink); color: #fff; font-size: .75rem; font-weight: 800; }.points-redeem-row button:disabled { opacity: .45; cursor: not-allowed; }.quote-note { margin: 8px 0; color: var(--muted); font-size: .75rem; }
+.summary-discount { color: var(--success); }
+
+.store-closed-checkout { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; padding: 15px 17px; border: 1px solid #efcbb9; border-radius: 14px; color: #8a4b2e; background: #fff4ee; }
+.store-closed-checkout > svg { flex: 0 0 auto; margin-top: 1px; }
+.store-closed-checkout strong { display: block; margin-bottom: 3px; }
+.store-closed-checkout p { font-size: .82rem; line-height: 1.5; }
+
+.delivery-zone-field select { width: 100%; }
+.delivery-zone-hint { display: flex; align-items: flex-start; gap: 9px; margin-top: 8px; padding: 11px 12px; border: 1px solid #e2e8e4; border-radius: 11px; color: #52635a; background: #f8faf9; }
+.delivery-zone-hint > svg { flex: 0 0 auto; margin-top: 1px; color: var(--brand); }
+.delivery-zone-hint p { margin: 0 0 3px; font-size: .78rem; line-height: 1.45; }
+.delivery-zone-hint small { color: #748078; font-size: .72rem; line-height: 1.45; }
+.delivery-pricing-note { display: flex; align-items: flex-start; gap: 10px; margin: 12px 0; padding: 12px 13px; border: 1px solid #d8e7de; border-radius: 12px; color: #35634a; background: #f2faf5; }
+.delivery-pricing-note > svg { flex: 0 0 auto; margin-top: 1px; }
+.delivery-pricing-note strong { display: block; margin-bottom: 2px; font-size: .8rem; }
+.delivery-pricing-note p { color: inherit; font-size: .75rem; line-height: 1.45; }
+.delivery-pricing-note.is-warning { border-color: #efd2bd; color: #855033; background: #fff6f0; }
+.delivery-pricing-note.is-free { border-color: #bfe0cd; color: #216643; background: #ecf8f1; }
+
+/* Step 05: fulfilment scheduling */
+.fulfillment-type-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+.fulfillment-type-card { position:relative; display:flex; align-items:center; gap:12px; width:100%; min-height:78px; padding:15px; border:1px solid #dfe6e2; border-radius:14px; color:#25352d; background:#fff; text-align:left; cursor:pointer; transition:.18s ease; }
+.fulfillment-type-card:hover { border-color:#f1aa8e; transform:translateY(-1px); }
+.fulfillment-type-card.is-selected { border-color:var(--brand); background:#fff6f2; box-shadow:0 0 0 2px rgba(255,76,36,.08); }
+.fulfillment-type-card.is-disabled { opacity:.48; cursor:not-allowed; transform:none; }
+.fulfillment-type-card > svg { flex:0 0 auto; color:var(--brand); }
+.fulfillment-type-card span { min-width:0; display:grid; gap:3px; }
+.fulfillment-type-card strong { font-size:.92rem; }
+.fulfillment-type-card small { color:#768078; font-size:.74rem; line-height:1.35; }
+.fulfillment-type-card i { margin-left:auto; width:18px; height:18px; border:2px solid #c7d0cb; border-radius:50%; }
+.fulfillment-type-card.is-selected i { border:5px solid var(--brand); }
+.fulfillment-mode-options { display:grid; gap:10px; }
+.fulfillment-mode { display:flex; align-items:center; gap:12px; padding:13px 14px; border:1px solid #e2e7e4; border-radius:13px; cursor:pointer; }
+.fulfillment-mode.is-selected { border-color:#f4a386; background:#fff7f3; }
+.fulfillment-mode.is-disabled { opacity:.5; cursor:not-allowed; }
+.fulfillment-mode input { width:17px; height:17px; accent-color:var(--brand); }
+.fulfillment-mode svg { color:var(--brand); }
+.fulfillment-mode div { display:grid; gap:2px; }
+.fulfillment-mode strong { font-size:.86rem; }
+.fulfillment-mode small { color:#77817b; font-size:.73rem; }
+.schedule-picker { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; padding:14px; border:1px solid #e7ece9; border-radius:14px; background:#fafcfb; }
+.pickup-details-card { display:flex; gap:14px; margin-bottom:16px; padding:16px; border:1px solid #d8e6de; border-radius:14px; color:#275840; background:#f4faf6; }
+.pickup-details-card svg { flex:0 0 auto; }
+.pickup-details-card h3 { margin-bottom:4px; font-size:.95rem; }
+.pickup-details-card p { font-size:.8rem; line-height:1.5; }
+.pickup-details-card small { display:block; margin-top:5px; color:#668073; line-height:1.45; }
+.fulfillment-summary { display:flex; align-items:center; gap:11px; padding:12px 13px; border:1px solid #e5eae7; border-radius:12px; background:#fbfcfb; }
+.fulfillment-summary svg { color:var(--brand); flex:0 0 auto; }
+.fulfillment-summary div { display:grid; gap:2px; }
+.fulfillment-summary strong { font-size:.82rem; }
+.fulfillment-summary small { color:#748079; font-size:.72rem; }
+@media (max-width:620px) { .fulfillment-type-options, .schedule-picker { grid-template-columns:1fr; } }

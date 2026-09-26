@@ -29,10 +29,12 @@ export default function AdminDashboard() {
     { label: 'Orders', value: metrics.orders, detail: `${metrics.todayOrders} placed today`, icon: 'orders', tone: 'is-orange' },
     { label: 'Customers', value: metrics.customers, detail: 'Registered accounts', icon: 'users', tone: 'is-blue' },
     { label: 'Active products', value: metrics.products, detail: `${metrics.lowStock} low-stock items`, icon: 'products', tone: 'is-gold' },
+    { label: 'Wishlist saves', value: metrics.wishlistSaves || 0, detail: 'Saved customer favourites', icon: 'heart', tone: 'is-red' },
   ];
 
   return <>
     <AdminPageHeader eyebrow="Live operations" title="Everything at a glance" description={`${metrics.pendingOrders} orders currently require attention.`} action={<button className="button button-secondary" onClick={load}><Icon name="refresh" />Refresh</button>} />
+    {data.storeStatus && <Link to="/admin/store-operations" className={`dashboard-store-status ${data.storeStatus.isOpen ? 'is-open' : 'is-closed'}`}><span><Icon name={data.storeStatus.isOpen ? 'check' : 'clock'} /><strong>{data.storeStatus.headline}</strong></span><p>{data.storeStatus.message}</p><Icon name="arrow" /></Link>}
     <section className="admin-metrics" aria-label="Business metrics">
       {cards.map(card => <article className="admin-card metric-card" key={card.label}>
         <span className={`metric-icon ${card.tone}`}><Icon name={card.icon} size={23} /></span>
