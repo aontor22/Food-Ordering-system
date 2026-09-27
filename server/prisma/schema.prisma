@@ -29,6 +29,27 @@ model User {
   notificationPreference NotificationPreference?
   pushSubscriptions PushSubscription[]
   notificationDeliveries NotificationDelivery[]
+  savedAddresses SavedAddress[]
+}
+
+
+model SavedAddress {
+  id String @id @default(cuid())
+  label String @default("Home")
+  firstName String
+  lastName String
+  phone String
+  street String
+  city String
+  state String
+  postalCode String
+  country String @default("Bangladesh")
+  isDefault Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, isDefault, updatedAt])
 }
 
 model Session {

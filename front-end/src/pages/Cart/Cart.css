@@ -28,3 +28,6 @@
 
 /* Step 10: customized cart lines */
 .cart-customizations{display:grid;gap:3px;margin-top:8px}.cart-customizations small{display:block;color:#66726b;font-size:.72rem;line-height:1.35}.cart-customizations strong{color:#4b5850}.cart-special-note{max-width:520px;display:flex!important;align-items:flex-start;gap:5px;margin-top:7px;color:#875a2d!important;font-style:italic;line-height:1.4}.cart-special-note svg{flex:0 0 auto;margin-top:1px}.cart-edit-customization{margin-top:8px;padding:0;border:0;color:var(--brand);background:transparent;font-size:.72rem;font-weight:800;text-decoration:underline;text-underline-offset:3px}.cart-edit-customization:hover{opacity:.78}
+
+/* Step 12: reorder status */
+.reorder-cart-notice{display:flex;align-items:flex-start;gap:9px;margin-bottom:18px;padding:13px 15px;border:1px solid #cfe4d7;border-radius:13px;color:#2d6547;background:#f1faf4;font-size:.8rem;line-height:1.5}.reorder-cart-notice svg{flex:0 0 auto;margin-top:1px}

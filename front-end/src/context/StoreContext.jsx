@@ -254,6 +254,14 @@ export default function StoreContextProvider({ children }) {
     return data;
   };
 
+  const reorderOrder = async orderId => {
+    const data = await api.prepareReorder(orderId);
+    const nextCart = (data.cartItems || []).map(normalizeCartLine).filter(Boolean).slice(0, 100);
+    if (nextCart.length) setCartItems(nextCart);
+    await refreshProducts().catch(() => {});
+    return data;
+  };
+
   const isWishlisted = productId => wishlistIds.includes(productId);
 
   const toggleWishlist = async product => {
@@ -310,7 +318,7 @@ export default function StoreContextProvider({ children }) {
     addToCart, updateCartLine, removeFromCart, removeItem, getTotalCartAmount,
     user, setUser, loading, authenticate, authenticateWithGoogle, logout,
     searchQuery, setSearchQuery, couponCode, setCouponCode,
-    createOrder, getOrders: api.getOrders, refreshProducts,
+    createOrder, reorderOrder, getOrders: api.getOrders, refreshProducts,
     wishlistProducts, wishlistIds, wishlistCount, wishlistBusy,
     isWishlisted, toggleWishlist, removeWishlistItem, refreshWishlist: loadAccountWishlist,
     storeStatus, refreshStoreStatus,

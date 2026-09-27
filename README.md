@@ -24,6 +24,7 @@ A working Preact storefront and responsive restaurant admin dashboard with a Nod
 - Guest checkout for Delivery/Pickup and ASAP/scheduled orders, with private expiring order access, secure tracking/payment actions, matching-account linking, and admin Guest/Registered provenance
 - Product variants/sizes, add-ons, per-item kitchen instructions, server-authoritative customization pricing, and immutable order-item snapshots
 - Stronger product/variant/add-on inventory controls with atomic reservations, checkout idempotency, optimistic admin stock updates, cancellation restoration, low-stock states, and an inventory ledger
+- Account-saved delivery addresses with a default location and one-click reorder that rebuilds the cart against current menu choices, prices, limits, and stock
 
 ## Quick start
 
@@ -130,7 +131,8 @@ For email, configure backend-only generic SMTP variables (`SMTP_HOST`, `SMTP_POR
 | Store status | `GET /api/store/status` |
 | Auth | `POST /api/auth/register`, `login`, `refresh`, `logout`; `GET /me` |
 | Catalog | `GET /api/products`, `/api/products/categories` |
-| Orders | Authenticated `POST/GET /api/orders`, detail, cancellation, reviews, and live tracking; guest quote/create/private tracking/cancel/link under `/api/orders/guest*` |
+| Orders | Authenticated `POST/GET /api/orders`, detail, cancellation, reviews, live tracking, and `POST /api/orders/:id/reorder`; guest quote/create/private tracking/cancel/link under `/api/orders/guest*` |
+| Saved addresses | Account-owned CRUD under `/api/addresses`, including default-address selection |
 | Customer notifications | `GET /api/notifications`, preferences, push subscriptions, test delivery |
 | Payments | `GET /api/payments/options`; authenticated and private-token guest payment/manual routes; SSLCOMMERZ callback routes |
 | Admin payments | `GET /api/admin/payments`; cash receive/refund; gateway status check; risk acceptance; SSLCOMMERZ refund request/status under `/api/admin/payments/:id/*` |
@@ -181,4 +183,9 @@ Products can now have admin-managed single-select **Variant/Size** groups and mu
 ## Inventory & concurrency safeguards (Step 11)
 
 Admin → **Inventory** is now the authoritative place to change live product and tracked variant/add-on stock. Checkout reserves product and option quantities atomically inside serializable PostgreSQL transactions, retries transient write conflicts, prevents negative stock, and uses a unique browser checkout request ID so network retries/double-submits cannot create duplicate orders or reserve inventory twice. Existing product options remain untracked after migration until an administrator explicitly enables option-level stock tracking. Cancellations restore the exact inventory originally reserved, and every automatic/manual movement is written to an inventory adjustment ledger. See `INVENTORY_CONCURRENCY_SETUP.md` and `STEP_11_VERIFICATION.md`.
+## Saved addresses & one-click reorder (Step 12)
+
+Signed-in customers can store up to ten delivery addresses, mark one as the default, edit/remove them, and select a saved location during checkout. Saved addresses are account-owned convenience records only: choosing one fills the checkout form, while the normal server-side delivery-zone, postal-code, fee, minimum-order, opening-hour, scheduling, pricing, payment and stock validation still runs for the new order. Guest checkout remains unchanged and does not persist private addresses to an account.
+
+**Reorder** on My Orders never duplicates the historical order record or copies its old total, coupon, points redemption, payment status, delivery fee or schedule. The API reconstructs cart lines from immutable `OrderItem` product/customization snapshots and validates those product/option IDs against the current menu and Step 11 inventory rules. Fully valid orders reload in one click; if some lines are no longer orderable, only the validated lines are loaded and the customer is told what was skipped. Account-linked former guest orders can use the same reorder path because normal order ownership applies after linking. See `SAVED_ADDRESSES_REORDER_SETUP.md` and `STEP_12_VERIFICATION.md`.
 

@@ -13,7 +13,7 @@ Implemented sequentially so each release remains deployable and testable.
 - [x] 09 — Guest checkout and post-order account linking
 - [x] 10 — Product variants, sizes, add-ons and special instructions
 - [x] 11 — Stronger stock/availability controls and concurrency safeguards
-- [ ] 12 — Saved addresses and one-click reorder
+- [x] 12 — Saved addresses and one-click reorder
 - [ ] 13 — Advanced search, dietary filters, price/rating/popularity sorting
 - [ ] 14 — Expanded admin sales/customer/product analytics + CSV export
 - [ ] 15 — Kitchen display mode (NEW / PREPARING / READY) with timers

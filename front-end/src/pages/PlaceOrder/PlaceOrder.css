@@ -78,3 +78,6 @@
 .fulfillment-summary strong { font-size:.82rem; }
 .fulfillment-summary small { color:#748079; font-size:.72rem; }
 @media (max-width:620px) { .fulfillment-type-options, .schedule-picker { grid-template-columns:1fr; } }
+
+/* Step 12: account saved-address picker */
+.saved-address-checkout{display:grid;gap:10px;padding:14px;border:1px solid #e2e8e4;border-radius:14px;background:#fafcfb}.saved-address-checkout-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.saved-address-checkout-head>div{display:grid;gap:3px}.saved-address-checkout-head strong{display:flex;align-items:center;gap:6px;font-size:.82rem}.saved-address-checkout-head strong svg{color:var(--brand)}.saved-address-checkout-head small{color:var(--muted);font-size:.72rem;line-height:1.4}.saved-address-checkout-head>a{color:var(--brand);font-size:.73rem;font-weight:800}.saved-address-checkout select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);outline:0}.saved-address-checkout select:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}

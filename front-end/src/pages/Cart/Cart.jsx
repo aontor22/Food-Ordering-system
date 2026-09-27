@@ -1,5 +1,5 @@
 import { useContext, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { StoreContext } from '../../context/StoreContext';
 import { formatCurrency } from '../../lib/format';
 import OrderSummary from '../../components/ui/OrderSummary';
@@ -15,6 +15,7 @@ export default function Cart() {
   const [promoMessage, setPromoMessage] = useState('');
   const [editing, setEditing] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   if (!cartProducts.length) return <EmptyState icon="🛒" title="Your cart is waiting" text="Add a few delicious dishes and they’ll appear here, ready for checkout." />;
 
@@ -27,6 +28,7 @@ export default function Cart() {
 
   return <div className="cart-page">
     <header className="page-title"><div className="section-kicker">Almost there</div><h1>Your cart</h1><p>Review each dish, size, add-ons and kitchen instructions before checkout.</p></header>
+    {location.state?.reorderNotice && <div className="reorder-cart-notice"><Icon name="repeat" size={18} /><span>{location.state.reorderNotice}</span></div>}
     <div className="cart-layout">
       <section className="cart-list surface-card" aria-label="Cart items">
         {cartProducts.map(item => {

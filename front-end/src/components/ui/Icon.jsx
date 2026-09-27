@@ -40,6 +40,8 @@ const paths = {
   download: <><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></>,
   wifiOff: <><path d="M2 8.5a16 16 0 0 1 5-3M10.5 4.2A16 16 0 0 1 22 8.5M5 12.5a11 11 0 0 1 5-2M14 10.2a11 11 0 0 1 5 2.3M8.5 16a6 6 0 0 1 7 0M12 20h.01M3 3l18 18"/></>,
   gift: <><path d="M4 10h16v11H4zM3 6h18v4H3zM12 6v15"/><path d="M12 6H8.5A2.5 2.5 0 1 1 11 3.5c.7 1.2 1 2.5 1 2.5ZM12 6h3.5A2.5 2.5 0 1 0 13 3.5c-.7 1.2-1 2.5-1 2.5Z"/></>,
+  location: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></>,
+  repeat: <><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></>,
 };
 
 export default function Icon({ name, size = 20, className = '', strokeWidth = 1.8 }) {

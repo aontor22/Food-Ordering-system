@@ -9,6 +9,7 @@ import PlaceOrder from './pages/PlaceOrder/PlaceOrder';
 import Orders from './pages/Orders/Orders';
 import Wishlist from './pages/Wishlist/Wishlist';
 import Notifications from './pages/Notifications/Notifications';
+import Addresses from './pages/Addresses/Addresses';
 import OrderSuccess from './pages/OrderSuccess/OrderSuccess';
 import GuestOrder from './pages/GuestOrder/GuestOrder';
 import EmptyState from './components/ui/EmptyState';
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="/orders" element={<Orders onLogin={() => setShowLogin(true)} />} />
         <Route path="/wishlist" element={<Wishlist />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/addresses" element={<Addresses onLogin={() => setShowLogin(true)} />} />
         <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
         <Route path="/guest-order/:orderNumber" element={<GuestOrder onLogin={() => setShowLogin(true)} />} />
         <Route path="/payment/demo/:transactionId" element={<PaymentDemo onLogin={() => setShowLogin(true)} />} />

@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { StoreContext } from '../../context/StoreContext';
 import { formatCurrency, formatDate, humanizeStatus } from '../../lib/format';
 import EmptyState from '../../components/ui/EmptyState';
@@ -10,7 +10,8 @@ import { api } from '../../lib/api';
 import './Orders.css';
 
 export default function Orders({ onLogin }) {
-  const { user, setUser, getOrders, refreshProducts } = useContext(StoreContext);
+  const { user, setUser, getOrders, refreshProducts, reorderOrder, cartCount } = useContext(StoreContext);
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loyalty, setLoyalty] = useState(null);
   const [loading, setLoading] = useState(Boolean(user));
@@ -51,6 +52,22 @@ export default function Orders({ onLogin }) {
     setBusy(`pay:${order.id}`); setError('');
     try { const result = await api.initiatePayment(order.id); window.location.assign(result.paymentUrl); }
     catch (requestError) { setError(requestError.message); setBusy(''); load().catch(() => {}); }
+  };
+
+  const reorder = async order => {
+    if (cartCount > 0 && !window.confirm('Replace your current cart with this reorder?')) return;
+    setBusy(`reorder:${order.id}`); setError('');
+    try {
+      const result = await reorderOrder(order.id);
+      if (!result.cartItems?.length) {
+        const reason = result.skippedItems?.[0]?.message || 'None of the items from this order are currently available.';
+        setError(reason);
+        return;
+      }
+      const skipped = result.skippedItems?.length || 0;
+      navigate('/cart', { state: { reorderNotice: skipped ? `Reorder loaded with ${skipped} unavailable item${skipped === 1 ? '' : 's'} skipped. Current prices and stock will be used.` : `Order ${order.orderNumber} was loaded into your cart with current prices and availability.` } });
+    } catch (requestError) { setError(requestError.message); }
+    finally { setBusy(''); }
   };
 
   const cancel = async order => {
@@ -105,6 +122,7 @@ export default function Orders({ onLogin }) {
           {order.pointsEarned > 0 && <span className="earned">+{order.pointsEarned} points earned</span>}
         </div>}
         <div className="order-card-foot"><span><Icon name={order.fulfillmentType === 'PICKUP' ? 'store' : 'delivery'} />{order.status === 'DELIVERED' ? (order.fulfillmentType === 'PICKUP' ? 'Picked up' : 'Delivered') : order.status === 'CANCELLED' ? 'Order cancelled' : order.status === 'READY_FOR_PICKUP' ? 'Ready for pickup' : order.status === 'PENDING' ? 'Awaiting confirmation' : order.fulfillmentType === 'PICKUP' ? 'Pickup order in progress' : 'Delivery in progress'}</span><p>Total <strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></p></div>
+        <div className="order-reorder-row"><button className="button button-secondary" type="button" disabled={Boolean(busy)} onClick={() => reorder(order)}><Icon name="repeat" size={17} />{busy === `reorder:${order.id}` ? 'Checking availability…' : 'Reorder'}</button><small>Rebuilds this cart using today’s menu, prices and stock.</small></div>
         {(order.paymentMethod === 'MANUAL' || (order.paymentMethod === 'ONLINE' && !['PAID', 'REFUNDED', 'REFUND_PENDING', 'REVIEW'].includes(order.paymentStatus) && !['CANCELLED', 'DELIVERED'].includes(order.status)) || (['PENDING', 'CONFIRMED'].includes(order.status) && !(order.paymentMethod !== 'COD' && (order.paymentStatus === 'PAID' || order.paymentStatus === 'REFUND_PENDING' || order.paymentStatus === 'REVIEW' || (order.payment?.provider === 'SSLCOMMERZ' && order.paymentStatus === 'PROCESSING'))))) && <div className="order-customer-actions">
           {order.paymentMethod === 'MANUAL' && <Link className="button button-primary" to={`/payment/manual/${order.id}`}><Icon name="cash" />{['PENDING','REJECTED'].includes(order.paymentStatus) && order.status !== 'CANCELLED' ? 'Submit payment details' : 'Payment details'}</Link>}
           {order.paymentMethod === 'ONLINE' && !['PAID', 'REFUNDED', 'REFUND_PENDING', 'REVIEW'].includes(order.paymentStatus) && !['CANCELLED', 'DELIVERED'].includes(order.status) && <button className="button button-primary" disabled={Boolean(busy)} onClick={() => pay(order)}><Icon name="card" />{busy === `pay:${order.id}` ? 'Opening payment…' : order.paymentStatus === 'PROCESSING' ? 'Check / continue payment' : order.paymentStatus === 'PENDING' ? 'Pay now' : 'Retry payment'}</button>}

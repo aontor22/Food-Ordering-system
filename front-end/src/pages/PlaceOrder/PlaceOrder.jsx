@@ -42,9 +42,56 @@ export default function PlaceOrder({ onLogin }) {
   const [selectedDate, setSelectedDate] = useState('');
   const [scheduledForLocal, setScheduledForLocal] = useState('');
   const [clientRequestId] = useState(createCheckoutRequestId);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [savedAddressesError, setSavedAddressesError] = useState('');
+  const [selectedAddressId, setSelectedAddressId] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => { if (user?.email) setForm(previous => ({ ...previous, email: user.email })); }, [user]);
+  useEffect(() => {
+    if (!user?.email) return;
+    const parts = String(user.name || '').trim().split(/\s+/).filter(Boolean);
+    setForm(previous => ({
+      ...previous,
+      email: user.email,
+      firstName: previous.firstName || parts[0] || '',
+      lastName: previous.lastName || parts.slice(1).join(' '),
+    }));
+  }, [user?.id, user?.email]);
+  useEffect(() => {
+    if (!user) {
+      setSavedAddresses([]);
+      setSelectedAddressId('');
+      setForm(previous => ({ ...emptyForm, notes: previous.notes || '' }));
+      return;
+    }
+    setSavedAddresses([]);
+    setSelectedAddressId('');
+    const parts = String(user.name || '').trim().split(/\s+/).filter(Boolean);
+    setForm(previous => ({
+      ...emptyForm,
+      notes: previous.notes || '',
+      email: user.email || '',
+      firstName: parts[0] || '',
+      lastName: parts.slice(1).join(' '),
+    }));
+    let active = true;
+    api.getAddresses().then(data => {
+      if (!active) return;
+      const values = data.addresses || [];
+      setSavedAddresses(values);
+      setSavedAddressesError('');
+      const preferred = values.find(address => address.isDefault) || values[0];
+      if (preferred) {
+        setSelectedAddressId(preferred.id);
+        setForm(previous => ({
+          ...previous, firstName: preferred.firstName, lastName: preferred.lastName, phone: preferred.phone,
+          street: preferred.street, city: preferred.city, state: preferred.state, postalCode: preferred.postalCode, country: preferred.country,
+          email: user.email || previous.email,
+        }));
+      }
+    }).catch(requestError => { if (active) setSavedAddressesError(requestError.message); });
+    return () => { active = false; };
+  }, [user?.id]);
   useEffect(() => { api.getPaymentOptions().then(setPaymentOptions).catch(() => setPaymentOptions(null)); }, []);
   useEffect(() => {
     let active = true;
@@ -128,7 +175,21 @@ export default function PlaceOrder({ onLogin }) {
 
   if (!cartProducts.length) return <EmptyState icon="🥡" title="Nothing to check out yet" text="Choose your favourites before starting checkout." />;
 
-  const update = event => setForm(previous => ({ ...previous, [event.target.name]: event.target.value }));
+  const update = event => {
+    const { name, value } = event.target;
+    setForm(previous => ({ ...previous, [name]: value }));
+    if (selectedAddressId && ['firstName','lastName','phone','street','city','state','postalCode','country'].includes(name)) setSelectedAddressId('');
+  };
+  const useSavedAddress = addressId => {
+    setSelectedAddressId(addressId);
+    const address = savedAddresses.find(item => item.id === addressId);
+    if (!address) return;
+    setForm(previous => ({
+      ...previous, firstName: address.firstName, lastName: address.lastName, phone: address.phone,
+      street: address.street, city: address.city, state: address.state, postalCode: address.postalCode, country: address.country,
+      email: user?.email || previous.email,
+    }));
+  };
   const submit = async event => {
     event.preventDefault();
     if (!selectedFulfillment?.enabled) { setError(`${fulfillmentType === 'PICKUP' ? 'Pickup' : 'Delivery'} is unavailable right now.`); return; }
@@ -211,6 +272,11 @@ export default function PlaceOrder({ onLogin }) {
         <div className="checkout-divider" />
         {fulfillmentType === 'DELIVERY' ? <>
           <div className="checkout-section-title"><span>3</span><div><h2>Delivery address</h2><p>Select your service area so the server can calculate the correct delivery fee.</p></div></div>
+          {user && <div className="saved-address-checkout">
+            <div className="saved-address-checkout-head"><div><strong><Icon name="location" size={17} />Saved addresses</strong><small>{savedAddresses.length ? 'Choose one to fill delivery details instantly.' : 'Save a delivery address for faster checkout next time.'}</small></div><Link to="/addresses">Manage</Link></div>
+            {savedAddresses.length > 0 && <select value={selectedAddressId} onChange={event => useSavedAddress(event.target.value)} aria-label="Choose a saved address"><option value="">Use a different address</option>{savedAddresses.map(address => <option key={address.id} value={address.id}>{address.label}{address.isDefault ? ' · Default' : ''} — {address.street}, {address.city}</option>)}</select>}
+            {savedAddressesError && <p className="form-error">{savedAddressesError}</p>}
+          </div>}
           <div className="field delivery-zone-field"><label htmlFor="deliveryZone">Delivery area *</label><select id="deliveryZone" value={deliveryZoneId} onChange={event => setDeliveryZoneId(event.target.value)} required disabled={!deliveryZones.length}><option value="" disabled>{deliveryZones.length ? 'Select delivery area' : 'No delivery zones available'}</option>{deliveryZones.map(zone => <option key={zone.id} value={zone.id}>{zone.name} · {zone.feeCents === 0 ? 'Free delivery' : formatCurrency(zone.feeCents / 100, zone.currency)}</option>)}</select>{deliveryZonesError && <p className="form-error">{deliveryZonesError}</p>}{deliveryZoneId && <DeliveryZoneHint zone={deliveryZones.find(zone => zone.id === deliveryZoneId)} />}</div>
           <div className="field"><label htmlFor="street">Street address *</label><input id="street" name="street" value={form.street} onChange={update} required autoComplete="street-address" /></div>
           <div className="field-grid">

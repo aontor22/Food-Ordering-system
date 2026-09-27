@@ -25,6 +25,7 @@ import {
 import { serializeOrderForClient } from '../services/order-view.js';
 import { resolveCustomizedCartLines } from '../services/product-customizations.js';
 import { reserveInventory, restoreOrderInventory, withSerializableRetry } from '../services/inventory.js';
+import { prepareReorderCart } from '../services/reorder.js';
 
 const router = Router();
 const orderInclude = {
@@ -583,6 +584,27 @@ router.get('/', async (req, res) => {
     orderBy: { createdAt: 'desc' },
   });
   res.json({ orders: orders.map(serializeOrderForClient) });
+});
+
+router.post('/:id/reorder', async (req, res, next) => {
+  try {
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id, userId: req.auth.sub },
+      include: { items: { orderBy: { id: 'asc' } } },
+    });
+    if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+    const prepared = await prepareReorderCart(prisma, order);
+    await audit(req, 'ORDER_REORDER_PREPARED', 'Order', order.id, {
+      sourceOrderNumber: order.orderNumber,
+      status: prepared.status,
+      addedLines: prepared.cartItems.length,
+      skippedLines: prepared.skippedItems.length,
+    });
+    res.json({
+      sourceOrder: { id: order.id, orderNumber: order.orderNumber, status: order.status, createdAt: order.createdAt },
+      ...prepared,
+    });
+  } catch (error) { next(error); }
 });
 
 router.get('/live', (req, res) => {
