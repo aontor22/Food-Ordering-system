@@ -3,7 +3,7 @@ import { parseOrderItemCustomizations } from './product-customizations.js';
 
 export function stripOrderSecrets(order) {
   if (!order) return order;
-  const { guestAccessNonce, ...safe } = order;
+  const { guestAccessNonce, checkoutRequestId, ...safe } = order;
   return safe;
 }
 

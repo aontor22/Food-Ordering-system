@@ -2,7 +2,7 @@ import { createContext, useEffect, useMemo, useState } from 'react';
 import { api, setAccessToken } from '../lib/api';
 import { detachPushOnLogout } from '../lib/push';
 import { getGuestOrderAccessRecords, removeGuestOrderAccess, saveGuestOrderAccess } from '../lib/guestOrders';
-import { cartLineFingerprint, customizationDetails, customizationSummary, normalizeSelections, productUnitPriceCents } from '../lib/productCustomizations';
+import { cartLineFingerprint, customizationDetails, customizationSummary, normalizeSelections, productPurchaseLimit, productUnitPriceCents, selectedConfigurationLimit } from '../lib/productCustomizations';
 
 export const StoreContext = createContext(null);
 const GUEST_WISHLIST_KEY = 'tomato_guest_wishlist';
@@ -146,16 +146,26 @@ export default function StoreContextProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => { api.getStoreStatus().then(data => setStoreStatus(data.store)).catch(() => {}); }, 60_000);
+    const timer = setInterval(() => {
+      api.getStoreStatus().then(data => setStoreStatus(data.store)).catch(() => {});
+      api.getProducts().then(data => setFoodList(normalizeProducts(data.products))).catch(() => {});
+    }, 60_000);
     return () => clearInterval(timer);
   }, []);
 
   useEffect(() => localStorage.setItem('cart', JSON.stringify(cartItems)), [cartItems]);
 
+  const productLimit = productId => productPurchaseLimit(food_list.find(product => product._id === productId)) || 0;
+
   const setQuantity = (lineId, quantity) => setCartItems(previous => previous.flatMap(line => {
     if (line.lineId !== lineId) return [line];
-    const otherQuantity = previous.filter(item => item.lineId !== lineId && item.productId === line.productId).reduce((sum, item) => sum + item.quantity, 0);
-    const maxForLine = Math.max(0, 20 - otherQuantity);
+    const product = food_list.find(item => item._id === line.productId);
+    const otherLines = previous.filter(item => item.lineId !== lineId);
+    const otherQuantity = otherLines.filter(item => item.productId === line.productId).reduce((sum, item) => sum + item.quantity, 0);
+    const optionLimit = selectedConfigurationLimit(product, line.selections, optionId => otherLines
+      .filter(item => (item.selections || []).some(selection => selection.optionIds?.includes(optionId)))
+      .reduce((sum, item) => sum + item.quantity, 0));
+    const maxForLine = Math.max(0, Math.min(productLimit(line.productId) - otherQuantity, optionLimit));
     const next = Math.max(0, Math.min(maxForLine, Number(quantity) || 0));
     return next > 0 ? [{ ...line, quantity: next }] : [];
   }));
@@ -164,7 +174,11 @@ export default function StoreContextProvider({ children }) {
     const incoming = normalizeCartLine(typeof input === 'string' ? { productId: input, quantity: 1 } : input);
     if (!incoming) return previous;
     const currentProductQuantity = previous.filter(line => line.productId === incoming.productId).reduce((sum, line) => sum + line.quantity, 0);
-    const allowedQuantity = Math.min(incoming.quantity, Math.max(0, 20 - currentProductQuantity));
+    const product = food_list.find(item => item._id === incoming.productId);
+    const optionLimit = selectedConfigurationLimit(product, incoming.selections, optionId => previous
+      .filter(line => (line.selections || []).some(selection => selection.optionIds?.includes(optionId)))
+      .reduce((sum, line) => sum + line.quantity, 0));
+    const allowedQuantity = Math.min(incoming.quantity, Math.max(0, productLimit(incoming.productId) - currentProductQuantity), optionLimit);
     if (allowedQuantity <= 0) return previous;
     const fingerprint = cartLineFingerprint(incoming);
     const matchIndex = previous.findIndex(line => cartLineFingerprint(line) === fingerprint);
@@ -177,7 +191,11 @@ export default function StoreContextProvider({ children }) {
     if (!incoming) return previous;
     const withoutCurrent = previous.filter(line => line.lineId !== incoming.lineId);
     const otherProductQuantity = withoutCurrent.filter(line => line.productId === incoming.productId).reduce((sum, line) => sum + line.quantity, 0);
-    const allowedQuantity = Math.min(incoming.quantity, Math.max(0, 20 - otherProductQuantity));
+    const product = food_list.find(item => item._id === incoming.productId);
+    const optionLimit = selectedConfigurationLimit(product, incoming.selections, optionId => withoutCurrent
+      .filter(line => (line.selections || []).some(selection => selection.optionIds?.includes(optionId)))
+      .reduce((sum, line) => sum + line.quantity, 0));
+    const allowedQuantity = Math.min(incoming.quantity, Math.max(0, productLimit(incoming.productId) - otherProductQuantity), optionLimit);
     if (allowedQuantity <= 0) return previous;
     const adjusted = { ...incoming, quantity: allowedQuantity };
     const fingerprint = cartLineFingerprint(adjusted);
@@ -205,6 +223,9 @@ export default function StoreContextProvider({ children }) {
 
   const cartCount = cartProducts.reduce((sum, product) => sum + product.quantity, 0);
   const cartProductQuantity = productId => cartItems.filter(line => line.productId === productId).reduce((sum, line) => sum + line.quantity, 0);
+  const cartOptionQuantity = (optionId, excludeLineId = null) => cartItems
+    .filter(line => line.lineId !== excludeLineId && (line.selections || []).some(selection => selection.optionIds?.includes(optionId)))
+    .reduce((sum, line) => sum + line.quantity, 0);
   const getTotalCartAmount = () => cartProducts.reduce((sum, product) => sum + product.price * product.quantity, 0);
 
   const authenticate = async (mode, values) => {
@@ -229,6 +250,7 @@ export default function StoreContextProvider({ children }) {
     const data = user ? await api.createOrder(body) : await api.createGuestOrder({ ...body, pointsToRedeem: 0 });
     if (data.guestAccess) saveGuestOrderAccess({ order: data.order, guestAccess: data.guestAccess });
     if (data.loyalty && user) setUser(previous => previous ? { ...previous, pointsBalance: data.loyalty.pointsBalance } : previous);
+    refreshProducts().catch(() => {});
     return data;
   };
 
@@ -284,7 +306,7 @@ export default function StoreContextProvider({ children }) {
   };
 
   return <StoreContext.Provider value={{
-    food_list, cartItems, cartProducts, cartCount, cartProductQuantity, setCartItems, setQuantity,
+    food_list, cartItems, cartProducts, cartCount, cartProductQuantity, cartOptionQuantity, setCartItems, setQuantity,
     addToCart, updateCartLine, removeFromCart, removeItem, getTotalCartAmount,
     user, setUser, loading, authenticate, authenticateWithGoogle, logout,
     searchQuery, setSearchQuery, couponCode, setCouponCode,

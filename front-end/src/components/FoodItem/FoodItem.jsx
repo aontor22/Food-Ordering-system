@@ -4,11 +4,15 @@ import { formatCurrency, formatDate } from '../../lib/format';
 import { api } from '../../lib/api';
 import Icon from '../ui/Icon';
 import ProductCustomizer from '../ProductCustomizer/ProductCustomizer';
+import { productPurchaseLimit } from '../../lib/productCustomizations';
 import './FoodItem.css';
 
 export default function FoodItem({ item }) {
-  const { cartProductQuantity, addToCart, isWishlisted, toggleWishlist, wishlistBusy } = useContext(StoreContext);
+  const { cartProductQuantity, cartOptionQuantity, addToCart, isWishlisted, toggleWishlist, wishlistBusy } = useContext(StoreContext);
   const quantity = cartProductQuantity(item._id);
+  const purchaseLimit = productPurchaseLimit(item);
+  const soldOut = purchaseLimit <= 0;
+  const lowStock = !soldOut && item.stockStatus === 'LOW_STOCK';
   const saved = isWishlisted(item._id);
   const savingWishlist = wishlistBusy.includes(item._id);
   const [showReviews, setShowReviews] = useState(false);
@@ -39,7 +43,7 @@ export default function FoodItem({ item }) {
     <article className="food-card">
       <div className="food-card-media">
         <img src={item.image} alt={item.name} loading="lazy" />
-        <span className="food-category">{item.category}</span>
+        <span className="food-category">{item.category}</span>{soldOut ? <span className="food-stock-badge is-sold-out">Sold out</span> : lowStock ? <span className="food-stock-badge">Only {item.stock} left</span> : null}
         <button className={`food-wishlist ${saved ? 'is-saved' : ''}`} type="button" onClick={toggleSaved} disabled={savingWishlist} aria-pressed={saved} aria-label={`${saved ? 'Remove' : 'Save'} ${item.name} ${saved ? 'from' : 'to'} wishlist`} title={saved ? 'Remove from wishlist' : 'Save to wishlist'}><Icon name={saved ? 'heartFilled' : 'heart'} size={19} /></button>
         <button className="food-rating" type="button" onClick={openReviews} aria-label={`${item.name}: ${ratingLabel}. View reviews`}><span>★</span>{item.reviewCount ? `${Number(item.reviewRating).toFixed(1)} · ${item.reviewCount}` : 'New'}</button>
       </div>
@@ -49,11 +53,11 @@ export default function FoodItem({ item }) {
         {wishlistError && <p className="wishlist-error" role="alert">{wishlistError}</p>}
         <div className="food-card-footer">
           <div className="food-card-meta"><span className="delivery-time"><Icon name="clock" size={16} />20–30 min</span><button className="food-review-link" type="button" onClick={openReviews}>{item.reviewCount ? `${item.reviewCount} review${item.reviewCount === 1 ? '' : 's'}` : 'No reviews yet'}</button></div>
-          <button className={`add-button ${quantity ? 'has-cart-items' : ''}`} disabled={quantity >= 20} onClick={() => setShowCustomizer(true)} aria-label={`${quantity >= 20 ? 'Maximum quantity reached for' : quantity ? 'Customize another' : 'Add'} ${item.name}`}><Icon name="plus" size={18} />{quantity >= 20 ? '20 in cart · Max' : quantity ? `${quantity} in cart · Add` : 'Add'}</button>
+          <button className={`add-button ${quantity ? 'has-cart-items' : ''}`} disabled={soldOut || quantity >= purchaseLimit} onClick={() => setShowCustomizer(true)} aria-label={`${soldOut ? 'Sold out' : quantity >= purchaseLimit ? 'Maximum quantity reached for' : quantity ? 'Customize another' : 'Add'} ${item.name}`}><Icon name={soldOut ? 'alert' : 'plus'} size={18} />{soldOut ? 'Sold out' : quantity >= purchaseLimit ? `${purchaseLimit} in cart · Max` : quantity ? `${quantity} in cart · Add` : 'Add'}</button>
         </div>
       </div>
     </article>
-    {showCustomizer && <ProductCustomizer product={item} maxQuantity={Math.max(1, 20 - quantity)} onClose={() => setShowCustomizer(false)} onSave={line => { addToCart(line); setShowCustomizer(false); }} />}
+    {showCustomizer && <ProductCustomizer product={item} maxQuantity={Math.max(0, purchaseLimit - quantity)} reservedOptionQuantity={optionId => cartOptionQuantity(optionId)} onClose={() => setShowCustomizer(false)} onSave={line => { addToCart(line); setShowCustomizer(false); }} />}
     {showReviews && <div className="food-reviews-overlay" role="presentation" onMouseDown={event => event.target === event.currentTarget && setShowReviews(false)}>
       <section className="food-reviews-modal" role="dialog" aria-modal="true" aria-labelledby={`reviews-${item._id}`}>
         <header><div><span>{item.category}</span><h2 id={`reviews-${item._id}`}>{item.name} reviews</h2>{reviews?.reviewCount > 0 && <p><strong>★ {reviews.averageRating.toFixed(1)}</strong> from {reviews.reviewCount} verified order review{reviews.reviewCount === 1 ? '' : 's'}</p>}</div><button type="button" onClick={() => setShowReviews(false)} aria-label="Close reviews"><Icon name="close" /></button></header>

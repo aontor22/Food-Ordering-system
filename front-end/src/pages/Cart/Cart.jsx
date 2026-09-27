@@ -6,10 +6,11 @@ import OrderSummary from '../../components/ui/OrderSummary';
 import EmptyState from '../../components/ui/EmptyState';
 import Icon from '../../components/ui/Icon';
 import ProductCustomizer from '../../components/ProductCustomizer/ProductCustomizer';
+import { productPurchaseLimit, selectedConfigurationLimit } from '../../lib/productCustomizations';
 import './Cart.css';
 
 export default function Cart() {
-  const { cartProducts, cartProductQuantity, setQuantity, updateCartLine, removeItem, getTotalCartAmount, couponCode, setCouponCode, storeStatus } = useContext(StoreContext);
+  const { cartProducts, cartProductQuantity, cartOptionQuantity, setQuantity, updateCartLine, removeItem, getTotalCartAmount, couponCode, setCouponCode, storeStatus } = useContext(StoreContext);
   const [promo, setPromo] = useState(couponCode);
   const [promoMessage, setPromoMessage] = useState('');
   const [editing, setEditing] = useState(null);
@@ -28,7 +29,11 @@ export default function Cart() {
     <header className="page-title"><div className="section-kicker">Almost there</div><h1>Your cart</h1><p>Review each dish, size, add-ons and kitchen instructions before checkout.</p></header>
     <div className="cart-layout">
       <section className="cart-list surface-card" aria-label="Cart items">
-        {cartProducts.map(item => <article className="cart-row" key={item.lineId}>
+        {cartProducts.map(item => {
+          const productLineLimit = Math.max(0, productPurchaseLimit(item) - (cartProductQuantity(item._id) - item.quantity));
+          const optionLineLimit = selectedConfigurationLimit(item, item.selections, optionId => cartOptionQuantity(optionId, item.lineId));
+          const lineLimit = Math.min(productLineLimit, optionLineLimit);
+          return <article className="cart-row" key={item.lineId}>
           <img src={item.image} alt={item.name} />
           <div className="cart-item-copy">
             <span>{item.category}</span><h2>{item.name}</h2><p>{formatCurrency(item.price)} each</p>
@@ -39,11 +44,11 @@ export default function Cart() {
           <div className="quantity-control cart-quantity">
             <button onClick={() => setQuantity(item.lineId, item.quantity - 1)} aria-label={`Decrease ${item.name} quantity`}><Icon name="minus" size={16} /></button>
             <strong>{item.quantity}</strong>
-            <button disabled={cartProductQuantity(item._id) >= 20} onClick={() => setQuantity(item.lineId, item.quantity + 1)} aria-label={`Increase ${item.name} quantity`}><Icon name="plus" size={16} /></button>
+            <button disabled={item.quantity >= lineLimit} onClick={() => setQuantity(item.lineId, item.quantity + 1)} aria-label={`Increase ${item.name} quantity`}><Icon name="plus" size={16} /></button>
           </div>
           <strong className="cart-line-total">{formatCurrency(item.price * item.quantity)}</strong>
           <button className="remove-item" onClick={() => removeItem(item.lineId)} aria-label={`Remove ${item.name}`}><Icon name="trash" size={19} /></button>
-        </article>)}
+        </article>;})}
         <div className="cart-list-footer"><Link className="text-link" to="/">← Continue shopping</Link><span>{cartProducts.length} customized {cartProducts.length === 1 ? 'line' : 'lines'}</span></div>
       </section>
       <div>
@@ -58,6 +63,6 @@ export default function Cart() {
         </OrderSummary>
       </div>
     </div>
-    {editing && <ProductCustomizer product={editing} line={editing} maxQuantity={Math.max(1, 20 - (cartProductQuantity(editing._id) - editing.quantity))} onClose={() => setEditing(null)} onSave={line => { updateCartLine(line); setEditing(null); }} />}
+    {editing && <ProductCustomizer product={editing} line={editing} maxQuantity={Math.max(0, productPurchaseLimit(editing) - (cartProductQuantity(editing._id) - editing.quantity))} reservedOptionQuantity={optionId => cartOptionQuantity(optionId, editing.lineId)} onClose={() => setEditing(null)} onSave={line => { updateCartLine(line); setEditing(null); }} />}
   </div>;
 }

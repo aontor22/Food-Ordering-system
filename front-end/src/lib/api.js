@@ -164,6 +164,8 @@ export const api = {
   updateAdminDeliveryZone: (id, body) => request(`/admin/delivery-zones/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   archiveAdminDeliveryZone: id => request(`/admin/delivery-zones/${id}`, { method: 'DELETE' }),
   getAdminProducts: () => request('/admin/products'),
+  getAdminInventory: () => request('/admin/inventory'),
+  adjustAdminInventory: body => request('/admin/inventory/adjust', { method: 'POST', body: JSON.stringify(body) }),
   getAdminMedia: () => request('/admin/media'),
   uploadProductImage,
   cleanupProductImage: publicId => request('/admin/media/cleanup', { method: 'POST', body: JSON.stringify({ publicId }) }),

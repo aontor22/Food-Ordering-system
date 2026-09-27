@@ -24,6 +24,7 @@ import {
 } from '../services/guest-orders.js';
 import { serializeOrderForClient } from '../services/order-view.js';
 import { resolveCustomizedCartLines } from '../services/product-customizations.js';
+import { reserveInventory, restoreOrderInventory, withSerializableRetry } from '../services/inventory.js';
 
 const router = Router();
 const orderInclude = {
@@ -67,6 +68,7 @@ const createBodySchema = z.object({
   scheduledForLocal: z.string().trim().max(16).optional(),
   paymentMethod: z.enum(['COD', 'ONLINE', 'MANUAL']).default('COD'),
   manualChannelId: z.string().min(1).optional(),
+  clientRequestId: z.string().uuid().optional(),
   delivery: deliverySchema,
 }).superRefine((value, ctx) => {
   if (value.fulfillmentType === 'DELIVERY') {
@@ -99,7 +101,7 @@ const linkGuestSchema = z.object({
 
 async function calculatePricing(data, userId = null, db = prisma, { enforceMinimum = true } = {}) {
   const customized = await resolveCustomizedCartLines(db, data.items);
-  const { quantities, products, lines } = customized;
+  const { quantities, products, productMap, optionUsages, lines } = customized;
   const subtotalCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
   let coupon;
   let discountCents = 0;
@@ -160,6 +162,8 @@ async function calculatePricing(data, userId = null, db = prisma, { enforceMinim
   return {
     quantities,
     products,
+    productMap,
+    optionUsages,
     lines,
     coupon,
     subtotalCents,
@@ -208,6 +212,56 @@ function quotePayload(pricing, body, { guest = false } = {}) {
   };
 }
 
+function checkoutRequestKey(value) {
+  return value ? crypto.createHash('sha256').update(value).digest('hex') : null;
+}
+
+async function existingOrderResult(data, { userId = null, guest = false, paymentOptions }) {
+  if (!data.clientRequestId) return null;
+  const existing = await prisma.order.findUnique({ where: { checkoutRequestId: checkoutRequestKey(data.clientRequestId) }, include: orderInclude });
+  if (!existing) return null;
+
+  if (guest) {
+    if (existing.customerType !== 'GUEST'
+      || normalizeOrderEmail(existing.email) !== normalizeOrderEmail(data.delivery.email)
+      || String(existing.phone).trim() !== String(data.delivery.phone).trim()) {
+      throw new AppError(409, 'CHECKOUT_REQUEST_CONFLICT', 'This checkout request identifier is already associated with another order');
+    }
+  } else if (existing.userId !== userId) {
+    throw new AppError(409, 'CHECKOUT_REQUEST_CONFLICT', 'This checkout request identifier is already associated with another order');
+  }
+
+  const guestToken = guest ? issueGuestOrderAccessToken(existing) : null;
+  let paymentSession;
+  let paymentError;
+  if (existing.paymentMethod === 'ONLINE' && existing.paymentStatus !== 'PAID') {
+    try {
+      paymentSession = await initiateOrderPayment(existing.id, guest ? { guestToken } : { userId });
+    } catch (error) {
+      paymentError = error.message || 'Payment could not be reopened';
+    }
+  }
+  const currentOrder = existing.paymentMethod === 'ONLINE'
+    ? await prisma.order.findUnique({ where: { id: existing.id }, include: orderInclude })
+    : existing;
+
+  return {
+    order: serializeOrderForClient(currentOrder),
+    idempotentReplay: true,
+    ...(guest ? {
+      guestAccess: {
+        token: guestToken,
+        expiresAt: existing.guestAccessExpiresAt,
+        orderNumber: existing.orderNumber,
+      },
+    } : {
+      loyalty: { ...(await getLoyaltySnapshot(userId)), currency: paymentOptions.currency },
+    }),
+    ...(paymentSession && { paymentUrl: paymentSession.paymentUrl, paymentMode: paymentSession.mode }),
+    ...(paymentError && { paymentError }),
+  };
+}
+
 async function createOrder(req, data, { userId = null, guest = false } = {}) {
   const paymentOptions = await getPaymentOptions();
   const onlineOption = paymentOptions.methods.find(method => method.id === 'ONLINE');
@@ -218,118 +272,125 @@ async function createOrder(req, data, { userId = null, guest = false } = {}) {
     throw new AppError(400, 'GUEST_POINTS_NOT_AVAILABLE', 'Guest checkout cannot redeem Tomato Points');
   }
 
+  const replay = await existingOrderResult(data, { userId, guest, paymentOptions });
+  if (replay) return replay;
+
   const preview = await calculatePricing(data, userId);
   const orderNumber = `FO-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
   const guestState = guest ? newGuestAccessState() : {};
-  const order = await prisma.$transaction(async tx => {
-    const fulfillment = await resolveFulfillmentSelection(tx, data);
-    const pricing = await calculatePricing(data, userId, tx);
-    let manualDestination;
-    if (data.paymentMethod === 'MANUAL') {
-      const channel = data.manualChannelId && await tx.manualPaymentChannel.findFirst({ where: { id: data.manualChannelId, active: true } });
-      if (!channel) throw new AppError(409, 'MANUAL_PAYMENT_UNAVAILABLE', 'Please select an available manual payment method');
-      if (channel.provider !== 'BANK' && config.PAYMENT_CURRENCY !== 'BDT') throw new AppError(409, 'CURRENCY_MISMATCH', 'This payment method requires BDT prices');
-      manualDestination = JSON.stringify({ channelId: channel.id, provider: channel.provider, label: channel.label, account: channel.account, instructions: channel.instructions });
-    }
+  let order;
+  try {
+    order = await withSerializableRetry(async tx => {
+      const fulfillment = await resolveFulfillmentSelection(tx, data);
+      const pricing = await calculatePricing(data, userId, tx);
+      let manualDestination;
+      if (data.paymentMethod === 'MANUAL') {
+        const channel = data.manualChannelId && await tx.manualPaymentChannel.findFirst({ where: { id: data.manualChannelId, active: true } });
+        if (!channel) throw new AppError(409, 'MANUAL_PAYMENT_UNAVAILABLE', 'Please select an available manual payment method');
+        if (channel.provider !== 'BANK' && config.PAYMENT_CURRENCY !== 'BDT') throw new AppError(409, 'CURRENCY_MISMATCH', 'This payment method requires BDT prices');
+        manualDestination = JSON.stringify({ channelId: channel.id, provider: channel.provider, label: channel.label, account: channel.account, instructions: channel.instructions });
+      }
 
-    for (const product of pricing.products) {
-      const result = await tx.product.updateMany({
-        where: { id: product.id, stock: { gte: pricing.quantities.get(product.id) }, isAvailable: true },
-        data: { stock: { decrement: pricing.quantities.get(product.id) } },
-      });
-      if (result.count !== 1) throw new AppError(409, 'STOCK_CHANGED', 'Stock changed while placing the order; please try again');
-    }
+      await reserveInventory(tx, pricing, { sourceId: orderNumber });
 
-    if (pricing.pointsRedeemed > 0) {
-      const reserved = await tx.user.updateMany({
-        where: { id: userId, pointsBalance: { gte: pricing.pointsRedeemed } },
-        data: { pointsBalance: { decrement: pricing.pointsRedeemed } },
-      });
-      if (reserved.count !== 1) throw new AppError(409, 'POINTS_CHANGED', 'Your points balance changed. Please review the order total and try again');
-    }
+      if (pricing.pointsRedeemed > 0) {
+        const reserved = await tx.user.updateMany({
+          where: { id: userId, pointsBalance: { gte: pricing.pointsRedeemed } },
+          data: { pointsBalance: { decrement: pricing.pointsRedeemed } },
+        });
+        if (reserved.count !== 1) throw new AppError(409, 'POINTS_CHANGED', 'Your points balance changed. Please review the order total and try again');
+      }
 
-    const created = await tx.order.create({
-      data: {
-        orderNumber,
-        userId,
-        customerType: guest ? 'GUEST' : 'REGISTERED',
-        ...guestState,
-        paymentMethod: data.paymentMethod,
-        subtotalCents: pricing.subtotalCents,
-        discountCents: pricing.discountCents,
-        pointsRedeemed: pricing.pointsRedeemed,
-        pointsDiscountCents: pricing.pointsDiscountCents,
-        deliveryFeeCents: pricing.deliveryFeeCents,
-        deliveryZoneId: pricing.deliveryZone?.id || null,
-        deliveryZoneName: pricing.deliveryZone?.name || null,
-        fulfillmentType: fulfillment.fulfillmentType,
-        fulfillmentMode: fulfillment.fulfillmentMode,
-        scheduledForLocal: fulfillment.scheduledForLocal,
-        scheduledDateKey: fulfillment.scheduledDateKey,
-        scheduledTimeKey: fulfillment.scheduledTimeKey,
-        schedulingTimezone: fulfillment.schedulingTimezone,
-        pickupAddressSnapshot: fulfillment.pickupAddressSnapshot,
-        pickupInstructionsSnapshot: fulfillment.pickupInstructionsSnapshot,
-        totalCents: pricing.totalCents,
-        couponCode: pricing.coupon?.code,
-        firstName: data.delivery.firstName,
-        lastName: data.delivery.lastName,
-        email: normalizeOrderEmail(data.delivery.email),
-        phone: data.delivery.phone,
-        street: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.street : null,
-        city: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.city : null,
-        state: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.state : null,
-        postalCode: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.postalCode : null,
-        country: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.country : null,
-        notes: data.delivery.notes,
-        items: {
-          create: pricing.lines.map(line => ({
-            productId: line.productId,
-            productName: line.product.name,
-            baseUnitPriceCents: line.baseUnitPriceCents,
-            unitPriceCents: line.unitPriceCents,
-            quantity: line.quantity,
-            lineTotalCents: line.lineTotalCents,
-            customizationsJson: line.customizationsJson,
-            specialInstructions: line.specialInstructions,
-          })),
-        },
-        trackingEvents: {
-          create: trackingEventData('PENDING', {
-            actorType: 'CUSTOMER',
-            actorLabel: `${data.delivery.firstName} ${data.delivery.lastName}`,
-            note: 'We received your order and will confirm it shortly.',
-          }),
-        },
-        payment: {
-          create: {
-            transactionId: newPaymentTransactionId(),
-            provider: data.paymentMethod === 'ONLINE' ? onlineOption.provider : data.paymentMethod,
-            manualDestination,
-            status: 'PENDING',
-            amountCents: pricing.totalCents,
-            currency: paymentOptions.currency,
+      const created = await tx.order.create({
+        data: {
+          orderNumber,
+          checkoutRequestId: checkoutRequestKey(data.clientRequestId),
+          userId,
+          customerType: guest ? 'GUEST' : 'REGISTERED',
+          ...guestState,
+          paymentMethod: data.paymentMethod,
+          subtotalCents: pricing.subtotalCents,
+          discountCents: pricing.discountCents,
+          pointsRedeemed: pricing.pointsRedeemed,
+          pointsDiscountCents: pricing.pointsDiscountCents,
+          deliveryFeeCents: pricing.deliveryFeeCents,
+          deliveryZoneId: pricing.deliveryZone?.id || null,
+          deliveryZoneName: pricing.deliveryZone?.name || null,
+          fulfillmentType: fulfillment.fulfillmentType,
+          fulfillmentMode: fulfillment.fulfillmentMode,
+          scheduledForLocal: fulfillment.scheduledForLocal,
+          scheduledDateKey: fulfillment.scheduledDateKey,
+          scheduledTimeKey: fulfillment.scheduledTimeKey,
+          schedulingTimezone: fulfillment.schedulingTimezone,
+          pickupAddressSnapshot: fulfillment.pickupAddressSnapshot,
+          pickupInstructionsSnapshot: fulfillment.pickupInstructionsSnapshot,
+          totalCents: pricing.totalCents,
+          couponCode: pricing.coupon?.code,
+          firstName: data.delivery.firstName,
+          lastName: data.delivery.lastName,
+          email: normalizeOrderEmail(data.delivery.email),
+          phone: data.delivery.phone,
+          street: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.street : null,
+          city: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.city : null,
+          state: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.state : null,
+          postalCode: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.postalCode : null,
+          country: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.country : null,
+          notes: data.delivery.notes,
+          items: {
+            create: pricing.lines.map(line => ({
+              productId: line.productId,
+              productName: line.product.name,
+              baseUnitPriceCents: line.baseUnitPriceCents,
+              unitPriceCents: line.unitPriceCents,
+              quantity: line.quantity,
+              lineTotalCents: line.lineTotalCents,
+              customizationsJson: line.customizationsJson,
+              specialInstructions: line.specialInstructions,
+            })),
+          },
+          trackingEvents: {
+            create: trackingEventData('PENDING', {
+              actorType: 'CUSTOMER',
+              actorLabel: `${data.delivery.firstName} ${data.delivery.lastName}`,
+              note: 'We received your order and will confirm it shortly.',
+            }),
+          },
+          payment: {
+            create: {
+              transactionId: newPaymentTransactionId(),
+              provider: data.paymentMethod === 'ONLINE' ? onlineOption.provider : data.paymentMethod,
+              manualDestination,
+              status: 'PENDING',
+              amountCents: pricing.totalCents,
+              currency: paymentOptions.currency,
+            },
           },
         },
-      },
-      include: orderInclude,
-    });
-
-    if (pricing.pointsRedeemed > 0) {
-      const customer = await tx.user.findUnique({ where: { id: userId }, select: { pointsBalance: true } });
-      await tx.loyaltyTransaction.create({
-        data: {
-          userId,
-          orderId: created.id,
-          type: 'REDEEM',
-          points: -pricing.pointsRedeemed,
-          balanceAfter: customer.pointsBalance,
-          note: `Points redeemed on order ${created.orderNumber}`,
-        },
+        include: orderInclude,
       });
+
+      if (pricing.pointsRedeemed > 0) {
+        const customer = await tx.user.findUnique({ where: { id: userId }, select: { pointsBalance: true } });
+        await tx.loyaltyTransaction.create({
+          data: {
+            userId,
+            orderId: created.id,
+            type: 'REDEEM',
+            points: -pricing.pointsRedeemed,
+            balanceAfter: customer.pointsBalance,
+            note: `Points redeemed on order ${created.orderNumber}`,
+          },
+        });
+      }
+      return created;
+    });
+  } catch (error) {
+    if (error?.code === 'P2002' && data.clientRequestId) {
+      const collided = await existingOrderResult(data, { userId, guest, paymentOptions });
+      if (collided) return collided;
     }
-    return created;
-  }, { isolationLevel: 'Serializable' });
+    throw error;
+  }
 
   const guestToken = guest ? issueGuestOrderAccessToken(order) : null;
   await audit(req, 'ORDER_CREATED', 'Order', order.id, {
@@ -339,6 +400,7 @@ async function createOrder(req, data, { userId = null, guest = false } = {}) {
     fulfillmentType: order.fulfillmentType,
     fulfillmentMode: order.fulfillmentMode,
     scheduledForLocal: order.scheduledForLocal,
+    idempotencyKeyPresent: Boolean(data.clientRequestId),
   });
   publishOrderChange(order);
   await safeEnqueueOrderNotification(order.id, 'PENDING', {}, req.log);
@@ -382,9 +444,11 @@ async function cancelOrderInTransaction(tx, order) {
     throw new AppError(409, 'PAYMENT_PROCESSING', 'Wait for gateway payment/refund verification before cancelling');
   }
 
-  for (const item of order.items) {
-    await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
-  }
+  await restoreOrderInventory(tx, order, {
+    sourceId: order.orderNumber,
+    reason: 'ORDER_CANCELLED_BY_CUSTOMER',
+    actorLabel: `${order.firstName} ${order.lastName}`,
+  });
   if (order.payment) {
     await tx.payment.updateMany({
       where: { id: order.payment.id, status: { notIn: ['PAID', 'REFUNDED'] } },
@@ -464,10 +528,10 @@ router.get('/guest/live', async (req, res, next) => {
 router.post('/guest/cancel', async (req, res, next) => {
   try {
     const token = guestTokenFromRequest(req);
-    const updated = await prisma.$transaction(async tx => {
+    const updated = await withSerializableRetry(async tx => {
       const order = await getGuestOrderByToken(token, { db: tx, include: { items: true, payment: true } });
       return cancelOrderInTransaction(tx, order);
-    }, { isolationLevel: 'Serializable' });
+    });
     await audit(req, 'ORDER_CANCELLED', 'Order', updated.id, { customerType: 'GUEST', pointsRestored: 0 });
     publishOrderChange(updated);
     await safeEnqueueOrderNotification(updated.id, 'CANCELLED', {}, req.log);
@@ -574,10 +638,10 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/:id/cancel', async (req, res, next) => {
   try {
-    const updated = await prisma.$transaction(async tx => {
+    const updated = await withSerializableRetry(async tx => {
       const order = await tx.order.findFirst({ where: { id: req.params.id, userId: req.auth.sub }, include: { items: true, payment: true } });
       return cancelOrderInTransaction(tx, order);
-    }, { isolationLevel: 'Serializable' });
+    });
     await audit(req, 'ORDER_CANCELLED', 'Order', updated.id, { pointsRestored: updated.pointsRedeemed || 0 });
     publishOrderChange(updated);
     await safeEnqueueOrderNotification(updated.id, 'CANCELLED', {}, req.log);

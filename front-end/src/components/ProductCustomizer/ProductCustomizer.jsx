@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatCurrency } from '../../lib/format';
-import { defaultSelectionsForProduct, normalizeSelections, productUnitPriceCents, validateProductSelections } from '../../lib/productCustomizations';
+import { defaultSelectionsForProduct, normalizeSelections, optionIsOrderable, productUnitPriceCents, selectedConfigurationLimit, validateProductSelections } from '../../lib/productCustomizations';
 import Icon from '../ui/Icon';
 import './ProductCustomizer.css';
 
@@ -9,17 +9,27 @@ function initialSelectionMap(product, line) {
   return Object.fromEntries(source.map(selection => [selection.groupId, [...selection.optionIds]]));
 }
 
-export default function ProductCustomizer({ product, line = null, maxQuantity = 20, onClose, onSave }) {
+export default function ProductCustomizer({ product, line = null, maxQuantity = 20, reservedOptionQuantity = () => 0, onClose, onSave }) {
   const [selections, setSelections] = useState(() => initialSelectionMap(product, line));
   const [specialInstructions, setSpecialInstructions] = useState(line?.specialInstructions || '');
-  const safeMaxQuantity = Math.max(1, Math.min(20, Number(maxQuantity) || 20));
-  const [quantity, setQuantity] = useState(Math.min(safeMaxQuantity, Math.max(1, Number(line?.quantity) || 1)));
+  const safeMaxQuantity = Math.max(0, Math.min(1000, Number(maxQuantity) || 0));
+  const [quantity, setQuantity] = useState(Math.max(1, Math.min(Math.max(1, safeMaxQuantity), Number(line?.quantity) || 1)));
   const [error, setError] = useState('');
 
   const normalized = useMemo(() => normalizeSelections(Object.entries(selections).map(([groupId, optionIds]) => ({ groupId, optionIds }))), [selections]);
   const unitPriceCents = useMemo(() => productUnitPriceCents(product, normalized), [product, normalized]);
+  const configurationLimit = useMemo(
+    () => Math.min(safeMaxQuantity, selectedConfigurationLimit(product, normalized, reservedOptionQuantity)),
+    [product, normalized, safeMaxQuantity, reservedOptionQuantity],
+  );
 
-  const selectOption = (group, optionId, checked) => {
+  useEffect(() => {
+    if (configurationLimit > 0) setQuantity(value => Math.min(Math.max(1, value), configurationLimit));
+  }, [configurationLimit]);
+
+  const selectOption = (group, option, checked) => {
+    if (option && !optionIsOrderable(option)) { setError(`${option.name} is currently sold out.`); return; }
+    const optionId = option?.id || '';
     setError('');
     setSelections(previous => {
       const current = previous[group.id] || [];
@@ -39,6 +49,8 @@ export default function ProductCustomizer({ product, line = null, maxQuantity = 
   const save = () => {
     const validation = validateProductSelections(product, normalized);
     if (validation) { setError(validation); return; }
+    if (configurationLimit <= 0) { setError('This configuration is sold out. Choose another option.'); return; }
+    if (quantity > configurationLimit) { setError(`Only ${configurationLimit} available for this configuration.`); return; }
     onSave({
       ...(line?.lineId ? { lineId: line.lineId } : {}),
       productId: product._id || product.id,
@@ -63,22 +75,27 @@ export default function ProductCustomizer({ product, line = null, maxQuantity = 
           <legend><span>{group.name}</span><small>{group.minSelections > 0 ? 'Required' : 'Optional'}{group.maxSelections > 1 ? ` · choose up to ${group.maxSelections}` : ''}</small></legend>
           <div className="customizer-options">
             {group.kind === 'VARIANT' && group.minSelections === 0 && <label className={`customizer-option ${(selections[group.id] || []).length === 0 ? 'is-selected' : ''}`}>
-              <input type="radio" name={`customizer-${group.id}`} checked={(selections[group.id] || []).length === 0} onChange={() => selectOption(group, '', true)} />
+              <input type="radio" name={`customizer-${group.id}`} checked={(selections[group.id] || []).length === 0} onChange={() => selectOption(group, null, true)} />
               <span className="customizer-control" /><strong>No preference</strong><small>Included</small>
             </label>}
             {(group.options || []).map(option => {
               const selected = (selections[group.id] || []).includes(option.id);
               const inputType = group.kind === 'VARIANT' ? 'radio' : 'checkbox';
-              return <label className={`customizer-option ${selected ? 'is-selected' : ''}`} key={option.id}>
+              const orderable = optionIsOrderable(option);
+              const stockCopy = option.trackStock
+                ? option.stock <= 0 ? 'Sold out' : option.stock <= option.lowStockThreshold ? `Only ${option.stock} left` : null
+                : null;
+              return <label className={`customizer-option ${selected ? 'is-selected' : ''} ${!orderable ? 'is-disabled' : ''}`} key={option.id}>
                 <input
                   type={inputType}
                   name={`customizer-${group.id}`}
                   checked={selected}
-                  onChange={event => selectOption(group, option.id, event.target.checked)}
+                  disabled={!orderable}
+                  onChange={event => selectOption(group, option, event.target.checked)}
                 />
                 <span className="customizer-control" />
                 <strong>{option.name}</strong>
-                <small>{option.priceDeltaCents > 0 ? `+${formatCurrency(option.priceDeltaCents / 100)}` : 'Included'}</small>
+                <small>{stockCopy || (option.priceDeltaCents > 0 ? `+${formatCurrency(option.priceDeltaCents / 100)}` : 'Included')}</small>
               </label>;
             })}
           </div>
@@ -89,16 +106,18 @@ export default function ProductCustomizer({ product, line = null, maxQuantity = 
           <textarea id="special-instructions" maxLength="300" value={specialInstructions} onChange={event => setSpecialInstructions(event.target.value)} placeholder="e.g. no onions, sauce on the side, less spicy" />
           <small>{specialInstructions.length}/300 · Requests are sent to the kitchen but cannot guarantee allergen-free preparation.</small>
         </div>
+        {configurationLimit > 0 && configurationLimit <= 5 && <p className="customizer-stock-note"><Icon name="alert" size={15} />Only {configurationLimit} available for this configuration.</p>}
+        {configurationLimit <= 0 && <p className="form-error" role="alert">This configuration is sold out. Choose another option.</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
       </div>
 
       <footer className="customizer-footer">
         <div className="customizer-quantity" aria-label="Quantity">
-          <button type="button" onClick={() => setQuantity(value => Math.max(1, value - 1))} disabled={quantity <= 1}><Icon name="minus" size={15} /></button>
+          <button type="button" onClick={() => setQuantity(value => Math.max(1, value - 1))} disabled={quantity <= 1 || configurationLimit <= 0}><Icon name="minus" size={15} /></button>
           <strong>{quantity}</strong>
-          <button type="button" onClick={() => setQuantity(value => Math.min(safeMaxQuantity, value + 1))} disabled={quantity >= safeMaxQuantity}><Icon name="plus" size={15} /></button>
+          <button type="button" onClick={() => setQuantity(value => Math.min(configurationLimit, value + 1))} disabled={configurationLimit <= 0 || quantity >= configurationLimit}><Icon name="plus" size={15} /></button>
         </div>
-        <button className="button button-primary customizer-add" type="button" onClick={save}><span>{line ? 'Update item' : 'Add to cart'}</span><strong>{formatCurrency(unitPriceCents * quantity / 100)}</strong></button>
+        <button className="button button-primary customizer-add" type="button" onClick={save} disabled={configurationLimit <= 0}><span>{line ? 'Update item' : 'Add to cart'}</span><strong>{formatCurrency(unitPriceCents * quantity / 100)}</strong></button>
       </footer>
     </section>
   </div>;

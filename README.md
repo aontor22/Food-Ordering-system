@@ -23,6 +23,7 @@ A working Preact storefront and responsive restaurant admin dashboard with a Nod
 - Server-enforced restaurant opening hours, overnight schedules, emergency ordering pause, temporary closures, holiday closures, and customer-facing open/closed status
 - Guest checkout for Delivery/Pickup and ASAP/scheduled orders, with private expiring order access, secure tracking/payment actions, matching-account linking, and admin Guest/Registered provenance
 - Product variants/sizes, add-ons, per-item kitchen instructions, server-authoritative customization pricing, and immutable order-item snapshots
+- Stronger product/variant/add-on inventory controls with atomic reservations, checkout idempotency, optimistic admin stock updates, cancellation restoration, low-stock states, and an inventory ledger
 
 ## Quick start
 
@@ -176,3 +177,8 @@ Customers can now use Delivery or Pickup, ASAP or scheduled slots, and COD/manua
 ## Product customizations (Step 10)
 
 Products can now have admin-managed single-select **Variant/Size** groups and multi-select **Add-on** groups with required/optional selection rules, default choices, availability, ordering, and non-negative price adjustments. The cart stores configured lines rather than only product quantities, so the same dish can appear multiple times with different choices and kitchen notes. Checkout never trusts browser pricing: the API reloads the current product/options, validates every selection, enforces stock using the aggregate product quantity, recalculates the configured unit price, and stores an immutable snapshot on each `OrderItem`. Historical orders therefore keep the purchased names/prices even when menu choices are later renamed or changed. Existing pre-Step-10 carts are migrated locally into line records, and existing order rows are backfilled with their original unit price as `baseUnitPriceCents`. See `PRODUCT_CUSTOMIZATIONS_SETUP.md` and `STEP_10_VERIFICATION.md`.
+
+## Inventory & concurrency safeguards (Step 11)
+
+Admin → **Inventory** is now the authoritative place to change live product and tracked variant/add-on stock. Checkout reserves product and option quantities atomically inside serializable PostgreSQL transactions, retries transient write conflicts, prevents negative stock, and uses a unique browser checkout request ID so network retries/double-submits cannot create duplicate orders or reserve inventory twice. Existing product options remain untracked after migration until an administrator explicitly enables option-level stock tracking. Cancellations restore the exact inventory originally reserved, and every automatic/manual movement is written to an inventory adjustment ledger. See `INVENTORY_CONCURRENCY_SETUP.md` and `STEP_11_VERIFICATION.md`.
+

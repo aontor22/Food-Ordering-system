@@ -18,7 +18,8 @@ import { getFulfillmentAdminConfig } from '../services/fulfillment-scheduling.js
 import { etaUpdateData, openOrderSseStream, publishOrderChange, trackingEventData, trackingTimestampData } from '../services/order-tracking.js';
 import { notificationCapabilities, processPendingNotifications, retryNotificationDelivery, safeEnqueueOrderNotification } from '../services/notifications.js';
 import { serializeOrderForClient, stripOrderSecrets } from '../services/order-view.js';
-import { adminProductCustomizationInclude } from '../services/product-customizations.js';
+import { adminProductCustomizationInclude, serializeProductForClient } from '../services/product-customizations.js';
+import { restoreOrderInventory, setInventoryLevel, withSerializableRetry } from '../services/inventory.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -36,6 +37,9 @@ const optionInput = z.object({
   isDefault: z.boolean().default(false),
   sortOrder: z.number().int().min(0).max(1000).default(0),
   isAvailable: z.boolean().default(true),
+  trackStock: z.boolean().default(false),
+  stock: z.number().int().nonnegative().max(1_000_000).default(0),
+  lowStockThreshold: z.number().int().nonnegative().max(1_000_000).default(5),
 });
 const optionGroupInput = z.object({
   id: z.string().trim().min(1).max(100).optional(),
@@ -70,6 +74,8 @@ const productFields = {
   imagePublicId,
   priceCents: z.number().int().positive().max(10_000_000),
   stock: z.number().int().nonnegative().max(1_000_000),
+  lowStockThreshold: z.number().int().nonnegative().max(1_000_000).default(10),
+  maxPerOrder: z.number().int().min(1).max(20).default(20),
   isAvailable: z.boolean(),
   optionGroups: optionGroupsInput.optional(),
 };
@@ -109,32 +115,85 @@ function generatedCustomizationId(prefix) {
   return `${prefix}_${crypto.randomUUID().replaceAll('-', '').slice(0, 20)}`;
 }
 
-async function replaceProductCustomizations(tx, productId, groups) {
-  await tx.productOptionGroup.deleteMany({ where: { productId } });
+async function syncProductCustomizations(tx, productId, groups) {
+  const existingGroups = await tx.productOptionGroup.findMany({ where: { productId }, include: { options: true } });
+  const existingGroupMap = new Map(existingGroups.map(group => [group.id, group]));
+
+  for (const group of existingGroups) {
+    await tx.productOptionGroup.update({ where: { id: group.id }, data: { isArchived: true, isAvailable: false } });
+    if (group.options.length) {
+      await tx.productOption.updateMany({ where: { groupId: group.id }, data: { isArchived: true, isAvailable: false, isDefault: false } });
+    }
+  }
+
   for (const [groupIndex, group] of (groups || []).entries()) {
     const groupId = group.id || generatedCustomizationId('grp');
-    await tx.productOptionGroup.create({
-      data: {
-        id: groupId,
-        productId,
-        name: group.name,
-        kind: group.kind,
-        minSelections: group.minSelections,
-        maxSelections: group.maxSelections,
-        sortOrder: group.sortOrder ?? groupIndex,
-        isAvailable: group.isAvailable,
-        options: {
-          create: group.options.map((option, optionIndex) => ({
-            id: option.id || generatedCustomizationId('opt'),
-            name: option.name,
-            priceDeltaCents: option.priceDeltaCents,
-            isDefault: option.isDefault,
-            sortOrder: option.sortOrder ?? optionIndex,
-            isAvailable: option.isAvailable,
-          })),
+    const existingGroup = existingGroupMap.get(groupId);
+    if (group.id && !existingGroup) {
+      const collision = await tx.productOptionGroup.findUnique({ where: { id: group.id }, select: { productId: true } });
+      if (collision) throw new AppError(409, 'CUSTOMIZATION_ID_CONFLICT', 'A customization group ID belongs to another product');
+    }
+
+    if (existingGroup) {
+      await tx.productOptionGroup.update({
+        where: { id: groupId },
+        data: {
+          name: group.name,
+          kind: group.kind,
+          minSelections: group.minSelections,
+          maxSelections: group.maxSelections,
+          sortOrder: group.sortOrder ?? groupIndex,
+          isAvailable: group.isAvailable,
+          isArchived: false,
         },
-      },
-    });
+      });
+    } else {
+      await tx.productOptionGroup.create({
+        data: {
+          id: groupId,
+          productId,
+          name: group.name,
+          kind: group.kind,
+          minSelections: group.minSelections,
+          maxSelections: group.maxSelections,
+          sortOrder: group.sortOrder ?? groupIndex,
+          isAvailable: group.isAvailable,
+          isArchived: false,
+        },
+      });
+    }
+
+    const existingOptions = new Map((existingGroup?.options || []).map(option => [option.id, option]));
+    for (const [optionIndex, option] of group.options.entries()) {
+      const optionId = option.id || generatedCustomizationId('opt');
+      const existingOption = existingOptions.get(optionId);
+      if (option.id && !existingOption) {
+        const collision = await tx.productOption.findUnique({ where: { id: option.id }, select: { groupId: true } });
+        if (collision) throw new AppError(409, 'CUSTOMIZATION_ID_CONFLICT', 'A customization option ID belongs to another group');
+      }
+      const common = {
+        name: option.name,
+        priceDeltaCents: option.priceDeltaCents,
+        isDefault: option.isDefault,
+        sortOrder: option.sortOrder ?? optionIndex,
+        isAvailable: option.isAvailable,
+        isArchived: false,
+        trackStock: option.trackStock === true,
+        lowStockThreshold: option.lowStockThreshold ?? 5,
+      };
+      if (existingOption) {
+        await tx.productOption.update({ where: { id: optionId }, data: common });
+      } else {
+        await tx.productOption.create({
+          data: {
+            id: optionId,
+            groupId,
+            ...common,
+            stock: option.trackStock ? (option.stock || 0) : 0,
+          },
+        });
+      }
+    }
   }
 }
 
@@ -143,10 +202,20 @@ router.post('/products', validate(productCreate), async (req, res, next) => {
     const { id, optionGroups = [], ...rawValues } = req.validated.body;
     const values = normalizeProductMedia(rawValues);
     const productId = id || `prd_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`;
-    const product = await prisma.$transaction(async tx => {
+    const product = await withSerializableRetry(async tx => {
       await tx.product.create({ data: { id: productId, ...values } });
-      await replaceProductCustomizations(tx, productId, optionGroups);
-      return tx.product.findUnique({ where: { id: productId }, include: adminProductCustomizationInclude });
+      await syncProductCustomizations(tx, productId, optionGroups);
+      const created = await tx.product.findUnique({ where: { id: productId }, include: adminProductCustomizationInclude });
+      const openingAdjustments = [{
+        targetType: 'PRODUCT', quantityDelta: created.stock, balanceAfter: created.stock, reason: 'INITIAL_STOCK', sourceType: 'SYSTEM',
+        actorId: req.auth.sub, actorLabel: req.auth.email || 'Administrator', productId: created.id,
+      }];
+      for (const group of created.optionGroups) for (const option of group.options) if (option.trackStock) openingAdjustments.push({
+        targetType: 'OPTION', quantityDelta: option.stock, balanceAfter: option.stock, reason: 'INITIAL_STOCK', sourceType: 'SYSTEM',
+        actorId: req.auth.sub, actorLabel: req.auth.email || 'Administrator', productId: created.id, optionId: option.id,
+      });
+      await tx.inventoryAdjustment.createMany({ data: openingAdjustments });
+      return created;
     });
     await audit(req, 'PRODUCT_CREATED', 'Product', product.id, { imageStorage: product.imagePublicId ? 'cloudinary' : 'external_or_local', customizationGroups: product.optionGroups.length });
     res.status(201).json({ product });
@@ -157,11 +226,14 @@ router.patch('/products/:id', validate(productUpdate), async (req, res, next) =>
   try {
     const existing = await prisma.product.findUnique({ where: { id: req.validated.params.id } });
     if (!existing) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
-    const { optionGroups, ...rawValues } = req.validated.body;
+    const { optionGroups, stock: submittedStock, ...rawValues } = req.validated.body;
+    if (submittedStock !== undefined && submittedStock !== existing.stock) {
+      throw new AppError(409, 'USE_INVENTORY_ADJUSTMENT', 'Use Inventory to change stock so concurrent orders cannot be overwritten.');
+    }
     const values = normalizeProductMedia(rawValues);
-    const product = await prisma.$transaction(async tx => {
+    const product = await withSerializableRetry(async tx => {
       if (Object.keys(values).length) await tx.product.update({ where: { id: existing.id }, data: values });
-      if (optionGroups) await replaceProductCustomizations(tx, existing.id, optionGroups);
+      if (optionGroups) await syncProductCustomizations(tx, existing.id, optionGroups);
       return tx.product.findUnique({ where: { id: existing.id }, include: adminProductCustomizationInclude });
     });
     if (existing.imagePublicId && existing.imagePublicId !== product.imagePublicId) {
@@ -178,6 +250,78 @@ router.delete('/products/:id', async (req, res, next) => {
     const product = await prisma.product.update({ where: { id: req.params.id }, data: { isAvailable: false } });
     await audit(req, 'PRODUCT_ARCHIVED', 'Product', product.id);
     res.status(204).end();
+  } catch (error) { next(error); }
+});
+
+
+const inventoryAdjustmentSchema = z.object({
+  body: z.object({
+    targetType: z.enum(['PRODUCT', 'OPTION']),
+    productId: z.string().min(1).max(100),
+    optionId: z.string().min(1).max(100).optional(),
+    expectedVersion: z.number().int().nonnegative(),
+    newStock: z.number().int().nonnegative().max(1_000_000),
+    reason: z.enum(['RESTOCK', 'STOCK_COUNT', 'WASTE', 'DAMAGE', 'CORRECTION', 'OTHER']),
+    note: z.string().trim().max(240).optional().transform(value => value || null),
+  }).superRefine((value, ctx) => {
+    if (value.targetType === 'OPTION' && !value.optionId) ctx.addIssue({ code: 'custom', path: ['optionId'], message: 'Option is required' });
+  }),
+  params: empty,
+  query: empty,
+});
+
+router.get('/inventory', async (_req, res) => {
+  const [products, adjustments] = await Promise.all([
+    prisma.product.findMany({
+      include: adminProductCustomizationInclude,
+      orderBy: [{ isAvailable: 'desc' }, { name: 'asc' }],
+    }),
+    prisma.inventoryAdjustment.findMany({
+      include: {
+        product: { select: { id: true, name: true } },
+        option: { select: { id: true, name: true, group: { select: { name: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 150,
+    }),
+  ]);
+  const serialized = products.map(serializeProductForClient);
+  const trackedOptions = serialized.flatMap(product => product.optionGroups.flatMap(group => group.options
+    .filter(option => option.trackStock)
+    .map(option => ({ ...option, productId: product.id, productName: product.name, groupName: group.name }))));
+  const lowStockProducts = serialized.filter(product => product.isAvailable && product.stock > 0 && product.stock <= product.lowStockThreshold).length;
+  const soldOutProducts = serialized.filter(product => product.isAvailable && product.stock <= 0).length;
+  const lowStockOptions = trackedOptions.filter(option => option.isAvailable && option.stock > 0 && option.stock <= option.lowStockThreshold).length;
+  const soldOutOptions = trackedOptions.filter(option => option.isAvailable && option.stock <= 0).length;
+  res.json({
+    products: serialized,
+    summary: {
+      productCount: serialized.length,
+      trackedOptionCount: trackedOptions.length,
+      lowStockProducts,
+      soldOutProducts,
+      lowStockOptions,
+      soldOutOptions,
+    },
+    adjustments,
+  });
+});
+
+router.post('/inventory/adjust', validate(inventoryAdjustmentSchema), async (req, res, next) => {
+  try {
+    const result = await withSerializableRetry(tx => setInventoryLevel(tx, {
+      ...req.validated.body,
+      actorId: req.auth.sub,
+      actorLabel: req.auth.email || 'Administrator',
+    }));
+    await audit(req, 'INVENTORY_ADJUSTED', req.validated.body.targetType === 'PRODUCT' ? 'Product' : 'ProductOption', req.validated.body.optionId || req.validated.body.productId, {
+      productId: req.validated.body.productId,
+      optionId: req.validated.body.optionId || null,
+      newStock: req.validated.body.newStock,
+      reason: req.validated.body.reason,
+      quantityDelta: result.adjustment.quantityDelta,
+    });
+    res.json(result);
   } catch (error) { next(error); }
 });
 
@@ -270,7 +414,7 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
     let previousStatus;
     let pointsAwarded = 0;
     let pointsRestored = 0;
-    const order = await prisma.$transaction(async transaction => {
+    const order = await withSerializableRetry(async transaction => {
       const existing = await transaction.order.findUnique({ where: { id: req.validated.params.id }, include: { items: true, payment: true } });
       if (!existing) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
       const nextStatus = req.validated.body.status;
@@ -289,7 +433,7 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
       const settleCod = nextStatus === 'DELIVERED' && existing.paymentMethod === 'COD' && existing.paymentStatus !== 'REFUNDED';
 
       if (nextStatus === 'CANCELLED') {
-        for (const item of existing.items) await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
+        await restoreOrderInventory(transaction, existing, { sourceId: existing.orderNumber, reason: 'ORDER_CANCELLED_BY_ADMIN', actorId: req.auth.sub, actorLabel: req.auth.email || 'Administrator' });
         if (existing.payment) await transaction.payment.updateMany({ where: { id: existing.payment.id, status: { notIn: ['PAID', 'REFUNDED'] } }, data: { status: 'CANCELLED', failureReason: 'Order cancelled by administrator' } });
       }
       if (settleCod && existing.payment) {
@@ -883,7 +1027,7 @@ router.get('/dashboard', async (_req, res) => {
   const sevenDaysAgo = new Date(startOfToday);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
-  const [customers, orders, products, wishlistSaves, revenue, todayOrders, pendingOrders, lowStock, recentOrders, statusGroups, deliveredThisWeek, topItems, storeStatus] = await Promise.all([
+  const [customers, orders, products, wishlistSaves, revenue, todayOrders, pendingOrders, lowStockRows, recentOrders, statusGroups, deliveredThisWeek, topItems, storeStatus] = await Promise.all([
     prisma.user.count({ where: { role: 'CUSTOMER' } }),
     prisma.order.count(),
     prisma.product.count({ where: { isAvailable: true } }),
@@ -891,7 +1035,7 @@ router.get('/dashboard', async (_req, res) => {
     prisma.order.aggregate({ where: { status: 'DELIVERED' }, _sum: { totalCents: true } }),
     prisma.order.count({ where: { createdAt: { gte: startOfToday } } }),
     prisma.order.count({ where: { status: { in: ['PENDING', 'CONFIRMED', 'PREPARING'] } } }),
-    prisma.product.count({ where: { isAvailable: true, stock: { lte: 10 } } }),
+    prisma.product.findMany({ where: { isAvailable: true }, select: { stock: true, lowStockThreshold: true } }),
     prisma.order.findMany({ include: { user: { select: { name: true, email: true } } }, orderBy: { createdAt: 'desc' }, take: 6 }),
     prisma.order.groupBy({ by: ['status'], _count: { status: true } }),
     prisma.order.findMany({ where: { status: 'DELIVERED', createdAt: { gte: sevenDaysAgo } }, select: { totalCents: true, createdAt: true } }),
@@ -908,6 +1052,8 @@ router.get('/dashboard', async (_req, res) => {
       revenueCents: deliveredThisWeek.filter(order => order.createdAt.toISOString().slice(0, 10) === key).reduce((sum, order) => sum + order.totalCents, 0),
     };
   });
+
+  const lowStock = lowStockRows.filter(product => product.stock <= product.lowStockThreshold).length;
 
   res.json({
     metrics: { customers, orders, products, wishlistSaves, revenueCents: revenue._sum.totalCents || 0, todayOrders, pendingOrders, lowStock },

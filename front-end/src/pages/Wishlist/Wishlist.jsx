@@ -4,10 +4,11 @@ import { formatCurrency } from '../../lib/format';
 import EmptyState from '../../components/ui/EmptyState';
 import Icon from '../../components/ui/Icon';
 import ProductCustomizer from '../../components/ProductCustomizer/ProductCustomizer';
+import { productPurchaseLimit } from '../../lib/productCustomizations';
 import './Wishlist.css';
 
 export default function Wishlist() {
-  const { wishlistProducts, wishlistCount, user, addToCart, cartProductQuantity, removeWishlistItem, wishlistBusy } = useContext(StoreContext);
+  const { wishlistProducts, wishlistCount, user, addToCart, cartProductQuantity, cartOptionQuantity, removeWishlistItem, wishlistBusy } = useContext(StoreContext);
   const [customizing, setCustomizing] = useState(null);
 
   if (!wishlistCount) return <section className="wishlist-page"><EmptyState icon="♡" title="Your wishlist is empty" text="Tap the heart on any dish to save it here for later." action="Explore dishes" to="/" /></section>;
@@ -20,7 +21,8 @@ export default function Wishlist() {
 
     <div className="wishlist-grid">
       {wishlistProducts.map(product => {
-        const available = product.isAvailable !== false && product.stock !== 0;
+        const limit = productPurchaseLimit(product);
+        const available = limit > 0;
         const quantity = cartProductQuantity(product._id);
         const busy = wishlistBusy.includes(product._id);
         return <article className={`wishlist-card ${available ? '' : 'is-unavailable'}`} key={product._id}>
@@ -31,13 +33,13 @@ export default function Wishlist() {
             <small>{product.reviewCount ? `★ ${Number(product.reviewRating).toFixed(1)} · ${product.reviewCount} review${product.reviewCount === 1 ? '' : 's'}` : 'No reviews yet'}</small>
             {!available && <div className="wishlist-unavailable"><Icon name="alert" size={16} />Currently unavailable</div>}
             <div className="wishlist-actions">
-              {available && <button className="button button-primary" disabled={quantity >= 20} onClick={() => setCustomizing(product)}><Icon name="cart" size={18} />{quantity >= 20 ? '20 in cart · Max' : quantity ? `${quantity} in cart · Add` : 'Add to cart'}</button>}
+              {available && <button className="button button-primary" disabled={quantity >= limit} onClick={() => setCustomizing(product)}><Icon name="cart" size={18} />{quantity >= limit ? `${limit} in cart · Max` : quantity ? `${quantity} in cart · Add` : 'Add to cart'}</button>}
               <button className="button button-secondary" disabled={busy} onClick={() => removeWishlistItem(product._id)}><Icon name="heartFilled" size={17} />{busy ? 'Removing…' : 'Remove'}</button>
             </div>
           </div>
         </article>;
       })}
     </div>
-    {customizing && <ProductCustomizer product={customizing} maxQuantity={Math.max(1, 20 - cartProductQuantity(customizing._id))} onClose={() => setCustomizing(null)} onSave={line => { addToCart(line); setCustomizing(null); }} />}
+    {customizing && <ProductCustomizer product={customizing} maxQuantity={Math.max(0, productPurchaseLimit(customizing) - cartProductQuantity(customizing._id))} reservedOptionQuantity={optionId => cartOptionQuantity(optionId)} onClose={() => setCustomizing(null)} onSave={line => { addToCart(line); setCustomizing(null); }} />}
   </section>;
 }

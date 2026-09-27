@@ -7,6 +7,7 @@ import './admin.css';
 const navigation = [
   { to: '/admin', label: 'Overview', icon: 'dashboard', end: true },
   { to: '/admin/products', label: 'Products', icon: 'products' },
+  { to: '/admin/inventory', label: 'Inventory', icon: 'activity' },
   { to: '/admin/orders', label: 'Orders', icon: 'orders' },
   { to: '/admin/store-operations', label: 'Store hours', icon: 'clock' },
   { to: '/admin/delivery-zones', label: 'Delivery zones', icon: 'delivery' },
@@ -22,7 +23,8 @@ const navigation = [
 
 const titles = {
   '/admin': ['Dashboard overview', 'Monitor the health of your restaurant in real time.'],
-  '/admin/products': ['Product management', 'Control menu availability, prices and stock.'],
+  '/admin/products': ['Product management', 'Control menu availability, pricing, variants and add-ons.'],
+  '/admin/inventory': ['Inventory control', 'Manage concurrency-safe product and option stock with a complete adjustment history.'],
   '/admin/orders': ['Live order operations', 'Track, estimate and move orders through fulfilment in real time.'],
   '/admin/store-operations': ['Store availability', 'Set opening hours, temporary pauses and holiday closures.'],
   '/admin/delivery-zones': ['Delivery zones', 'Control service areas, delivery fees, minimum orders and free-delivery thresholds.'],

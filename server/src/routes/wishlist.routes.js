@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
-import { publicProductCustomizationInclude } from '../services/product-customizations.js';
+import { publicProductCustomizationInclude, serializeProductForClient } from '../services/product-customizations.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -42,7 +42,7 @@ async function listWishlist(userId) {
   return items.map(item => ({
     ...item,
     product: {
-      ...item.product,
+      ...serializeProductForClient(item.product),
       price: item.product.priceCents / 100,
       ...(ratingMap.get(item.productId) || { reviewRating: 0, reviewCount: 0 }),
     },

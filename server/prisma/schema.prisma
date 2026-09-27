@@ -54,6 +54,9 @@ model Product {
   imagePublicId String?
   priceCents Int
   stock Int @default(100)
+  lowStockThreshold Int @default(10)
+  maxPerOrder Int @default(20)
+  inventoryVersion Int @default(0)
   isAvailable Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -61,7 +64,9 @@ model Product {
   reviews Review[]
   wishlistItems WishlistItem[]
   optionGroups ProductOptionGroup[]
+  inventoryAdjustments InventoryAdjustment[]
   @@index([category, isAvailable])
+  @@index([isAvailable, stock])
   @@index([imagePublicId])
 }
 
@@ -74,12 +79,13 @@ model ProductOptionGroup {
   maxSelections Int @default(1)
   sortOrder Int @default(0)
   isAvailable Boolean @default(true)
+  isArchived Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   productId String
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   options ProductOption[]
-  @@index([productId, isAvailable, sortOrder])
+  @@index([productId, isArchived, isAvailable, sortOrder])
 }
 
 model ProductOption {
@@ -89,11 +95,41 @@ model ProductOption {
   isDefault Boolean @default(false)
   sortOrder Int @default(0)
   isAvailable Boolean @default(true)
+  isArchived Boolean @default(false)
+  trackStock Boolean @default(false)
+  stock Int @default(0)
+  lowStockThreshold Int @default(5)
+  inventoryVersion Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   groupId String
   group ProductOptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  @@index([groupId, isAvailable, sortOrder])
+  inventoryAdjustments InventoryAdjustment[]
+  @@index([groupId, isArchived, isAvailable, sortOrder])
+  @@index([trackStock, stock])
+}
+
+
+model InventoryAdjustment {
+  id String @id @default(cuid())
+  targetType String
+  quantityDelta Int
+  balanceAfter Int
+  reason String
+  note String?
+  sourceType String @default("ADMIN")
+  sourceId String?
+  actorId String?
+  actorLabel String?
+  createdAt DateTime @default(now())
+  productId String
+  optionId String?
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  option ProductOption? @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  @@index([productId, createdAt])
+  @@index([optionId, createdAt])
+  @@index([sourceType, sourceId])
+  @@index([createdAt])
 }
 
 model WishlistItem {
@@ -193,6 +229,7 @@ model Order {
   guestAccessNonce String? @unique
   guestAccessExpiresAt DateTime?
   guestLinkedAt DateTime?
+  checkoutRequestId String? @unique
   userId String?
   user User? @relation(fields: [userId], references: [id])
   items OrderItem[]

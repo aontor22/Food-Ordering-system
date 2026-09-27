@@ -8,6 +8,16 @@ import { api } from '../../lib/api';
 import { formatCurrency } from '../../lib/format';
 import './PlaceOrder.css';
 
+
+function createCheckoutRequestId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
+    const random = Math.floor(Math.random() * 16);
+    const value = char === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
 const emptyForm = { firstName: '', lastName: '', email: '', street: '', city: '', state: '', postalCode: '', country: 'Bangladesh', phone: '', notes: '' };
 
 export default function PlaceOrder({ onLogin }) {
@@ -31,6 +41,7 @@ export default function PlaceOrder({ onLogin }) {
   const [fulfillmentMode, setFulfillmentMode] = useState('ASAP');
   const [selectedDate, setSelectedDate] = useState('');
   const [scheduledForLocal, setScheduledForLocal] = useState('');
+  const [clientRequestId] = useState(createCheckoutRequestId);
   const navigate = useNavigate();
 
   useEffect(() => { if (user?.email) setForm(previous => ({ ...previous, email: user.email })); }, [user]);
@@ -133,6 +144,7 @@ export default function PlaceOrder({ onLogin }) {
         : { firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, notes: form.notes, country: form.country };
       const result = await createOrder({
         items: orderItems,
+        clientRequestId,
         paymentMethod,
         pointsToRedeem: user ? Number(pointsToRedeem) || 0 : 0,
         fulfillmentType,

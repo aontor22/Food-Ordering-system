@@ -16,6 +16,7 @@ import AdminGuard from './components/admin/AdminGuard';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import AdminProducts from './pages/Admin/AdminProducts';
+import AdminInventory from './pages/Admin/AdminInventory';
 import AdminOrders from './pages/Admin/AdminOrders';
 import AdminCustomers from './pages/Admin/AdminCustomers';
 import AdminCoupons from './pages/Admin/AdminCoupons';
@@ -49,6 +50,7 @@ export default function App() {
       <Route path="/admin" element={<AdminGuard onLogin={() => setShowLogin(true)}><AdminLayout /></AdminGuard>}>
         <Route index element={<AdminDashboard />} />
         <Route path="products" element={<AdminProducts />} />
+        <Route path="inventory" element={<AdminInventory />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="payments" element={<AdminPayments />} />
         <Route path="customers" element={<AdminCustomers />} />
