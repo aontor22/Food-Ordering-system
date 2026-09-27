@@ -5,12 +5,14 @@ import { formatCurrency } from '../../lib/format';
 import OrderSummary from '../../components/ui/OrderSummary';
 import EmptyState from '../../components/ui/EmptyState';
 import Icon from '../../components/ui/Icon';
+import ProductCustomizer from '../../components/ProductCustomizer/ProductCustomizer';
 import './Cart.css';
 
 export default function Cart() {
-  const { cartProducts, setQuantity, removeItem, getTotalCartAmount, couponCode, setCouponCode, storeStatus } = useContext(StoreContext);
+  const { cartProducts, cartProductQuantity, setQuantity, updateCartLine, removeItem, getTotalCartAmount, couponCode, setCouponCode, storeStatus } = useContext(StoreContext);
   const [promo, setPromo] = useState(couponCode);
   const [promoMessage, setPromoMessage] = useState('');
+  const [editing, setEditing] = useState(null);
   const navigate = useNavigate();
 
   if (!cartProducts.length) return <EmptyState icon="🛒" title="Your cart is waiting" text="Add a few delicious dishes and they’ll appear here, ready for checkout." />;
@@ -23,21 +25,26 @@ export default function Cart() {
   };
 
   return <div className="cart-page">
-    <header className="page-title"><div className="section-kicker">Almost there</div><h1>Your cart</h1><p>Review your dishes and quantities before checkout.</p></header>
+    <header className="page-title"><div className="section-kicker">Almost there</div><h1>Your cart</h1><p>Review each dish, size, add-ons and kitchen instructions before checkout.</p></header>
     <div className="cart-layout">
       <section className="cart-list surface-card" aria-label="Cart items">
-        {cartProducts.map(item => <article className="cart-row" key={item._id}>
+        {cartProducts.map(item => <article className="cart-row" key={item.lineId}>
           <img src={item.image} alt={item.name} />
-          <div className="cart-item-copy"><span>{item.category}</span><h2>{item.name}</h2><p>{formatCurrency(item.price)} each</p></div>
+          <div className="cart-item-copy">
+            <span>{item.category}</span><h2>{item.name}</h2><p>{formatCurrency(item.price)} each</p>
+            {item.customizationDetails?.length > 0 && <div className="cart-customizations">{item.customizationDetails.map(group => <small key={group.groupId}><strong>{group.groupName}:</strong> {group.options.map(option => option.name).join(', ')}</small>)}</div>}
+            {item.specialInstructions && <small className="cart-special-note"><Icon name="edit" size={13} />{item.specialInstructions}</small>}
+            <button className="cart-edit-customization" type="button" onClick={() => setEditing(item)}>Edit options & instructions</button>
+          </div>
           <div className="quantity-control cart-quantity">
-            <button onClick={() => setQuantity(item._id, item.quantity - 1)} aria-label={`Decrease ${item.name} quantity`}><Icon name="minus" size={16} /></button>
+            <button onClick={() => setQuantity(item.lineId, item.quantity - 1)} aria-label={`Decrease ${item.name} quantity`}><Icon name="minus" size={16} /></button>
             <strong>{item.quantity}</strong>
-            <button onClick={() => setQuantity(item._id, item.quantity + 1)} aria-label={`Increase ${item.name} quantity`}><Icon name="plus" size={16} /></button>
+            <button disabled={cartProductQuantity(item._id) >= 20} onClick={() => setQuantity(item.lineId, item.quantity + 1)} aria-label={`Increase ${item.name} quantity`}><Icon name="plus" size={16} /></button>
           </div>
           <strong className="cart-line-total">{formatCurrency(item.price * item.quantity)}</strong>
-          <button className="remove-item" onClick={() => removeItem(item._id)} aria-label={`Remove ${item.name}`}><Icon name="trash" size={19} /></button>
+          <button className="remove-item" onClick={() => removeItem(item.lineId)} aria-label={`Remove ${item.name}`}><Icon name="trash" size={19} /></button>
         </article>)}
-        <div className="cart-list-footer"><Link className="text-link" to="/">← Continue shopping</Link><span>{cartProducts.length} selected {cartProducts.length === 1 ? 'dish' : 'dishes'}</span></div>
+        <div className="cart-list-footer"><Link className="text-link" to="/">← Continue shopping</Link><span>{cartProducts.length} customized {cartProducts.length === 1 ? 'line' : 'lines'}</span></div>
       </section>
       <div>
         <OrderSummary subtotal={getTotalCartAmount()} delivery={null} action={{ onClick: () => navigate('/order') }} actionLabel={storeStatus && !storeStatus.isOpen ? 'Ordering unavailable' : 'Continue to checkout'} disabled={Boolean(storeStatus && !storeStatus.isOpen)}>
@@ -51,5 +58,6 @@ export default function Cart() {
         </OrderSummary>
       </div>
     </div>
+    {editing && <ProductCustomizer product={editing} line={editing} maxQuantity={Math.max(1, 20 - (cartProductQuantity(editing._id) - editing.quantity))} onClose={() => setEditing(null)} onSave={line => { updateCartLine(line); setEditing(null); }} />}
   </div>;
 }

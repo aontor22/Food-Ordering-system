@@ -11,7 +11,7 @@ Implemented sequentially so each release remains deployable and testable.
 - [x] 07 — Order notifications (email/browser push foundation)
 - [x] 08 — PWA installability and offline fallback
 - [x] 09 — Guest checkout and post-order account linking
-- [ ] 10 — Product variants, sizes, add-ons and special instructions
+- [x] 10 — Product variants, sizes, add-ons and special instructions
 - [ ] 11 — Stronger stock/availability controls and concurrency safeguards
 - [ ] 12 — Saved addresses and one-click reorder
 - [ ] 13 — Advanced search, dietary filters, price/rating/popularity sorting

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { formatCurrency, humanizeStatus } from '../../lib/format';
 import Icon from '../../components/ui/Icon';
+import OrderItemCustomization from '../../components/orders/OrderItemCustomization';
 import { api } from '../../lib/api';
 import './OrderSuccess.css';
 
@@ -27,8 +28,15 @@ export default function OrderSuccess() {
     <h1>{isOnline && order?.paymentStatus !== 'PAID' ? 'Complete payment to confirm' : order?.fulfillmentType === 'PICKUP' ? 'Thanks—your pickup is booked!' : 'Thanks—your food is on its way!'}</h1>
     <p>We’ve received order <strong>{orderNumber}</strong>. {isOnline && order?.paymentStatus !== 'PAID' ? 'Your items are reserved while you retry online payment.' : order?.fulfillmentType === 'PICKUP' ? 'We’ll prepare it for collection at your selected time.' : 'Keep your phone nearby for delivery updates.'}</p>
     {paymentError && <p className="success-alert"><Icon name="alert" size={18} />{paymentError}</p>}
+    {order?.items?.length > 0 && <div className="success-items">
+      <h2>Order items</h2>
+      {order.items.map(item => <div className="success-item" key={item.id}>
+        <div><strong>{item.quantity}× {item.productName}</strong><span>{formatCurrency(item.lineTotalCents / 100, order.payment?.currency)}</span></div>
+        <OrderItemCustomization item={item} currency={order.payment?.currency} compact />
+      </div>)}
+    </div>}
     {order && <div className="success-details">
-      <div><span>Payment</span><strong>{isOnline ? 'Online payment' : 'Cash on delivery'}</strong></div>
+      <div><span>Payment</span><strong>{isOnline ? 'Online payment' : order.paymentMethod === 'MANUAL' ? 'Manual payment' : 'Cash on delivery'}</strong></div>
       <div><span>Order total</span><strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></div>
       <div><span>Payment status</span><strong>{humanizeStatus(order.paymentStatus)}</strong></div>
       <div><span>Fulfilment</span><strong>{order.fulfillmentType === 'PICKUP' ? 'Pickup' : 'Delivery'} · {order.fulfillmentMode === 'SCHEDULED' ? formatScheduled(order.scheduledForLocal) : 'ASAP'}</strong></div>

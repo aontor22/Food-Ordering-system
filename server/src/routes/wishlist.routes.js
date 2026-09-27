@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
+import { publicProductCustomizationInclude } from '../services/product-customizations.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -20,22 +21,10 @@ const syncSchema = z.object({
   query: empty,
 });
 
-const productSelect = {
-  id: true,
-  name: true,
-  description: true,
-  category: true,
-  imageUrl: true,
-  imagePublicId: true,
-  priceCents: true,
-  stock: true,
-  isAvailable: true,
-};
-
 async function listWishlist(userId) {
   const items = await prisma.wishlistItem.findMany({
     where: { userId },
-    include: { product: { select: productSelect } },
+    include: { product: { include: publicProductCustomizationInclude } },
     orderBy: { createdAt: 'desc' },
     take: 200,
   });

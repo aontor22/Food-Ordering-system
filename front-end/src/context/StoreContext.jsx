@@ -2,13 +2,39 @@ import { createContext, useEffect, useMemo, useState } from 'react';
 import { api, setAccessToken } from '../lib/api';
 import { detachPushOnLogout } from '../lib/push';
 import { getGuestOrderAccessRecords, removeGuestOrderAccess, saveGuestOrderAccess } from '../lib/guestOrders';
+import { cartLineFingerprint, customizationDetails, customizationSummary, normalizeSelections, productUnitPriceCents } from '../lib/productCustomizations';
 
 export const StoreContext = createContext(null);
 const GUEST_WISHLIST_KEY = 'tomato_guest_wishlist';
 
+function newLineId() {
+  return globalThis.crypto?.randomUUID?.() || `line_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeCartLine(line) {
+  if (!line?.productId) return null;
+  const quantity = Math.max(1, Math.min(20, Number(line.quantity) || 1));
+  return {
+    lineId: String(line.lineId || newLineId()),
+    productId: String(line.productId),
+    quantity,
+    selections: normalizeSelections(line.selections || []),
+    specialInstructions: String(line.specialInstructions || '').trim().slice(0, 300),
+  };
+}
+
 function loadCart() {
-  try { return JSON.parse(localStorage.getItem('cart') || '{}'); }
-  catch { return {}; }
+  try {
+    const parsed = JSON.parse(localStorage.getItem('cart') || '[]');
+    if (Array.isArray(parsed)) return parsed.map(normalizeCartLine).filter(Boolean).slice(0, 100);
+    if (parsed && typeof parsed === 'object') {
+      return Object.entries(parsed)
+        .filter(([, quantity]) => Number(quantity) > 0)
+        .map(([productId, quantity]) => normalizeCartLine({ productId, quantity }))
+        .filter(Boolean);
+    }
+    return [];
+  } catch { return []; }
 }
 
 function loadGuestWishlist() {
@@ -126,20 +152,59 @@ export default function StoreContextProvider({ children }) {
 
   useEffect(() => localStorage.setItem('cart', JSON.stringify(cartItems)), [cartItems]);
 
-  const setQuantity = (itemId, quantity) => setCartItems(previous => ({
-    ...previous,
-    [itemId]: Math.max(0, Math.min(20, Number(quantity) || 0)),
+  const setQuantity = (lineId, quantity) => setCartItems(previous => previous.flatMap(line => {
+    if (line.lineId !== lineId) return [line];
+    const otherQuantity = previous.filter(item => item.lineId !== lineId && item.productId === line.productId).reduce((sum, item) => sum + item.quantity, 0);
+    const maxForLine = Math.max(0, 20 - otherQuantity);
+    const next = Math.max(0, Math.min(maxForLine, Number(quantity) || 0));
+    return next > 0 ? [{ ...line, quantity: next }] : [];
   }));
 
-  const addToCart = itemId => setCartItems(previous => ({ ...previous, [itemId]: Math.min(20, (previous[itemId] || 0) + 1) }));
-  const removeFromCart = itemId => setCartItems(previous => ({ ...previous, [itemId]: Math.max(0, (previous[itemId] || 0) - 1) }));
-  const removeItem = itemId => setQuantity(itemId, 0);
+  const addToCart = input => setCartItems(previous => {
+    const incoming = normalizeCartLine(typeof input === 'string' ? { productId: input, quantity: 1 } : input);
+    if (!incoming) return previous;
+    const currentProductQuantity = previous.filter(line => line.productId === incoming.productId).reduce((sum, line) => sum + line.quantity, 0);
+    const allowedQuantity = Math.min(incoming.quantity, Math.max(0, 20 - currentProductQuantity));
+    if (allowedQuantity <= 0) return previous;
+    const fingerprint = cartLineFingerprint(incoming);
+    const matchIndex = previous.findIndex(line => cartLineFingerprint(line) === fingerprint);
+    if (matchIndex < 0) return [...previous, { ...incoming, quantity: allowedQuantity }].slice(0, 100);
+    return previous.map((line, index) => index === matchIndex ? { ...line, quantity: line.quantity + allowedQuantity } : line);
+  });
 
-  const cartProducts = useMemo(() => food_list
-    .filter(product => cartItems[product._id] > 0)
-    .map(product => ({ ...product, quantity: cartItems[product._id] })), [food_list, cartItems]);
+  const updateCartLine = input => setCartItems(previous => {
+    const incoming = normalizeCartLine(input);
+    if (!incoming) return previous;
+    const withoutCurrent = previous.filter(line => line.lineId !== incoming.lineId);
+    const otherProductQuantity = withoutCurrent.filter(line => line.productId === incoming.productId).reduce((sum, line) => sum + line.quantity, 0);
+    const allowedQuantity = Math.min(incoming.quantity, Math.max(0, 20 - otherProductQuantity));
+    if (allowedQuantity <= 0) return previous;
+    const adjusted = { ...incoming, quantity: allowedQuantity };
+    const fingerprint = cartLineFingerprint(adjusted);
+    const match = withoutCurrent.find(line => cartLineFingerprint(line) === fingerprint);
+    if (!match) return [...withoutCurrent, adjusted].slice(0, 100);
+    return withoutCurrent.map(line => line.lineId === match.lineId ? { ...line, quantity: line.quantity + adjusted.quantity } : line);
+  });
+
+  const removeFromCart = lineId => setCartItems(previous => previous.flatMap(line => line.lineId !== lineId ? [line] : line.quantity > 1 ? [{ ...line, quantity: line.quantity - 1 }] : []));
+  const removeItem = lineId => setCartItems(previous => previous.filter(line => line.lineId !== lineId));
+
+  const cartProducts = useMemo(() => cartItems.map(line => {
+    const product = food_list.find(item => item._id === line.productId);
+    if (!product) return null;
+    const unitPriceCents = productUnitPriceCents(product, line.selections);
+    return {
+      ...product,
+      ...line,
+      price: unitPriceCents / 100,
+      unitPriceCents,
+      customizationDetails: customizationDetails(product, line.selections),
+      customizationSummary: customizationSummary(product, line.selections),
+    };
+  }).filter(Boolean), [food_list, cartItems]);
 
   const cartCount = cartProducts.reduce((sum, product) => sum + product.quantity, 0);
+  const cartProductQuantity = productId => cartItems.filter(line => line.productId === productId).reduce((sum, line) => sum + line.quantity, 0);
   const getTotalCartAmount = () => cartProducts.reduce((sum, product) => sum + product.price * product.quantity, 0);
 
   const authenticate = async (mode, values) => {
@@ -219,8 +284,8 @@ export default function StoreContextProvider({ children }) {
   };
 
   return <StoreContext.Provider value={{
-    food_list, cartItems, cartProducts, cartCount, setCartItems, setQuantity,
-    addToCart, removeFromCart, removeItem, getTotalCartAmount,
+    food_list, cartItems, cartProducts, cartCount, cartProductQuantity, setCartItems, setQuantity,
+    addToCart, updateCartLine, removeFromCart, removeItem, getTotalCartAmount,
     user, setUser, loading, authenticate, authenticateWithGoogle, logout,
     searchQuery, setSearchQuery, couponCode, setCouponCode,
     createOrder, getOrders: api.getOrders, refreshProducts,

@@ -91,8 +91,8 @@ export default function PlaceOrder({ onLogin }) {
     if (!currentStillValid) setScheduledForLocal(dateSlots[0]?.localKey || '');
   }, [fulfillmentMode, selectedDate, dateSlots]);
 
-  const orderItems = useMemo(() => cartProducts.map(item => ({ productId: item._id, quantity: item.quantity })), [cartProducts]);
-  const orderItemKey = useMemo(() => orderItems.map(item => `${item.productId}:${item.quantity}`).join('|'), [orderItems]);
+  const orderItems = useMemo(() => cartProducts.map(item => ({ productId: item._id, quantity: item.quantity, selections: item.selections || [], ...(item.specialInstructions ? { specialInstructions: item.specialInstructions } : {}) })), [cartProducts]);
+  const orderItemKey = useMemo(() => JSON.stringify(orderItems), [orderItems]);
 
   useEffect(() => {
     const needsZone = fulfillmentType === 'DELIVERY';
@@ -144,7 +144,7 @@ export default function PlaceOrder({ onLogin }) {
         delivery,
       });
       const { order } = result;
-      setCartItems({});
+      setCartItems([]);
       if (paymentMethod === 'MANUAL') navigate(`/payment/manual/${order.id}`);
       else if (paymentMethod === 'ONLINE' && result.paymentUrl) window.location.assign(result.paymentUrl);
       else if (!user) navigate(`/guest-order/${order.orderNumber}`, { state: { order, guestAccess: result.guestAccess, paymentError: result.paymentError } });

@@ -3,6 +3,7 @@ import webpush from 'web-push';
 import { prisma } from '../lib/prisma.js';
 import { config } from '../config.js';
 import { guestTrackingUrl } from './guest-orders.js';
+import { parseOrderItemCustomizations } from './product-customizations.js';
 
 const STATUS_PREF_FIELD = {
   PENDING: 'orderPlaced',
@@ -93,7 +94,10 @@ function payloadForOrder(order, eventType, { etaNote = null } = {}) {
   const body = `${defaultBody} Order ${order.orderNumber}.`;
   const guest = order.customerType === 'GUEST' && !order.userId;
   const url = guest ? null : `${clientBaseUrl().replace(/\/$/, '')}/orders`;
-  const itemSummary = (order.items || []).slice(0, 5).map(item => `${item.quantity}× ${item.productName}`).join(', ');
+  const itemSummary = (order.items || []).slice(0, 5).map(item => {
+    const optionNames = parseOrderItemCustomizations(item.customizationsJson).flatMap(group => group.options?.map(option => option.name) || []);
+    return `${item.quantity}× ${item.productName}${optionNames.length ? ` (${optionNames.join(', ')})` : ''}`;
+  }).join(', ');
   return {
     title,
     body,

@@ -22,6 +22,7 @@ A working Preact storefront and responsive restaurant admin dashboard with a Nod
 - SSLCOMMERZ hosted checkout, validated success/IPN callbacks, server-side failure/cancellation reconciliation, risk review, and full gateway refund workflow
 - Server-enforced restaurant opening hours, overnight schedules, emergency ordering pause, temporary closures, holiday closures, and customer-facing open/closed status
 - Guest checkout for Delivery/Pickup and ASAP/scheduled orders, with private expiring order access, secure tracking/payment actions, matching-account linking, and admin Guest/Registered provenance
+- Product variants/sizes, add-ons, per-item kitchen instructions, server-authoritative customization pricing, and immutable order-item snapshots
 
 ## Quick start
 
@@ -171,3 +172,7 @@ The storefront is installable as a PWA on supported browsers. The production bui
 ## Guest checkout (Step 09)
 
 Customers can now use Delivery or Pickup, ASAP or scheduled slots, and COD/manual/online payment without an account. Existing server-side pricing, opening-hour, zone, capacity, stock, and payment checks are reused. Guest order numbers are not credentials: private access uses a signed expiring bearer token, while account linking requires the private token plus the matching account email (or a Google-verified matching email for eligible automatic linking). Anonymous orders cannot redeem or earn Tomato Points and cannot review until safely account-linked. See `GUEST_CHECKOUT_SETUP.md` and `STEP_09_VERIFICATION.md`.
+
+## Product customizations (Step 10)
+
+Products can now have admin-managed single-select **Variant/Size** groups and multi-select **Add-on** groups with required/optional selection rules, default choices, availability, ordering, and non-negative price adjustments. The cart stores configured lines rather than only product quantities, so the same dish can appear multiple times with different choices and kitchen notes. Checkout never trusts browser pricing: the API reloads the current product/options, validates every selection, enforces stock using the aggregate product quantity, recalculates the configured unit price, and stores an immutable snapshot on each `OrderItem`. Historical orders therefore keep the purchased names/prices even when menu choices are later renamed or changed. Existing pre-Step-10 carts are migrated locally into line records, and existing order rows are backfilled with their original unit price as `baseUnitPriceCents`. See `PRODUCT_CUSTOMIZATIONS_SETUP.md` and `STEP_10_VERIFICATION.md`.

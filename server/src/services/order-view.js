@@ -1,4 +1,5 @@
 import { serializePayment } from './payment.js';
+import { parseOrderItemCustomizations } from './product-customizations.js';
 
 export function stripOrderSecrets(order) {
   if (!order) return order;
@@ -6,8 +7,18 @@ export function stripOrderSecrets(order) {
   return safe;
 }
 
+function serializeOrderItem(item) {
+  if (!item) return item;
+  const { customizationsJson, ...safe } = item;
+  return { ...safe, customizations: parseOrderItemCustomizations(customizationsJson) };
+}
+
 export function serializeOrderForClient(order) {
   if (!order) return order;
   const safe = stripOrderSecrets(order);
-  return { ...safe, payment: serializePayment(order.payment) };
+  return {
+    ...safe,
+    items: Array.isArray(order.items) ? order.items.map(serializeOrderItem) : order.items,
+    payment: serializePayment(order.payment),
+  };
 }

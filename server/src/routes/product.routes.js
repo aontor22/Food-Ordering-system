@@ -3,13 +3,22 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
 import { validate } from '../middleware/validate.js';
+import { publicProductCustomizationInclude, serializeProductForClient } from '../services/product-customizations.js';
 
 const router = Router();
 const querySchema = z.object({ body: z.any(), params: z.any(), query: z.object({ category: z.string().max(50).optional(), search: z.string().max(100).optional() }) });
 
 router.get('/', validate(querySchema), async (req, res) => {
   const { category, search } = req.validated.query;
-  const products = await prisma.product.findMany({ where: { isAvailable: true, ...(category && category !== 'All' ? { category } : {}), ...(search ? { name: { contains: search } } : {}) }, orderBy: [{ category: 'asc' }, { name: 'asc' }] });
+  const products = await prisma.product.findMany({
+    where: {
+      isAvailable: true,
+      ...(category && category !== 'All' ? { category } : {}),
+      ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
+    },
+    include: publicProductCustomizationInclude,
+    orderBy: [{ category: 'asc' }, { name: 'asc' }],
+  });
   const ratings = products.length ? await prisma.review.groupBy({
     by: ['productId'],
     where: { status: 'PUBLISHED', productId: { in: products.map(product => product.id) } },
@@ -17,7 +26,7 @@ router.get('/', validate(querySchema), async (req, res) => {
     _count: { rating: true },
   }) : [];
   const ratingMap = new Map(ratings.map(row => [row.productId, { reviewRating: row._avg.rating || 0, reviewCount: row._count.rating || 0 }]));
-  res.json({ products: products.map(product => ({ ...product, price: product.priceCents / 100, ...(ratingMap.get(product.id) || { reviewRating: 0, reviewCount: 0 }) })) });
+  res.json({ products: products.map(product => ({ ...serializeProductForClient(product), price: product.priceCents / 100, ...(ratingMap.get(product.id) || { reviewRating: 0, reviewCount: 0 }) })) });
 });
 
 router.get('/categories', async (_req, res) => {

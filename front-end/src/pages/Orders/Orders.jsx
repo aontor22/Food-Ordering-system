@@ -5,6 +5,7 @@ import { formatCurrency, formatDate, humanizeStatus } from '../../lib/format';
 import EmptyState from '../../components/ui/EmptyState';
 import Icon from '../../components/ui/Icon';
 import OrderTracking from '../../components/orders/OrderTracking';
+import OrderItemCustomization from '../../components/orders/OrderItemCustomization';
 import { api } from '../../lib/api';
 import './Orders.css';
 
@@ -93,7 +94,7 @@ export default function Orders({ onLogin }) {
         </div>
         <OrderTracking order={order} />
         <div className="order-items-preview">{order.items.map(item => <div className="order-item-review-wrap" key={item.id}>
-          <div className="order-item-line"><span>{item.quantity}×</span><p>{item.productName}</p><strong>{formatCurrency(item.lineTotalCents / 100, order.payment?.currency)}</strong></div>
+          <div className="order-item-line"><span>{item.quantity}×</span><p>{item.productName}</p><strong>{formatCurrency(item.lineTotalCents / 100, order.payment?.currency)}</strong></div><OrderItemCustomization item={item} currency={order.payment?.currency} />
           {order.status === 'DELIVERED' && <ReviewEditor orderId={order.id} item={item} onChange={review => updateReview(order.id, item.id, review)} />}
         </div>)}</div>
         <div className="order-delivery-zone"><Icon name={order.fulfillmentType === 'PICKUP' ? 'store' : 'delivery'} size={16} /><span>{order.fulfillmentType === 'PICKUP' ? 'Pickup' : 'Delivery'} · {order.fulfillmentMode === 'SCHEDULED' ? formatScheduled(order.scheduledForLocal) : 'ASAP'}{order.deliveryZoneName ? ` · ${order.deliveryZoneName}` : ''}{order.fulfillmentType === 'DELIVERY' ? ` · ${order.deliveryFeeCents === 0 ? 'Free delivery' : `${formatCurrency(order.deliveryFeeCents / 100, order.payment?.currency)} delivery`}` : ''}</span></div>

@@ -13,7 +13,7 @@ export function StatusBadge({ value }) {
   return <span className={`status-badge status-${String(value).toLowerCase()}`}><i />{humanizeStatus(value)}</span>;
 }
 
-export function AdminModal({ title, subtitle, onClose, children }) {
+export function AdminModal({ title, subtitle, onClose, children, wide = false }) {
   useEffect(() => {
     document.body.classList.add('modal-open');
     const close = event => event.key === 'Escape' && onClose();
@@ -22,7 +22,7 @@ export function AdminModal({ title, subtitle, onClose, children }) {
   }, [onClose]);
 
   return <div className="admin-modal-overlay" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}>
-    <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
+    <section className={`admin-modal ${wide ? 'is-wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
       <header><div><h2 id="admin-modal-title">{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-button" onClick={onClose} aria-label="Close"><Icon name="close" /></button></header>
       {children}
     </section>

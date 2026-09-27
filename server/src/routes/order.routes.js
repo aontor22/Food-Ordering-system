@@ -23,6 +23,7 @@ import {
   normalizeOrderEmail,
 } from '../services/guest-orders.js';
 import { serializeOrderForClient } from '../services/order-view.js';
+import { resolveCustomizedCartLines } from '../services/product-customizations.js';
 
 const router = Router();
 const orderInclude = {
@@ -31,7 +32,16 @@ const orderInclude = {
   trackingEvents: { orderBy: { createdAt: 'asc' } },
 };
 
-const itemSchema = z.object({ productId: z.string().min(1), quantity: z.number().int().min(1).max(20) });
+const customizationSelectionSchema = z.object({
+  groupId: z.string().min(1).max(100),
+  optionIds: z.array(z.string().min(1).max(100)).max(20).default([]),
+});
+const itemSchema = z.object({
+  productId: z.string().min(1),
+  quantity: z.number().int().min(1).max(20),
+  selections: z.array(customizationSelectionSchema).max(20).default([]),
+  specialInstructions: z.string().trim().max(300).optional(),
+});
 const pricingFields = {
   items: z.array(itemSchema).min(1).max(50),
   couponCode: z.string().trim().max(30).optional(),
@@ -87,22 +97,10 @@ const linkGuestSchema = z.object({
   query: z.any(),
 });
 
-function quantitiesFrom(items) {
-  const quantities = new Map();
-  for (const item of items) quantities.set(item.productId, (quantities.get(item.productId) || 0) + item.quantity);
-  return quantities;
-}
-
 async function calculatePricing(data, userId = null, db = prisma, { enforceMinimum = true } = {}) {
-  const quantities = quantitiesFrom(data.items);
-  const ids = [...quantities.keys()];
-  const products = await db.product.findMany({ where: { id: { in: ids }, isAvailable: true } });
-  if (products.length !== ids.length) throw new AppError(400, 'PRODUCT_UNAVAILABLE', 'One or more products are unavailable');
-  for (const product of products) {
-    if (product.stock < quantities.get(product.id)) throw new AppError(409, 'INSUFFICIENT_STOCK', `${product.name} has insufficient stock`);
-  }
-
-  const subtotalCents = products.reduce((sum, product) => sum + product.priceCents * quantities.get(product.id), 0);
+  const customized = await resolveCustomizedCartLines(db, data.items);
+  const { quantities, products, lines } = customized;
+  const subtotalCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
   let coupon;
   let discountCents = 0;
   if (data.couponCode) {
@@ -162,6 +160,7 @@ async function calculatePricing(data, userId = null, db = prisma, { enforceMinim
   return {
     quantities,
     products,
+    lines,
     coupon,
     subtotalCents,
     discountCents,
@@ -284,12 +283,15 @@ async function createOrder(req, data, { userId = null, guest = false } = {}) {
         country: fulfillment.fulfillmentType === 'DELIVERY' ? data.delivery.country : null,
         notes: data.delivery.notes,
         items: {
-          create: pricing.products.map(product => ({
-            productId: product.id,
-            productName: product.name,
-            unitPriceCents: product.priceCents,
-            quantity: pricing.quantities.get(product.id),
-            lineTotalCents: product.priceCents * pricing.quantities.get(product.id),
+          create: pricing.lines.map(line => ({
+            productId: line.productId,
+            productName: line.product.name,
+            baseUnitPriceCents: line.baseUnitPriceCents,
+            unitPriceCents: line.unitPriceCents,
+            quantity: line.quantity,
+            lineTotalCents: line.lineTotalCents,
+            customizationsJson: line.customizationsJson,
+            specialInstructions: line.specialInstructions,
           })),
         },
         trackingEvents: {

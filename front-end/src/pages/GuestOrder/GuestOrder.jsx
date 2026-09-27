@@ -2,6 +2,7 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { StoreContext } from '../../context/StoreContext';
 import OrderTracking from '../../components/orders/OrderTracking';
+import OrderItemCustomization from '../../components/orders/OrderItemCustomization';
 import Icon from '../../components/ui/Icon';
 import { api } from '../../lib/api';
 import { formatCurrency, formatDate, humanizeStatus } from '../../lib/format';
@@ -100,7 +101,7 @@ export default function GuestOrder({ onLogin }) {
     <section className="surface-card guest-order-tracking"><h2>Order tracking</h2><OrderTracking order={order} /></section>
 
     <div className="guest-order-grid">
-      <section className="surface-card guest-order-panel"><h2>Order summary</h2><div className="guest-order-items">{order.items?.map(item => <div key={item.id}><span>{item.quantity} × {item.productName}</span><strong>{formatCurrency(item.lineTotalCents / 100, order.payment?.currency)}</strong></div>)}</div><div className="guest-order-total"><span>Total</span><strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></div></section>
+      <section className="surface-card guest-order-panel"><h2>Order summary</h2><div className="guest-order-items">{order.items?.map(item => <div className="guest-order-item" key={item.id}><div><span>{item.quantity} × {item.productName}</span><strong>{formatCurrency(item.lineTotalCents / 100, order.payment?.currency)}</strong></div><OrderItemCustomization compact item={item} currency={order.payment?.currency} /></div>)}</div><div className="guest-order-total"><span>Total</span><strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></div></section>
       <section className="surface-card guest-order-panel"><h2>{order.fulfillmentType === 'PICKUP' ? 'Pickup details' : 'Delivery details'}</h2><p><strong>{order.firstName} {order.lastName}</strong><br />{order.phone}<br />{order.email}</p>{order.fulfillmentType === 'DELIVERY' ? <p>{order.street}<br />{order.city}, {order.state} {order.postalCode}<br />{order.country}</p> : <p>{order.pickupAddressSnapshot || 'Restaurant pickup'}{order.pickupInstructionsSnapshot ? <><br />{order.pickupInstructionsSnapshot}</> : null}</p>}{order.notes && <p><strong>Note:</strong> {order.notes}</p>}</section>
     </div>
 

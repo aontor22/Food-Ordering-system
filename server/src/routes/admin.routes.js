@@ -18,6 +18,7 @@ import { getFulfillmentAdminConfig } from '../services/fulfillment-scheduling.js
 import { etaUpdateData, openOrderSseStream, publishOrderChange, trackingEventData, trackingTimestampData } from '../services/order-tracking.js';
 import { notificationCapabilities, processPendingNotifications, retryNotificationDelivery, safeEnqueueOrderNotification } from '../services/notifications.js';
 import { serializeOrderForClient, stripOrderSecrets } from '../services/order-view.js';
+import { adminProductCustomizationInclude } from '../services/product-customizations.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -28,6 +29,39 @@ const imageUrl = z.string().trim().max(500).nullable().optional().refine(
   'Image URL must be an HTTP(S) URL or a root-relative path',
 );
 const imagePublicId = z.string().trim().min(1).max(255).nullable().optional();
+const optionInput = z.object({
+  id: z.string().trim().min(1).max(100).optional(),
+  name: z.string().trim().min(1).max(80),
+  priceDeltaCents: z.number().int().nonnegative().max(10_000_000).default(0),
+  isDefault: z.boolean().default(false),
+  sortOrder: z.number().int().min(0).max(1000).default(0),
+  isAvailable: z.boolean().default(true),
+});
+const optionGroupInput = z.object({
+  id: z.string().trim().min(1).max(100).optional(),
+  name: z.string().trim().min(1).max(80),
+  kind: z.enum(['VARIANT', 'ADDON']).default('ADDON'),
+  minSelections: z.number().int().min(0).max(20).default(0),
+  maxSelections: z.number().int().min(1).max(20).default(1),
+  sortOrder: z.number().int().min(0).max(1000).default(0),
+  isAvailable: z.boolean().default(true),
+  options: z.array(optionInput).min(1).max(30),
+}).superRefine((group, ctx) => {
+  const availableOptions = group.options.filter(option => option.isAvailable);
+  if (group.minSelections > group.maxSelections) ctx.addIssue({ code: 'custom', path: ['minSelections'], message: 'Minimum selections cannot exceed maximum selections' });
+  if (group.maxSelections > group.options.length) ctx.addIssue({ code: 'custom', path: ['maxSelections'], message: 'Maximum selections cannot exceed the number of options' });
+  if (group.isAvailable && group.minSelections > availableOptions.length) ctx.addIssue({ code: 'custom', path: ['minSelections'], message: 'Minimum selections cannot exceed the number of active options' });
+  if (group.kind === 'VARIANT' && group.maxSelections !== 1) ctx.addIssue({ code: 'custom', path: ['maxSelections'], message: 'Variant groups allow exactly one selection at most' });
+  if (group.kind === 'VARIANT' && group.minSelections > 1) ctx.addIssue({ code: 'custom', path: ['minSelections'], message: 'Variant groups cannot require more than one selection' });
+  if (group.options.filter(option => option.isDefault).length > 1 && group.maxSelections === 1) ctx.addIssue({ code: 'custom', path: ['options'], message: 'Single-select groups can have only one default option' });
+  if (group.options.some(option => option.isDefault && !option.isAvailable)) ctx.addIssue({ code: 'custom', path: ['options'], message: 'A default option must be active' });
+});
+const optionGroupsInput = z.array(optionGroupInput).max(12).superRefine((groups, ctx) => {
+  const groupIds = groups.map(group => group.id).filter(Boolean);
+  if (new Set(groupIds).size !== groupIds.length) ctx.addIssue({ code: 'custom', message: 'Customization group IDs must be unique' });
+  const optionIds = groups.flatMap(group => group.options.map(option => option.id).filter(Boolean));
+  if (new Set(optionIds).size !== optionIds.length) ctx.addIssue({ code: 'custom', message: 'Customization option IDs must be unique' });
+});
 const productFields = {
   name: z.string().trim().min(2).max(100),
   description: z.string().trim().min(5).max(500),
@@ -37,6 +71,7 @@ const productFields = {
   priceCents: z.number().int().positive().max(10_000_000),
   stock: z.number().int().nonnegative().max(1_000_000),
   isAvailable: z.boolean(),
+  optionGroups: optionGroupsInput.optional(),
 };
 const productCreate = z.object({
   body: z.object({ id: z.string().trim().min(1).max(50).optional(), ...productFields }),
@@ -51,7 +86,7 @@ const productUpdate = z.object({
 
 router.get('/products', async (_req, res) => {
   const products = await prisma.product.findMany({
-    include: { _count: { select: { wishlistItems: true } } },
+    include: { ...adminProductCustomizationInclude, _count: { select: { wishlistItems: true } } },
     orderBy: [{ isAvailable: 'desc' }, { updatedAt: 'desc' }],
   });
   res.json({ products: products.map(({ _count, ...product }) => ({ ...product, wishlistCount: _count.wishlistItems })) });
@@ -70,14 +105,50 @@ function normalizeProductMedia(values) {
   return next;
 }
 
+function generatedCustomizationId(prefix) {
+  return `${prefix}_${crypto.randomUUID().replaceAll('-', '').slice(0, 20)}`;
+}
+
+async function replaceProductCustomizations(tx, productId, groups) {
+  await tx.productOptionGroup.deleteMany({ where: { productId } });
+  for (const [groupIndex, group] of (groups || []).entries()) {
+    const groupId = group.id || generatedCustomizationId('grp');
+    await tx.productOptionGroup.create({
+      data: {
+        id: groupId,
+        productId,
+        name: group.name,
+        kind: group.kind,
+        minSelections: group.minSelections,
+        maxSelections: group.maxSelections,
+        sortOrder: group.sortOrder ?? groupIndex,
+        isAvailable: group.isAvailable,
+        options: {
+          create: group.options.map((option, optionIndex) => ({
+            id: option.id || generatedCustomizationId('opt'),
+            name: option.name,
+            priceDeltaCents: option.priceDeltaCents,
+            isDefault: option.isDefault,
+            sortOrder: option.sortOrder ?? optionIndex,
+            isAvailable: option.isAvailable,
+          })),
+        },
+      },
+    });
+  }
+}
+
 router.post('/products', validate(productCreate), async (req, res, next) => {
   try {
-    const { id, ...rawValues } = req.validated.body;
+    const { id, optionGroups = [], ...rawValues } = req.validated.body;
     const values = normalizeProductMedia(rawValues);
-    const product = await prisma.product.create({
-      data: { id: id || `prd_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`, ...values },
+    const productId = id || `prd_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`;
+    const product = await prisma.$transaction(async tx => {
+      await tx.product.create({ data: { id: productId, ...values } });
+      await replaceProductCustomizations(tx, productId, optionGroups);
+      return tx.product.findUnique({ where: { id: productId }, include: adminProductCustomizationInclude });
     });
-    await audit(req, 'PRODUCT_CREATED', 'Product', product.id, { imageStorage: product.imagePublicId ? 'cloudinary' : 'external_or_local' });
+    await audit(req, 'PRODUCT_CREATED', 'Product', product.id, { imageStorage: product.imagePublicId ? 'cloudinary' : 'external_or_local', customizationGroups: product.optionGroups.length });
     res.status(201).json({ product });
   } catch (error) { next(error); }
 });
@@ -86,13 +157,18 @@ router.patch('/products/:id', validate(productUpdate), async (req, res, next) =>
   try {
     const existing = await prisma.product.findUnique({ where: { id: req.validated.params.id } });
     if (!existing) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
-    const values = normalizeProductMedia(req.validated.body);
-    const product = await prisma.product.update({ where: { id: existing.id }, data: values });
+    const { optionGroups, ...rawValues } = req.validated.body;
+    const values = normalizeProductMedia(rawValues);
+    const product = await prisma.$transaction(async tx => {
+      if (Object.keys(values).length) await tx.product.update({ where: { id: existing.id }, data: values });
+      if (optionGroups) await replaceProductCustomizations(tx, existing.id, optionGroups);
+      return tx.product.findUnique({ where: { id: existing.id }, include: adminProductCustomizationInclude });
+    });
     if (existing.imagePublicId && existing.imagePublicId !== product.imagePublicId) {
       try { await destroyCloudinaryImage(existing.imagePublicId); }
       catch (cleanupError) { req.log?.warn({ err: cleanupError, publicId: existing.imagePublicId }, 'old product image cleanup failed'); }
     }
-    await audit(req, 'PRODUCT_UPDATED', 'Product', product.id, { ...req.validated.body, imageStorage: product.imagePublicId ? 'cloudinary' : 'external_or_local' });
+    await audit(req, 'PRODUCT_UPDATED', 'Product', product.id, { fields: Object.keys(req.validated.body), imageStorage: product.imagePublicId ? 'cloudinary' : 'external_or_local', customizationGroups: product.optionGroups.length });
     res.json({ product });
   } catch (error) { next(error); }
 });
