@@ -17,6 +17,7 @@ import { findDeliveryPostalOverlap, listAllDeliveryZones, normalizePostalCodes, 
 import { getFulfillmentAdminConfig } from '../services/fulfillment-scheduling.js';
 import { etaUpdateData, openOrderSseStream, publishOrderChange, trackingEventData, trackingTimestampData } from '../services/order-tracking.js';
 import { notificationCapabilities, processPendingNotifications, retryNotificationDelivery, safeEnqueueOrderNotification } from '../services/notifications.js';
+import { serializeOrderForClient, stripOrderSecrets } from '../services/order-view.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -140,7 +141,7 @@ router.get('/orders', async (_req, res) => {
     orderBy: { createdAt: 'desc' },
     take: 250,
   });
-  res.json({ orders: orders.map(order => ({ ...order, payment: serializePayment(order.payment) })) });
+  res.json({ orders: orders.map(serializeOrderForClient) });
 });
 
 router.get('/orders/live', (req, res) => {
@@ -151,7 +152,7 @@ router.get('/orders/live', (req, res) => {
         orderBy: { createdAt: 'desc' },
         take: 250,
       });
-      const serialized = orders.map(order => ({ ...order, payment: serializePayment(order.payment) }));
+      const serialized = orders.map(serializeOrderForClient);
       return {
         data: { orders: serialized },
         signature: serialized.map(order => [order.id, order.status, order.paymentStatus, order.updatedAt, order.payment?.updatedAt, order.trackingEvents?.at(-1)?.createdAt, order.estimatedReadyAt, order.estimatedDeliveryAt]),
@@ -247,7 +248,7 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
     await audit(req, 'ORDER_STATUS_UPDATED', 'Order', order.id, { from: previousStatus, to: order.status, pointsAwarded, pointsRestored });
     publishOrderChange(order);
     await safeEnqueueOrderNotification(order.id, order.status, {}, req.log);
-    res.json({ order: { ...order, payment: serializePayment(order.payment) }, pointsAwarded, pointsRestored });
+    res.json({ order: serializeOrderForClient(order), pointsAwarded, pointsRestored });
   } catch (error) { next(error); }
 });
 
@@ -273,7 +274,7 @@ router.patch('/orders/:id/eta', validate(etaUpdate), async (req, res, next) => {
     publishOrderChange(order);
     const latestEvent = order.trackingEvents?.at(-1);
     await safeEnqueueOrderNotification(order.id, `ETA:${latestEvent?.id || Date.now()}`, { etaNote: latestEvent?.note || null }, req.log);
-    res.json({ order: { ...order, payment: serializePayment(order.payment) } });
+    res.json({ order: serializeOrderForClient(order) });
   } catch (error) { next(error); }
 });
 
@@ -283,7 +284,7 @@ router.get('/payments', async (_req, res) => {
     orderBy: { createdAt: 'desc' },
     take: 250,
   });
-  res.json({ payments: payments.map(payment => ({ ...serializePayment(payment), order: payment.order })), gateway: getGatewayConfiguration() });
+  res.json({ payments: payments.map(payment => ({ ...serializePayment(payment), order: stripOrderSecrets(payment.order) })), gateway: getGatewayConfiguration() });
 });
 
 router.get('/payment-channels', async (_req, res) => {
@@ -834,7 +835,7 @@ router.get('/dashboard', async (_req, res) => {
 
   res.json({
     metrics: { customers, orders, products, wishlistSaves, revenueCents: revenue._sum.totalCents || 0, todayOrders, pendingOrders, lowStock },
-    recentOrders,
+    recentOrders: recentOrders.map(stripOrderSecrets),
     ordersByStatus: statusGroups.map(group => ({ status: group.status, count: group._count.status })),
     revenueByDay,
     topProducts: topItems.map(item => ({ name: item.productName, quantity: item._sum.quantity || 0, revenueCents: item._sum.lineTotalCents || 0 })),

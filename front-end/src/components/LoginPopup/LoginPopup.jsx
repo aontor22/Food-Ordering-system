@@ -45,7 +45,7 @@ export default function LoginPopup({ onClose }) {
       <div className="auth-mark">T.</div>
       <div className="section-kicker">Welcome to Tomato</div>
       <h2 id="auth-title">{mode === 'login' ? 'Good to see you again' : 'Create your account'}</h2>
-      <p>{mode === 'login' ? 'Sign in to place orders and track deliveries.' : 'Save your details and order your favourites faster.'}</p>
+      <p>{mode === 'login' ? 'Sign in to keep orders, points, reviews, and tracking in one account.' : 'Save your details and order your favourites faster.'}</p>
       <form onSubmit={submit}>
         {mode === 'register' && <div className="field"><label htmlFor="auth-name">Full name</label><input id="auth-name" name="name" value={values.name} onChange={update} required autoComplete="name" placeholder="Your name" /></div>}
         <div className="field"><label htmlFor="auth-email">Email address</label><input id="auth-email" name="email" value={values.email} onChange={update} required type="email" autoComplete="email" placeholder="you@example.com" /></div>

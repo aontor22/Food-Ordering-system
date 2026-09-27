@@ -96,15 +96,15 @@ export default function PlaceOrder({ onLogin }) {
 
   useEffect(() => {
     const needsZone = fulfillmentType === 'DELIVERY';
-    if (!user || !orderItems.length || (needsZone && !deliveryZoneId)) { setQuote(null); setQuoteError(''); return undefined; }
+    if (!orderItems.length || (needsZone && !deliveryZoneId)) { setQuote(null); setQuoteError(''); return undefined; }
     let active = true;
     const timer = setTimeout(async () => {
       setQuoteLoading(true); setQuoteError('');
       try {
-        const data = await api.quoteOrder({
+        const data = await (user ? api.quoteOrder : api.quoteGuestOrder)({
           items: orderItems,
           ...(couponCode && { couponCode }),
-          pointsToRedeem: Number(pointsToRedeem) || 0,
+          pointsToRedeem: user ? Number(pointsToRedeem) || 0 : 0,
           fulfillmentType,
           ...(needsZone && { deliveryZoneId, postalCode: form.postalCode.trim() || undefined }),
         });
@@ -120,7 +120,6 @@ export default function PlaceOrder({ onLogin }) {
   const update = event => setForm(previous => ({ ...previous, [event.target.name]: event.target.value }));
   const submit = async event => {
     event.preventDefault();
-    if (!user) { setError('Please sign in to place your order.'); return; }
     if (!selectedFulfillment?.enabled) { setError(`${fulfillmentType === 'PICKUP' ? 'Pickup' : 'Delivery'} is unavailable right now.`); return; }
     if (fulfillmentMode === 'ASAP' && !selectedFulfillment.asapAvailable) { setError('ASAP ordering is unavailable right now. Choose an available scheduled time.'); return; }
     if (fulfillmentMode === 'SCHEDULED' && !scheduledForLocal) { setError('Please choose an available date and time.'); return; }
@@ -135,7 +134,7 @@ export default function PlaceOrder({ onLogin }) {
       const result = await createOrder({
         items: orderItems,
         paymentMethod,
-        pointsToRedeem: Number(pointsToRedeem) || 0,
+        pointsToRedeem: user ? Number(pointsToRedeem) || 0 : 0,
         fulfillmentType,
         fulfillmentMode,
         ...(fulfillmentMode === 'SCHEDULED' && { scheduledForLocal }),
@@ -148,6 +147,7 @@ export default function PlaceOrder({ onLogin }) {
       setCartItems({});
       if (paymentMethod === 'MANUAL') navigate(`/payment/manual/${order.id}`);
       else if (paymentMethod === 'ONLINE' && result.paymentUrl) window.location.assign(result.paymentUrl);
+      else if (!user) navigate(`/guest-order/${order.orderNumber}`, { state: { order, guestAccess: result.guestAccess, paymentError: result.paymentError } });
       else navigate(`/order-success/${order.orderNumber}`, { state: { order, paymentError: result.paymentError, loyalty: result.loyalty } });
     } catch (requestError) {
       setError(requestError.message);
@@ -222,7 +222,7 @@ export default function PlaceOrder({ onLogin }) {
       </section>
 
       <div className="checkout-sidebar">
-        <OrderSummary subtotal={subtotal} discount={promoDiscount} pointsDiscount={pointsDiscount} delivery={delivery} total={total} action={{ type: 'submit' }} actionLabel={busy ? 'Processing…' : fulfillmentMode === 'SCHEDULED' ? 'Reserve slot & place order' : paymentMethod === 'MANUAL' ? 'Place order & view payment details' : paymentMethod === 'ONLINE' ? 'Continue to secure payment' : 'Place order'} disabled={busy || quoteLoading || Boolean(quoteError) || zoneBlocked || fulfillmentBlocked || minimumOrderBlocked}>
+        <OrderSummary subtotal={subtotal} discount={promoDiscount} pointsDiscount={pointsDiscount} delivery={delivery} total={total} action={{ type: 'submit' }} actionLabel={busy ? 'Processing…' : !user ? (paymentMethod === 'ONLINE' ? 'Guest checkout & pay' : paymentMethod === 'MANUAL' ? 'Guest checkout & payment details' : 'Place guest order') : fulfillmentMode === 'SCHEDULED' ? 'Reserve slot & place order' : paymentMethod === 'MANUAL' ? 'Place order & view payment details' : paymentMethod === 'ONLINE' ? 'Continue to secure payment' : 'Place order'} disabled={busy || quoteLoading || Boolean(quoteError) || zoneBlocked || fulfillmentBlocked || minimumOrderBlocked}>
           <div className="fulfillment-summary"><Icon name={fulfillmentType === 'PICKUP' ? 'store' : 'delivery'} size={18} /><div><strong>{fulfillmentType === 'PICKUP' ? 'Pickup' : 'Delivery'} · {fulfillmentMode === 'ASAP' ? 'ASAP' : 'Scheduled'}</strong><small>{fulfillmentMode === 'ASAP' ? `About ${selectedFulfillment?.asapEtaMinutes || 0} minutes` : scheduledForLocal ? formatScheduledLocal(scheduledForLocal) : 'Choose a time'}</small></div></div>
           {user && loyalty && <section className={`loyalty-checkout ${loyalty.enabled ? '' : 'is-disabled'}`}>
             <div className="loyalty-checkout-head"><div><span><Icon name="gift" size={18} />Tomato Points</span><strong>{loyalty.pointsBalance} points</strong></div>{loyalty.enabled && loyalty.pointsPerOrder > 0 && <small>Earn {loyalty.pointsPerOrder} more after delivery</small>}</div>
@@ -238,7 +238,7 @@ export default function PlaceOrder({ onLogin }) {
           {couponCode && <p className="coupon-notice">Promo code <strong>{couponCode}</strong> {quote?.couponCode ? 'applied.' : 'will be verified now.'}</p>}
           {quoteLoading && <p className="quote-note">Updating secure total…</p>}
           {quoteError && <p className="form-error" role="alert">{quoteError}</p>}
-          {!user && <div className="signin-notice"><p>Already have an account?</p><button type="button" className="button button-secondary button-full" onClick={onLogin}><Icon name="user" />Sign in to continue</button></div>}
+          {!user && <div className="signin-notice"><p><strong>Guest checkout</strong><br />No account is required. We’ll email a private tracking link, and you can safely link this order after signing in with the same email.</p><button type="button" className="button button-secondary button-full" onClick={onLogin}><Icon name="user" />Sign in instead</button></div>}
           {error && <p className="form-error" role="alert">{error}</p>}
         </OrderSummary>
         <Link className="back-to-cart" to="/cart">← Return to cart</Link>

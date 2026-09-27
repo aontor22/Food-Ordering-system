@@ -14,6 +14,7 @@ model User {
   passwordHash String
   googleSub String? @unique
   avatarUrl String?
+  emailVerifiedAt DateTime?
   role String @default("CUSTOMER")
   isActive Boolean @default(true)
   pointsBalance Int @default(0)
@@ -157,8 +158,12 @@ model Order {
   notes String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  userId String
-  user User @relation(fields: [userId], references: [id])
+  customerType String @default("REGISTERED")
+  guestAccessNonce String? @unique
+  guestAccessExpiresAt DateTime?
+  guestLinkedAt DateTime?
+  userId String?
+  user User? @relation(fields: [userId], references: [id])
   items OrderItem[]
   reviews Review[]
   loyaltyTransactions LoyaltyTransaction[]
@@ -166,6 +171,8 @@ model Order {
   trackingEvents OrderTrackingEvent[]
   notificationDeliveries NotificationDelivery[]
   @@index([userId, createdAt])
+  @@index([email, customerType, createdAt])
+  @@index([guestAccessExpiresAt])
   @@index([status, createdAt])
   @@index([statusUpdatedAt])
   @@index([fulfillmentMode, scheduledDateKey, scheduledTimeKey])
@@ -402,11 +409,11 @@ model NotificationDelivery {
   sentAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  userId String
+  userId String?
   orderId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  @@unique([userId, orderId, eventType, channel])
+  @@unique([orderId, eventType, channel])
   @@index([status, nextAttemptAt])
   @@index([userId, createdAt])
   @@index([orderId, createdAt])

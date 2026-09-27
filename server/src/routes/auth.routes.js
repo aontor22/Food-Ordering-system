@@ -9,6 +9,7 @@ import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { GoogleTokenError, verifyGoogleIdToken } from '../lib/google-auth.js';
 import { hashToken, newSessionId, signAccessToken, signRefreshToken, verifyRefreshToken } from '../lib/tokens.js';
+import { linkEligibleGuestOrdersForVerifiedUser } from '../services/guest-orders.js';
 
 const router = Router();
 const credentials = z.object({ email: z.email().max(254).transform(v => v.toLowerCase().trim()), password: z.string().min(8).max(72) });
@@ -62,6 +63,7 @@ router.post('/google', validate(googleBody), async (req, res, next) => {
           data: {
             googleSub: profile.sub,
             avatarUrl: existing.avatarUrl || profile.picture || null,
+            emailVerifiedAt: existing.emailVerifiedAt || new Date(),
           },
         });
       } else {
@@ -73,12 +75,16 @@ router.post('/google', validate(googleBody), async (req, res, next) => {
             passwordHash: await bcrypt.hash(generatedPassword, 12),
             googleSub: profile.sub,
             avatarUrl: profile.picture || null,
+            emailVerifiedAt: new Date(),
           },
         });
       }
     }
 
     if (!user.isActive) throw new AppError(401, 'ACCOUNT_DISABLED', 'Account is unavailable');
+    if (!user.emailVerifiedAt) user = await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+    try { await linkEligibleGuestOrdersForVerifiedUser(user.id); }
+    catch (linkError) { req.log?.warn?.({ err: linkError, userId: user.id }, 'verified guest-order auto-link failed'); }
     res.json(await issueSession(req, res, user));
   } catch (e) {
     if (e instanceof GoogleTokenError) return next(new AppError(e.status, e.code, e.message));

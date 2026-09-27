@@ -21,6 +21,7 @@ A working Preact storefront and responsive restaurant admin dashboard with a Nod
 - Admin Payments ledger with transaction filters, cash collection/refund records, gateway reconciliation, risk-review decisions, and SSLCOMMERZ refund tracking
 - SSLCOMMERZ hosted checkout, validated success/IPN callbacks, server-side failure/cancellation reconciliation, risk review, and full gateway refund workflow
 - Server-enforced restaurant opening hours, overnight schedules, emergency ordering pause, temporary closures, holiday closures, and customer-facing open/closed status
+- Guest checkout for Delivery/Pickup and ASAP/scheduled orders, with private expiring order access, secure tracking/payment actions, matching-account linking, and admin Guest/Registered provenance
 
 ## Quick start
 
@@ -71,7 +72,7 @@ The runtime database is PostgreSQL. For local development, `docker compose up -d
 5. The order remains pending with payment **Awaiting verification**. Admin → Payments → **Review & approve** shows the amount, recipient, sender and transaction ID. Verify these against the receiving account, add a note and confirm receipt before approving. Only then does the order become confirmed/paid. Rejection requires a customer-visible reason and permits a corrected reference.
 6. Duplicate transaction references are blocked (including case/separator variants). A rejected reference remains reserved to prevent reuse: the customer should contact the restaurant if the original reference was correct, not pay again simply to resubmit. Under-review and paid manual orders cannot be cancelled until review/refund is handled. **Record refund** only records money already returned; it does not transfer money.
 
-Channel edits affect new orders. Existing orders retain their original destination and instructions. No gateway setup credentials are required for this manual workflow; any provider/account charges are separate. Customer details and review history are restricted to the owner and administrators.
+Channel edits affect new orders. Existing orders retain their original destination and instructions. No gateway setup credentials are required for this manual workflow; any provider/account charges are separate. Registered customer details and review history are restricted to the account owner and administrators; guest order access additionally requires its private expiring guest token.
 
 Database changes are now managed by Prisma Migrate on PostgreSQL. After copying updated files, set a PostgreSQL `DATABASE_URL`, then run `npm install`, `npm run db:setup`, and `npm run dev`. `db:setup` generates Prisma Client, applies only pending migrations, and runs the idempotent seed. If you need to preserve data from a local legacy SQLite file, follow `POSTGRESQL_SETUP.md` and run the included `db:import:sqlite` helper after creating the PostgreSQL schema.
 
@@ -127,9 +128,9 @@ For email, configure backend-only generic SMTP variables (`SMTP_HOST`, `SMTP_POR
 | Store status | `GET /api/store/status` |
 | Auth | `POST /api/auth/register`, `login`, `refresh`, `logout`; `GET /me` |
 | Catalog | `GET /api/products`, `/api/products/categories` |
-| Orders | `POST/GET /api/orders`, detail, cancellation, and live tracking |
+| Orders | Authenticated `POST/GET /api/orders`, detail, cancellation, reviews, and live tracking; guest quote/create/private tracking/cancel/link under `/api/orders/guest*` |
 | Customer notifications | `GET /api/notifications`, preferences, push subscriptions, test delivery |
-| Payments | `GET /api/payments/options`, `POST /api/payments/orders/:orderId/initiate`, authenticated demo routes, SSLCOMMERZ callback routes |
+| Payments | `GET /api/payments/options`; authenticated and private-token guest payment/manual routes; SSLCOMMERZ callback routes |
 | Admin payments | `GET /api/admin/payments`; cash receive/refund; gateway status check; risk acceptance; SSLCOMMERZ refund request/status under `/api/admin/payments/:id/*` |
 | Manual customer payments | `GET /api/payments/manual/:orderId`, `POST /api/payments/manual/:orderId/submit` |
 | Manual admin operations | `GET/POST /api/admin/payment-channels`, `PATCH /api/admin/payment-channels/:id`, `POST /api/admin/payments/:id/manual-review`, `manual-refunded` |
@@ -152,6 +153,7 @@ For email, configure backend-only generic SMTP variables (`SMTP_HOST`, `SMTP_POR
 5. Configure Cloudinary credentials for product image uploads; keep `CLOUDINARY_API_SECRET` only on the backend.
 6. Configure and validate SSLCOMMERZ sandbox callbacks, currency, public HTTPS URLs, risk-review handling, and refund flow before enabling live online payments. Register the Render service public IP with SSLCOMMERZ if required for live refund API access.
 7. Configure SMTP and/or VAPID Web Push, verify test notifications, and monitor Admin → Notifications before relying on customer messaging.
+8. Keep `JWT_ACCESS_SECRET` stable during normal deployments because Step 09 guest-order access tokens are signed with it; rotating the secret intentionally invalidates outstanding guest tracking links.
 
 ## Structure
 
@@ -165,3 +167,7 @@ server/test/     API integration tests
 ## Progressive Web App (Step 08)
 
 The storefront is installable as a PWA on supported browsers. The production build injects its final hashed Vite assets into the service-worker precache list, provides an offline fallback, preserves browser push notifications, and shows an in-app update prompt when a newer deployment is ready. See `PWA_SETUP.md` and `STEP_08_VERIFICATION.md`.
+
+## Guest checkout (Step 09)
+
+Customers can now use Delivery or Pickup, ASAP or scheduled slots, and COD/manual/online payment without an account. Existing server-side pricing, opening-hour, zone, capacity, stock, and payment checks are reused. Guest order numbers are not credentials: private access uses a signed expiring bearer token, while account linking requires the private token plus the matching account email (or a Google-verified matching email for eligible automatic linking). Anonymous orders cannot redeem or earn Tomato Points and cannot review until safely account-linked. See `GUEST_CHECKOUT_SETUP.md` and `STEP_09_VERIFICATION.md`.

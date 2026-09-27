@@ -218,3 +218,5 @@
 @media (max-width:520px) { .notification-admin-metrics { grid-template-columns:1fr; } }
 
 .admin-alert.error { margin-bottom:18px; padding:12px 14px; border:1px solid #f0c9c4; border-radius:11px; color:#9d342d; background:#fff0ee; font-size:.8rem; font-weight:700; }
+
+.customer-type-badge{display:inline-flex;width:max-content;margin-top:6px;padding:4px 7px;border-radius:999px;font-size:.62rem;font-weight:900;letter-spacing:.02em}.customer-type-badge.is-guest{color:#9a4d27;background:#fff0e7}.customer-type-badge.is-registered{color:#27664a;background:#eaf6ef}

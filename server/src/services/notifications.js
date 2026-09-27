@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import webpush from 'web-push';
 import { prisma } from '../lib/prisma.js';
 import { config } from '../config.js';
+import { guestTrackingUrl } from './guest-orders.js';
 
 const STATUS_PREF_FIELD = {
   PENDING: 'orderPlaced',
@@ -90,7 +91,8 @@ function payloadForOrder(order, eventType, { etaNote = null } = {}) {
     ? ['Order estimate updated', etaNote || 'The restaurant updated the estimated time for your order.']
     : (STATUS_COPY[eventType] || ['Order update', 'There is a new update for your order.']);
   const body = `${defaultBody} Order ${order.orderNumber}.`;
-  const url = `${clientBaseUrl().replace(/\/$/, '')}/orders`;
+  const guest = order.customerType === 'GUEST' && !order.userId;
+  const url = guest ? null : `${clientBaseUrl().replace(/\/$/, '')}/orders`;
   const itemSummary = (order.items || []).slice(0, 5).map(item => `${item.quantity}× ${item.productName}`).join(', ');
   return {
     title,
@@ -107,13 +109,13 @@ function payloadForOrder(order, eventType, { etaNote = null } = {}) {
     itemSummary,
     fulfillmentType: order.fulfillmentType,
     scheduledForLocal: order.scheduledForLocal || null,
+    guest,
   };
 }
 
 async function upsertDelivery(db, { order, eventType, channel, payload }) {
   const key = {
-    userId_orderId_eventType_channel: {
-      userId: order.userId,
+    orderId_eventType_channel: {
       orderId: order.id,
       eventType,
       channel,
@@ -140,7 +142,7 @@ export async function enqueueOrderNotification(orderOrId, eventType, options = {
     include: { items: true, user: { select: { id: true, name: true, email: true } } },
   });
   if (!order) return { queued: 0 };
-  const preference = await getNotificationPreference(order.userId);
+  const preference = order.userId ? await getNotificationPreference(order.userId) : { emailEnabled: true, pushEnabled: false, etaUpdates: true };
   if (!eventAllowed(preference, eventType)) return { queued: 0, disabled: true };
   const payload = payloadForOrder(order, eventType, options);
   let queued = 0;
@@ -165,19 +167,32 @@ export async function safeEnqueueOrderNotification(orderOrId, eventType, options
 
 function emailHtml(payload) {
   const safe = value => String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-  return `<!doctype html><html><body style="margin:0;background:#f7f5f1;font-family:Arial,sans-serif;color:#202521"><div style="max-width:620px;margin:0 auto;padding:28px 16px"><div style="background:#fff;border:1px solid #ebe6dd;border-radius:18px;overflow:hidden"><div style="padding:22px 26px;background:#f4512c;color:#fff"><strong style="font-size:22px">Tomato.</strong></div><div style="padding:28px"><p style="margin:0 0 8px;color:#777;font-size:13px">ORDER ${safe(payload.orderNumber)}</p><h1 style="margin:0 0 12px;font-size:25px">${safe(payload.title)}</h1><p style="margin:0 0 20px;line-height:1.6">Hi ${safe(payload.customerName)}, ${safe(payload.body)}</p>${payload.itemSummary ? `<p style="margin:0 0 8px;color:#555"><strong>Items:</strong> ${safe(payload.itemSummary)}</p>` : ''}<p style="margin:0 0 24px;color:#555"><strong>Total:</strong> ${safe(payload.total)}</p><a href="${safe(payload.url)}" style="display:inline-block;padding:12px 20px;border-radius:999px;background:#f4512c;color:#fff;text-decoration:none;font-weight:700">Track your order</a><p style="margin:28px 0 0;color:#888;font-size:12px;line-height:1.5">You can change email and browser notification preferences from your Tomato notification settings.</p></div></div></div></body></html>`;
+  return `<!doctype html><html><body style="margin:0;background:#f7f5f1;font-family:Arial,sans-serif;color:#202521"><div style="max-width:620px;margin:0 auto;padding:28px 16px"><div style="background:#fff;border:1px solid #ebe6dd;border-radius:18px;overflow:hidden"><div style="padding:22px 26px;background:#f4512c;color:#fff"><strong style="font-size:22px">Tomato.</strong></div><div style="padding:28px"><p style="margin:0 0 8px;color:#777;font-size:13px">ORDER ${safe(payload.orderNumber)}</p><h1 style="margin:0 0 12px;font-size:25px">${safe(payload.title)}</h1><p style="margin:0 0 20px;line-height:1.6">Hi ${safe(payload.customerName)}, ${safe(payload.body)}</p>${payload.itemSummary ? `<p style="margin:0 0 8px;color:#555"><strong>Items:</strong> ${safe(payload.itemSummary)}</p>` : ''}<p style="margin:0 0 24px;color:#555"><strong>Total:</strong> ${safe(payload.total)}</p><a href="${safe(payload.url)}" style="display:inline-block;padding:12px 20px;border-radius:999px;background:#f4512c;color:#fff;text-decoration:none;font-weight:700">Track your order</a>${payload.guest ? `<p style="margin:28px 0 0;color:#888;font-size:12px;line-height:1.5">This secure tracking link is private. Do not forward it. Create an account with the same email to link eligible guest orders.</p>` : `<p style="margin:28px 0 0;color:#888;font-size:12px;line-height:1.5">You can change email and browser notification preferences from your Tomato notification settings.</p>`}</div></div></div></body></html>`;
 }
 
 async function sendEmail(delivery, payload) {
   const transport = getTransporter();
   if (!transport) return { skipped: true, reason: 'SMTP is not configured' };
   if (!payload.email) return { skipped: true, reason: 'Customer email is unavailable' };
+
+  let url = payload.url;
+  if (payload.guest) {
+    const order = await prisma.order.findUnique({
+      where: { id: delivery.orderId },
+      select: { id: true, orderNumber: true, customerType: true, userId: true, guestAccessNonce: true, guestAccessExpiresAt: true },
+    });
+    if (!order) return { skipped: true, reason: 'Order is unavailable' };
+    url = order.customerType === 'GUEST' && !order.userId
+      ? guestTrackingUrl(order)
+      : `${clientBaseUrl().replace(/\/$/, '')}/orders`;
+  }
+  const resolvedPayload = { ...payload, url };
   const info = await transport.sendMail({
     from: { name: config.EMAIL_FROM_NAME, address: config.EMAIL_FROM },
-    to: payload.email,
-    subject: `${payload.title} · ${payload.orderNumber}`,
-    text: `${payload.title}\n\n${payload.body}\n\nOrder: ${payload.orderNumber}\nTotal: ${payload.total}\nTrack: ${payload.url}`,
-    html: emailHtml(payload),
+    to: resolvedPayload.email,
+    subject: `${resolvedPayload.title} · ${resolvedPayload.orderNumber}`,
+    text: `${resolvedPayload.title}\n\n${resolvedPayload.body}\n\nOrder: ${resolvedPayload.orderNumber}\nTotal: ${resolvedPayload.total}\nTrack: ${resolvedPayload.url}`,
+    html: emailHtml(resolvedPayload),
     headers: { 'X-Entity-Ref-ID': delivery.id },
   });
   return { messageId: info.messageId || null };
@@ -218,7 +233,7 @@ function retryDelayMs(attempts) {
 export async function processNotificationDelivery(delivery) {
   const payload = JSON.parse(delivery.payloadJson);
   const attempts = delivery.attempts + 1;
-  const preference = await getNotificationPreference(delivery.userId);
+  const preference = delivery.userId ? await getNotificationPreference(delivery.userId) : { emailEnabled: true, pushEnabled: false, etaUpdates: true };
   const channelEnabled = delivery.channel === 'EMAIL' ? preference.emailEnabled : preference.pushEnabled;
   if (!channelEnabled || !eventAllowed(preference, delivery.eventType)) {
     return prisma.notificationDelivery.update({

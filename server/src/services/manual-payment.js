@@ -5,6 +5,7 @@ import { AppError } from '../lib/errors.js';
 import { serializePayment } from './payment.js';
 import { config } from '../config.js';
 import { trackingEventData, trackingTimestampData } from './order-tracking.js';
+import { getGuestOrderByToken } from './guest-orders.js';
 
 export const channelSchema = z.object({
   provider: z.enum(['BKASH', 'NAGAD', 'ROCKET', 'BANK']),
@@ -33,27 +34,34 @@ export function validateChannel(input) {
   return data;
 }
 
-export async function manualOrder(orderId, userId, db = prisma) {
-  const order = await db.order.findFirst({ where: { id: orderId, userId }, include: { payment: true } });
+export async function manualOrder(orderId, access, db = prisma) {
+  const normalized = typeof access === 'string' ? { userId: access } : (access || {});
+  let order;
+  if (normalized.userId) order = await db.order.findFirst({ where: { id: orderId, userId: normalized.userId }, include: { payment: true } });
+  else if (normalized.guestToken) {
+    order = await getGuestOrderByToken(normalized.guestToken, { db, include: { payment: true } });
+    if (order.id !== orderId) order = null;
+  } else throw new AppError(401, 'ORDER_ACCESS_REQUIRED', 'Order access is required');
   if (!order || order.paymentMethod !== 'MANUAL' || !order.payment) throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Manual payment order not found');
   return order;
 }
 
-export async function getManualOrder(orderId, userId) {
-  const order = await manualOrder(orderId, userId);
+export async function getManualOrder(orderId, access) {
+  const order = await manualOrder(orderId, access);
   const submissions = await prisma.manualPaymentSubmission.findMany({ where: { paymentId: order.payment.id }, orderBy: { createdAt: 'desc' } });
   return { order: { id: order.id, orderNumber: order.orderNumber, status: order.status, paymentStatus: order.paymentStatus, totalCents: order.totalCents }, payment: serializePayment(order.payment), submissions: submissions.map(serializeSubmission) };
 }
 
 function event(tx, req, action, paymentId, metadata) {
-  return tx.auditLog.create({ data: { actorId: req.auth.sub, action, entity: 'Payment', entityId: paymentId, metadata: JSON.stringify(metadata) } });
+  return tx.auditLog.create({ data: { actorId: req.auth?.sub || null, action, entity: 'Payment', entityId: paymentId, metadata: JSON.stringify(metadata) } });
 }
 
-export async function submitManualPayment(orderId, userId, input, req) {
+
+export async function submitManualPayment(orderId, access, input, req) {
   const data = submissionSchema.parse(input);
   try {
     return await prisma.$transaction(async tx => {
-      const order = await manualOrder(orderId, userId, tx);
+      const order = await manualOrder(orderId, access, tx);
       const payment = order.payment;
       if (order.status !== 'PENDING' || !['PENDING', 'REJECTED'].includes(payment.status)) throw new AppError(409, 'PAYMENT_NOT_SUBMITTABLE', 'This payment is already submitted, settled, or the order is closed');
       const destination = JSON.parse(payment.manualDestination);

@@ -27,6 +27,7 @@ export async function getLoyaltySnapshot(userId, db = prisma) {
 }
 
 export async function awardDeliveredOrderPoints(db, order) {
+  if (!order.userId) return { awarded: 0, balance: null };
   if (order.pointsAwardedAt) return { awarded: 0, balance: null };
   const settings = await getLoyaltySettings(db);
   if (!settings.enabled || settings.pointsPerOrder <= 0) return { awarded: 0, balance: null };
@@ -60,6 +61,7 @@ export async function awardDeliveredOrderPoints(db, order) {
 }
 
 export async function restoreCancelledOrderPoints(db, order) {
+  if (!order.userId) return { restored: 0, balance: null };
   if (!order.pointsRedeemed || order.pointsRedeemed <= 0 || order.pointsRestoredAt) return { restored: 0, balance: null };
   const existing = await db.loyaltyTransaction.findUnique({
     where: { orderId_type: { orderId: order.id, type: 'RESTORE' } },

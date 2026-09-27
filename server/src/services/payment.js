@@ -3,6 +3,7 @@ import { config, isProduction } from '../config.js';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
 import { trackingEventData, trackingTimestampData } from './order-tracking.js';
+import { getGuestOrderByToken } from './guest-orders.js';
 
 const publicApiUrl = config.PUBLIC_API_URL.replace(/\/$/, '');
 const hasSslCommerz = Boolean(config.SSLCOMMERZ_STORE_ID && config.SSLCOMMERZ_STORE_PASSWORD);
@@ -168,20 +169,20 @@ async function initiateSslCommerz(order, payment) {
     ipn_url: `${callbackBase}/ipn`,
     cus_name: `${order.firstName} ${order.lastName}`.slice(0, 50),
     cus_email: order.email.slice(0, 50),
-    cus_add1: order.street.slice(0, 50),
-    cus_city: order.city.slice(0, 50),
-    cus_state: order.state.slice(0, 50),
-    cus_postcode: order.postalCode.slice(0, 30),
-    cus_country: order.country.slice(0, 50),
+    cus_add1: String(order.street || order.pickupAddressSnapshot || 'Restaurant pickup').slice(0, 50),
+    cus_city: String(order.city || 'Dhaka').slice(0, 50),
+    cus_state: String(order.state || 'Dhaka').slice(0, 50),
+    cus_postcode: String(order.postalCode || '0000').slice(0, 30),
+    cus_country: String(order.country || 'Bangladesh').slice(0, 50),
     cus_phone: order.phone.slice(0, 20),
-    shipping_method: 'YES',
+    shipping_method: order.fulfillmentType === 'PICKUP' ? 'NO' : 'YES',
     num_of_item: String(order.items.reduce((total, item) => total + item.quantity, 0)),
     ship_name: `${order.firstName} ${order.lastName}`.slice(0, 50),
-    ship_add1: order.street.slice(0, 50),
-    ship_city: order.city.slice(0, 50),
-    ship_state: order.state.slice(0, 50),
-    ship_postcode: order.postalCode.slice(0, 30),
-    ship_country: order.country.slice(0, 50),
+    ship_add1: String(order.street || order.pickupAddressSnapshot || 'Restaurant pickup').slice(0, 50),
+    ship_city: String(order.city || 'Dhaka').slice(0, 50),
+    ship_state: String(order.state || 'Dhaka').slice(0, 50),
+    ship_postcode: String(order.postalCode || '0000').slice(0, 30),
+    ship_country: String(order.country || 'Bangladesh').slice(0, 50),
     product_name: order.items.map(item => item.productName).join(', ').slice(0, 255),
     product_category: 'Food',
     product_profile: 'physical-goods',
@@ -210,25 +211,41 @@ async function initiateSslCommerz(order, payment) {
       where: { id: prepared.id, status: 'PROCESSING' },
       data: { failureReason: 'Gateway response unavailable; check payment status before retrying', lastGatewayCheckAt: new Date() },
     });
-    throw new AppError(502, 'PAYMENT_GATEWAY_UNAVAILABLE', 'The payment gateway is temporarily unavailable. Your order was saved; retry payment from My orders.');
+    throw new AppError(502, 'PAYMENT_GATEWAY_UNAVAILABLE', 'The payment gateway is temporarily unavailable. Your order was saved; retry payment from your secure order page.');
   }
 }
 
-export async function initiateOrderPayment(orderId, userId) {
-  let order = await prisma.order.findFirst({
-    where: { id: orderId, ...(userId ? { userId } : {}) },
-    include: { items: true, payment: true },
-  });
-  if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+function normalizePaymentAccess(access) {
+  if (typeof access === 'string') return { userId: access };
+  return access && typeof access === 'object' ? access : {};
+}
+
+async function authorizedOrderForPayment(orderId, access, include) {
+  const normalized = normalizePaymentAccess(access);
+  if (normalized.userId) {
+    const order = await prisma.order.findFirst({ where: { id: orderId, userId: normalized.userId }, include });
+    if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+    return order;
+  }
+  if (normalized.guestToken) {
+    const order = await getGuestOrderByToken(normalized.guestToken, { include });
+    if (order.id !== orderId) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+    return order;
+  }
+  throw new AppError(401, 'ORDER_ACCESS_REQUIRED', 'Order access is required');
+}
+
+export async function initiateOrderPayment(orderId, access) {
+  let order = await authorizedOrderForPayment(orderId, access, { items: true, payment: true });
   if (order.paymentMethod !== 'ONLINE') throw new AppError(409, 'NOT_ONLINE_PAYMENT', 'This order does not use online payment');
   if (['CANCELLED', 'DELIVERED'].includes(order.status)) throw new AppError(409, 'ORDER_NOT_PAYABLE', 'This order can no longer be paid online');
   if (order.paymentStatus === 'PAID' || order.payment?.status === 'PAID') throw new AppError(409, 'ALREADY_PAID', 'This order has already been paid');
   if (!order.payment) throw new AppError(409, 'PAYMENT_RECORD_MISSING', 'Payment record is unavailable');
   if (order.payment.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW'].includes(order.payment.status)) {
     await reconcileSslCommerzPayment(order.payment.transactionId);
-    order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, payment: true } });
+    order = await authorizedOrderForPayment(orderId, access, { items: true, payment: true });
   }
-  if (['PAID', 'REFUNDED', 'REFUND_PENDING', 'REVIEW'].includes(order.payment.status)) throw new AppError(409, 'PAYMENT_NOT_RETRYABLE', 'Payment is already received, being refunded, or under review. Check My orders.');
+  if (['PAID', 'REFUNDED', 'REFUND_PENDING', 'REVIEW'].includes(order.payment.status)) throw new AppError(409, 'PAYMENT_NOT_RETRYABLE', 'Payment is already received, being refunded, or under review. Check your order.');
   if (order.payment.provider === 'SSLCOMMERZ' && order.payment.status === 'PROCESSING') throw new AppError(409, 'PAYMENT_PROCESSING', 'The gateway has not confirmed a final result yet. Please check again shortly.');
   if (demoEnabled && order.payment.provider === 'DEMO' && order.payment.status === 'PROCESSING') {
     return { payment: order.payment, paymentUrl: `/payment/demo/${order.payment.transactionId}?signature=${demoSignature(order.payment.transactionId)}`, provider: 'DEMO', mode: 'demo' };
@@ -238,25 +255,37 @@ export async function initiateOrderPayment(orderId, userId) {
   throw new AppError(503, 'ONLINE_PAYMENT_UNAVAILABLE', 'Online payment is not configured');
 }
 
-export async function getDemoPayment(transactionId, userId, signature) {
+export async function getDemoPayment(transactionId, access, signature) {
   if (!demoEnabled || !validDemoSignature(transactionId, signature)) throw new AppError(404, 'PAYMENT_SESSION_NOT_FOUND', 'Payment session not found');
-  const payment = await prisma.payment.findFirst({
-    where: { transactionId, order: { userId } },
-    include: { order: { select: { id: true, orderNumber: true, totalCents: true, status: true, firstName: true, lastName: true } } },
-  });
+  const normalized = normalizePaymentAccess(access);
+  let payment;
+  if (normalized.userId) {
+    payment = await prisma.payment.findFirst({
+      where: { transactionId, order: { userId: normalized.userId } },
+      include: { order: { select: { id: true, orderNumber: true, totalCents: true, status: true, firstName: true, lastName: true } } },
+    });
+  } else if (normalized.guestToken) {
+    const guestOrder = await getGuestOrderByToken(normalized.guestToken);
+    payment = await prisma.payment.findFirst({
+      where: { transactionId, orderId: guestOrder.id },
+      include: { order: { select: { id: true, orderNumber: true, totalCents: true, status: true, firstName: true, lastName: true } } },
+    });
+  } else {
+    throw new AppError(401, 'ORDER_ACCESS_REQUIRED', 'Order access is required');
+  }
   if (!payment || payment.provider !== 'DEMO') throw new AppError(404, 'PAYMENT_SESSION_NOT_FOUND', 'Payment session not found');
   return { payment: serializePayment(payment), order: payment.order, mode: 'demo' };
 }
 
-export async function completeDemoPayment(transactionId, userId, signature, outcome) {
-  await getDemoPayment(transactionId, userId, signature);
+export async function completeDemoPayment(transactionId, access, signature, outcome) {
+  const sessionAccess = await getDemoPayment(transactionId, access, signature);
   return prisma.$transaction(async transaction => {
     const paymentRecord = await transaction.payment.findUnique({ where: { transactionId }, include: { order: true } });
-    if (!paymentRecord) throw new AppError(404, 'PAYMENT_SESSION_NOT_FOUND', 'Payment session not found');
+    if (!paymentRecord || paymentRecord.orderId !== sessionAccess.order.id) throw new AppError(404, 'PAYMENT_SESSION_NOT_FOUND', 'Payment session not found');
     const session = { payment: paymentRecord, order: paymentRecord.order };
     if (session.payment.status === 'PAID') return transaction.order.findUnique({ where: { id: session.order.id }, include: { items: true, payment: true } });
     if (['CANCELLED', 'DELIVERED'].includes(session.order.status)) throw new AppError(409, 'ORDER_NOT_PAYABLE', 'This order can no longer be paid online');
-    if (session.payment.status !== 'PROCESSING') throw new AppError(409, 'PAYMENT_SESSION_ENDED', 'This payment attempt has ended. Start a new attempt from My orders.');
+    if (session.payment.status !== 'PROCESSING') throw new AppError(409, 'PAYMENT_SESSION_ENDED', 'This payment attempt has ended. Start a new attempt from your order.');
     const paymentStatus = outcome === 'success' ? 'PAID' : outcome === 'cancel' ? 'CANCELLED' : 'FAILED';
     const payment = await transaction.payment.update({
       where: { transactionId },

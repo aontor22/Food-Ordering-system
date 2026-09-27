@@ -28,7 +28,7 @@ function parseSseBlock(block) {
   catch { return { event, data: raw }; }
 }
 
-function subscribe(path, { onEvent, onState } = {}) {
+function subscribe(path, { onEvent, onState, headers = {}, authRetry = true } = {}) {
   const controller = new AbortController();
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -41,16 +41,16 @@ function subscribe(path, { onEvent, onState } = {}) {
           method: 'GET',
           credentials: 'include',
           signal: controller.signal,
-          headers: { Accept: 'text/event-stream', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+          headers: { Accept: 'text/event-stream', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...headers },
         });
-        if (response.status === 401) {
+        if (response.status === 401 && authRetry) {
           const refreshed = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
           if (refreshed.ok) {
             const data = await refreshed.json();
             setAccessToken(data.accessToken);
             response = await fetch(`${API_URL}${path}`, {
               method: 'GET', credentials: 'include', signal: controller.signal,
-              headers: { Accept: 'text/event-stream', Authorization: `Bearer ${data.accessToken}` },
+              headers: { Accept: 'text/event-stream', Authorization: `Bearer ${data.accessToken}`, ...headers },
             });
           }
         }
@@ -116,6 +116,12 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   createOrder: body => request('/orders', { method: 'POST', body: JSON.stringify(body) }),
   quoteOrder: body => request('/orders/quote', { method: 'POST', body: JSON.stringify(body) }),
+  createGuestOrder: body => request('/orders/guest', { method: 'POST', body: JSON.stringify(body) }, false),
+  quoteGuestOrder: body => request('/orders/guest/quote', { method: 'POST', body: JSON.stringify(body) }, false),
+  getGuestOrder: token => request('/orders/guest', { headers: { 'X-Order-Access-Token': token } }, false),
+  subscribeGuestOrder: (token, handlers = {}) => subscribe('/orders/guest/live', { ...handlers, headers: { ...(handlers.headers || {}), 'X-Order-Access-Token': token }, authRetry: false }),
+  cancelGuestOrder: token => request('/orders/guest/cancel', { method: 'POST', headers: { 'X-Order-Access-Token': token } }, false),
+  linkGuestOrder: token => request('/orders/guest/link', { method: 'POST', body: JSON.stringify({ token }) }),
   getLoyalty: () => request('/orders/loyalty'),
   getOrders: () => request('/orders'),
   getNotifications: () => request('/notifications'),
@@ -136,6 +142,11 @@ export const api = {
   initiatePayment: orderId => request(`/payments/orders/${orderId}/initiate`, { method: 'POST' }),
   getDemoPayment: (transactionId, signature) => request(`/payments/demo/${transactionId}?signature=${encodeURIComponent(signature)}`),
   completeDemoPayment: (transactionId, body) => request(`/payments/demo/${transactionId}/complete`, { method: 'POST', body: JSON.stringify(body) }),
+  initiateGuestPayment: (orderId, token) => request(`/payments/guest/orders/${orderId}/initiate`, { method: 'POST', headers: { 'X-Order-Access-Token': token } }, false),
+  getGuestDemoPayment: (transactionId, signature, token) => request(`/payments/guest/demo/${transactionId}?signature=${encodeURIComponent(signature)}`, { headers: { 'X-Order-Access-Token': token } }, false),
+  completeGuestDemoPayment: (transactionId, body, token) => request(`/payments/guest/demo/${transactionId}/complete`, { method: 'POST', body: JSON.stringify(body), headers: { 'X-Order-Access-Token': token } }, false),
+  getGuestManualPayment: (orderId, token) => request(`/payments/guest/manual/${orderId}`, { headers: { 'X-Order-Access-Token': token } }, false),
+  submitGuestManualPayment: (orderId, body, token) => request(`/payments/guest/manual/${orderId}/submit`, { method: 'POST', body: JSON.stringify(body), headers: { 'X-Order-Access-Token': token } }, false),
   getAdminDashboard: () => request('/admin/dashboard'),
   getAdminNotifications: () => request('/admin/notifications'),
   processAdminNotifications: () => request('/admin/notifications/process', { method: 'POST' }),

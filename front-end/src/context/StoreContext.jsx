@@ -1,6 +1,7 @@
 import { createContext, useEffect, useMemo, useState } from 'react';
 import { api, setAccessToken } from '../lib/api';
 import { detachPushOnLogout } from '../lib/push';
+import { getGuestOrderAccessRecords, removeGuestOrderAccess, saveGuestOrderAccess } from '../lib/guestOrders';
 
 export const StoreContext = createContext(null);
 const GUEST_WISHLIST_KEY = 'tomato_guest_wishlist';
@@ -79,6 +80,21 @@ export default function StoreContextProvider({ children }) {
     return applyWishlistResponse(data);
   };
 
+  const syncGuestOrdersToAccount = async () => {
+    const records = getGuestOrderAccessRecords();
+    let linked = 0;
+    for (const record of records) {
+      try {
+        await api.linkGuestOrder(record.token);
+        removeGuestOrderAccess(record.token);
+        linked += 1;
+      } catch {
+        // Keep the private token locally if the current account email does not match or the service is temporarily unavailable.
+      }
+    }
+    return linked;
+  };
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -90,6 +106,7 @@ export default function StoreContextProvider({ children }) {
         setAccessToken(authResult.value.accessToken);
         setUser(authResult.value.user);
         try { if (active) await mergeGuestWishlist(); } catch { /* Wishlist should not block sign-in restoration. */ }
+        try { if (active) await syncGuestOrdersToAccount(); } catch { /* Guest-order linking should not block session restoration. */ }
       } else {
         const guestIds = loadGuestWishlist();
         const availableIds = productsResult.status === 'fulfilled' ? new Set(productsResult.value.products.map(product => product.id)) : null;
@@ -130,6 +147,7 @@ export default function StoreContextProvider({ children }) {
     setAccessToken(data.accessToken);
     setUser(data.user);
     try { await mergeGuestWishlist(); } catch { /* Keep authentication successful if wishlist sync is temporarily unavailable. */ }
+    try { await syncGuestOrdersToAccount(); } catch { /* Keep authentication successful if order linking is temporarily unavailable. */ }
     return data;
   };
 
@@ -138,11 +156,13 @@ export default function StoreContextProvider({ children }) {
     setAccessToken(data.accessToken);
     setUser(data.user);
     try { await mergeGuestWishlist(); } catch { /* Keep authentication successful if wishlist sync is temporarily unavailable. */ }
+    try { await syncGuestOrdersToAccount(); } catch { /* Keep authentication successful if order linking is temporarily unavailable. */ }
     return data;
   };
 
   const createOrder = async body => {
-    const data = await api.createOrder(body);
+    const data = user ? await api.createOrder(body) : await api.createGuestOrder({ ...body, pointsToRedeem: 0 });
+    if (data.guestAccess) saveGuestOrderAccess({ order: data.order, guestAccess: data.guestAccess });
     if (data.loyalty && user) setUser(previous => previous ? { ...previous, pointsBalance: data.loyalty.pointsBalance } : previous);
     return data;
   };
