@@ -29,6 +29,7 @@ A working Preact storefront and responsive restaurant admin dashboard with a Nod
 - Advanced menu discovery with full-catalog search, explicit Vegetarian/Vegan/Halal/Gluten-free product labels, price/rating filters, and price/rating/delivered-order popularity sorting
 - Live Kitchen Display System using the shared order lifecycle (`CONFIRMED`/NEW → `PREPARING` → `READY`) with preparation and handoff timers
 - Secure printable invoices and paid-only receipts for registered, guest and admin workflows, with standalone Unicode-safe downloads and browser Save-as-PDF printing
+- Production monitoring with correlation IDs, structured/redacted operational events, PostgreSQL readiness, slow-request tracking and an admin health dashboard
 
 ## Quick start
 
@@ -148,6 +149,7 @@ Step 18 adds verified-email password accounts, one-time password reset, mandator
 | Manual admin operations | `GET/POST /api/admin/payment-channels`, `PATCH /api/admin/payment-channels/:id`, `POST /api/admin/payments/:id/manual-review`, `manual-refunded` |
 | Admin dashboard | `GET /api/admin/dashboard` |
 | Admin analytics | Range-aware dashboard and CSV exports under `/api/admin/analytics` |
+| Admin monitoring | Operational health snapshot under `/api/admin/monitoring`; public liveness/readiness at `/api/health` and `/api/health/ready` |
 | Admin notifications | Delivery monitor, queue processing and retry under `/api/admin/notifications` |
 | Admin store operations | `GET/PATCH /api/admin/store-operations`, `POST /api/admin/store-closures`, `DELETE /api/admin/store-closures/:id` |
 | Admin products | List, create, update, archive and restore under `/api/admin/products` |
@@ -169,6 +171,7 @@ Step 18 adds verified-email password accounts, one-time password reset, mandator
 7. Configure SMTP and/or VAPID Web Push, verify test notifications, and monitor Admin → Notifications before relying on customer messaging.
 8. Keep `JWT_ACCESS_SECRET` stable during normal deployments because Step 09 guest-order access tokens are signed with it; rotating the secret intentionally invalidates outstanding guest tracking links.
 9. Keep Step 18 `AUTH_ENCRYPTION_KEY` server-side and stable; it encrypts administrator TOTP secrets. Generate a separate random value and configure it on Render before deploying Step 18.
+10. Use `/api/health/ready` for production readiness checks. Optional Step 19 tuning uses `MONITORING_SLOW_REQUEST_MS` (default 2000) and `MONITORING_RETENTION_DAYS` (default 30).
 
 ## Structure
 
@@ -219,3 +222,8 @@ Admin → **Kitchen display** provides a live three-lane production board: **NEW
 
 Timers are derived from the already persisted order timestamps. NEW ASAP tickets show confirmation wait time; scheduled NEW tickets show the requested schedule without being falsely marked overdue; PREPARING tickets compare against the live `estimatedReadyAt`; and READY tickets show how long the finished order has been waiting for pickup or delivery dispatch. Pickup can complete directly from READY, while delivery moves from READY to `OUT_FOR_DELIVERY` with a selectable ETA. Historical `READY_FOR_PICKUP` orders remain supported for backwards compatibility. Step 15 adds no Prisma migration or environment variable. See `KITCHEN_DISPLAY_SETUP.md` and `STEP_15_VERIFICATION.md`.
 
+
+
+## Production monitoring (Step 19)
+
+Every API response now carries an `X-Request-ID`. Unexpected 5xx responses return the same identifier as a customer-facing Support ID and persist a redacted operational event for admin diagnosis. Slow requests, notification-worker failures, database-readiness failures and fatal process failures emit structured logs; recoverable operational incidents are retained in PostgreSQL for a configurable period. `GET /api/health` is a lightweight liveness endpoint, while `GET /api/health/ready` verifies PostgreSQL readiness and returns HTTP 503 if the database is unavailable. Admin → **Monitoring** summarizes database latency, uptime/memory, configured integrations, active workload, notification backlog and recent operational events. No monitoring vendor is required and no secret values are exposed. See `MONITORING_SETUP.md` and `STEP_19_VERIFICATION.md`.

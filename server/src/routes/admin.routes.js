@@ -24,6 +24,7 @@ import { restoreOrderInventory, setInventoryLevel, withSerializableRetry } from 
 import { getAdminAnalytics, getAdminAnalyticsCsv } from '../services/admin-analytics.js';
 import { buildOrderDocument, orderDocumentFilename, orderDocumentInclude, renderOrderDocumentHtml } from '../services/order-documents.js';
 import { refundReconciliation } from '../services/cancellation-policy.js';
+import { monitoringSnapshot } from '../services/observability.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -1094,6 +1095,15 @@ router.get('/audit-logs', async (_req, res) => {
     take: 100,
   });
   res.json({ logs });
+});
+
+router.get('/monitoring', async (_req, res, next) => {
+  try {
+    const snapshot = await monitoringSnapshot();
+    res.set('Cache-Control', 'private, no-store');
+    res.set('Pragma', 'no-cache');
+    res.json(snapshot);
+  } catch (error) { next(error); }
 });
 
 const analyticsRangeFields = {

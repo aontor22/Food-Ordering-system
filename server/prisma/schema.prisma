@@ -559,3 +559,24 @@ model AuditLog {
   actor User? @relation("ActorLogs", fields: [actorId], references: [id], onDelete: SetNull)
   @@index([actorId, createdAt])
 }
+
+
+model OperationalEvent {
+  id String @id @default(cuid())
+  level String
+  source String
+  code String
+  message String
+  requestId String?
+  route String?
+  method String?
+  statusCode Int?
+  durationMs Int?
+  metadataJson String?
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+  @@index([level, createdAt])
+  @@index([source, createdAt])
+  @@index([code, createdAt])
+  @@index([requestId])
+}

@@ -4,18 +4,22 @@ let refreshPromise = null;
 export const setAccessToken = value => { accessToken = value; };
 
 export class ApiError extends Error {
-  constructor(message, { code = 'REQUEST_FAILED', status = 0, details = null } = {}) {
+  constructor(message, { code = 'REQUEST_FAILED', status = 0, details = null, requestId = null } = {}) {
     super(message);
     this.name = 'ApiError';
     this.code = code;
     this.status = status;
     this.details = details;
+    this.requestId = requestId;
   }
 }
 
 async function parseError(response, fallback = 'Request failed') {
   const data = await response.json().catch(() => ({}));
-  return new ApiError(data.error?.message || fallback, { code: data.error?.code, status: response.status, details: data.error?.details });
+  const requestId = data.error?.requestId || response.headers.get('x-request-id') || null;
+  const baseMessage = data.error?.message || fallback;
+  const message = response.status >= 500 && requestId ? `${baseMessage} (Support ID: ${requestId})` : baseMessage;
+  return new ApiError(message, { code: data.error?.code, status: response.status, details: data.error?.details, requestId });
 }
 
 async function refreshAccessToken() {
@@ -277,6 +281,7 @@ export const api = {
   getGuestManualPayment: (orderId, token) => request(`/payments/guest/manual/${orderId}`, { headers: { 'X-Order-Access-Token': token } }, false),
   submitGuestManualPayment: (orderId, body, token) => request(`/payments/guest/manual/${orderId}/submit`, { method: 'POST', body: JSON.stringify(body), headers: { 'X-Order-Access-Token': token } }, false),
   getAdminDashboard: () => request('/admin/dashboard'),
+  getAdminMonitoring: () => request('/admin/monitoring'),
   getAdminAnalytics: params => request(`/admin/analytics${buildQuery(params)}`),
   downloadAdminAnalyticsCsv: (type, params) => downloadRequest(`/admin/analytics/export${buildQuery({ ...params, type })}`),
   getAdminNotifications: () => request('/admin/notifications'),

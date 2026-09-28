@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { config } from '../config.js';
 import { guestTrackingUrl } from './guest-orders.js';
 import { parseOrderItemCustomizations } from './product-customizations.js';
+import { captureOperationalError } from './observability.js';
 
 const STATUS_PREF_FIELD = {
   PENDING: 'orderPlaced',
@@ -325,7 +326,7 @@ export async function processPendingNotifications({ limit = 25 } = {}) {
 
 export function startNotificationWorker({ intervalMs = 10_000, logger = console } = {}) {
   if (workerTimer) return () => {};
-  const tick = () => processPendingNotifications().catch(error => logger.error?.('notification worker failed', error));
+  const tick = () => processPendingNotifications().catch(error => { logger.error?.('notification worker failed', error); void captureOperationalError(error, { source: 'NOTIFICATION_WORKER', code: 'NOTIFICATION_WORKER_FAILED', message: 'Notification worker failed' }); });
   setTimeout(tick, 1500).unref?.();
   workerTimer = setInterval(tick, intervalMs);
   workerTimer.unref?.();

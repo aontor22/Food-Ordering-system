@@ -34,7 +34,9 @@ const schema = z.object({
   EMAIL_FROM_NAME: z.string().trim().max(80).default('Tomato Restaurant'),
   VAPID_PUBLIC_KEY: z.string().trim().optional().transform(value => value || undefined),
   VAPID_PRIVATE_KEY: z.string().trim().optional().transform(value => value || undefined),
-  VAPID_SUBJECT: z.string().trim().refine(value => value.startsWith('mailto:') || /^https?:\/\//i.test(value), 'VAPID_SUBJECT must be a mailto: address or HTTP(S) URL').default('mailto:admin@example.com')
+  VAPID_SUBJECT: z.string().trim().refine(value => value.startsWith('mailto:') || /^https?:\/\//i.test(value), 'VAPID_SUBJECT must be a mailto: address or HTTP(S) URL').default('mailto:admin@example.com'),
+  MONITORING_SLOW_REQUEST_MS: z.coerce.number().int().min(250).max(60_000).default(2000),
+  MONITORING_RETENTION_DAYS: z.coerce.number().int().min(7).max(365).default(30)
 });
 
 export const config = schema.parse(process.env);

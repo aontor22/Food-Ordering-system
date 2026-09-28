@@ -7,6 +7,7 @@ import './admin.css';
 const navigation = [
   { to: '/admin', label: 'Overview', icon: 'dashboard', end: true },
   { to: '/admin/analytics', label: 'Analytics', icon: 'trend' },
+  { to: '/admin/monitoring', label: 'Monitoring', icon: 'alert' },
   { to: '/admin/products', label: 'Products', icon: 'products' },
   { to: '/admin/inventory', label: 'Inventory', icon: 'activity' },
   { to: '/admin/orders', label: 'Orders', icon: 'orders' },
@@ -27,6 +28,7 @@ const navigation = [
 const titles = {
   '/admin': ['Dashboard overview', 'Monitor the health of your restaurant in real time.'],
   '/admin/analytics': ['Sales analytics', 'Understand revenue, customers, products and demand with exportable reporting.'],
+  '/admin/monitoring': ['Production monitoring', 'Inspect service health, dependency readiness, operational incidents and delivery queues.'],
   '/admin/products': ['Product management', 'Control menu availability, pricing, variants and add-ons.'],
   '/admin/inventory': ['Inventory control', 'Manage concurrency-safe product and option stock with a complete adjustment history.'],
   '/admin/orders': ['Live order operations', 'Track, estimate and move orders through fulfilment in real time.'],
