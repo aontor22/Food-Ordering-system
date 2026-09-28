@@ -232,3 +232,8 @@ Every API response now carries an `X-Request-ID`. Unexpected 5xx responses retur
 ## Step 20 — SEO and structured metadata
 
 Public product URLs, Open Graph/Twitter metadata, Product/Restaurant JSON-LD, sitemap generation and robots/noindex controls are documented in `SEO_SETUP.md` and `STEP_20_VERIFICATION.md`.
+
+
+## Final release audit
+
+The final release-candidate hardening closes the roadmap with complete test-suite discovery, patched Nodemailer 10, fail-fast production configuration checks, strict production SEO-feed generation, baseline Vercel security headers, and keyboard/focus accessibility improvements. Run the PostgreSQL-backed release gate with `npm run qa:release`, then complete the live cross-device matrix before treating production as fully verified. See `FINAL_QA_AUDIT.md` and `FINAL_RELEASE_CHECKLIST.md`.

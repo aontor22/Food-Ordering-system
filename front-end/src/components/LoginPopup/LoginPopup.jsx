@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { StoreContext } from '../../context/StoreContext';
 import { api } from '../../lib/api';
 import Icon from '../ui/Icon';
@@ -16,14 +16,33 @@ export default function LoginPopup({ onClose }) {
   const [mfaCode, setMfaCode] = useState('');
   const [setup, setSetup] = useState(null);
   const [recoveryCodes, setRecoveryCodes] = useState([]);
+  const modalRef = useRef(null);
+  const previousFocusRef = useRef(null);
   const { authenticate, authenticateWithGoogle, acceptAuthSession } = useContext(StoreContext);
   const googleEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim());
 
   useEffect(() => {
+    previousFocusRef.current = document.activeElement;
     document.body.classList.add('modal-open');
-    const close = event => event.key === 'Escape' && onClose();
-    document.addEventListener('keydown', close);
-    return () => { document.body.classList.remove('modal-open'); document.removeEventListener('keydown', close); };
+    const selector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const keydown = event => {
+      if (event.key === 'Escape') { event.preventDefault(); onClose(); return; }
+      if (event.key !== 'Tab' || !modalRef.current) return;
+      const focusable = [...modalRef.current.querySelectorAll(selector)].filter(element => element.getClientRects().length > 0);
+      if (!focusable.length) { event.preventDefault(); modalRef.current.focus(); return; }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', keydown);
+    const frame = requestAnimationFrame(() => modalRef.current?.querySelector(selector)?.focus());
+    return () => {
+      cancelAnimationFrame(frame);
+      document.body.classList.remove('modal-open');
+      document.removeEventListener('keydown', keydown);
+      previousFocusRef.current?.focus?.();
+    };
   }, [onClose]);
 
   const update = event => setValues(previous => ({ ...previous, [event.target.name]: event.target.value }));
@@ -102,20 +121,20 @@ export default function LoginPopup({ onClose }) {
     finally { setBusy(false); }
   };
 
-  if (recoveryCodes.length) return <div className="auth-overlay" role="presentation">
-    <section className="auth-modal auth-modal-wide" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+  if (recoveryCodes.length) return <div ref={modalRef} className="auth-overlay" role="presentation">
+    <section tabIndex="-1" className="auth-modal auth-modal-wide" role="dialog" aria-modal="true" aria-labelledby="auth-title">
       <div className="auth-mark">T.</div>
       <div className="section-kicker">Admin security</div>
       <h2 id="auth-title">Save your recovery codes</h2>
       <p>Two-factor authentication is enabled. Each recovery code works once if your authenticator is unavailable. Store them somewhere private; Tomato cannot show these same codes again.</p>
       <div className="recovery-code-grid">{recoveryCodes.map(code => <code key={code}>{code}</code>)}</div>
-      <button className="button button-primary button-full" onClick={onClose}>I saved the codes — continue</button>
+      <button type="button" className="button button-primary button-full" onClick={onClose}>I saved the codes — continue</button>
     </section>
   </div>;
 
-  if (challenge) return <div className="auth-overlay" role="presentation">
-    <section className="auth-modal auth-modal-wide" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-      <button className="auth-close icon-button" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
+  if (challenge) return <div ref={modalRef} className="auth-overlay" role="presentation">
+    <section tabIndex="-1" className="auth-modal auth-modal-wide" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <button type="button" className="auth-close icon-button" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
       <div className="auth-mark">T.</div>
       <div className="section-kicker">Administrator verification</div>
       <h2 id="auth-title">{challenge.type === 'setup' ? 'Set up two-factor authentication' : 'Enter your security code'}</h2>
@@ -128,13 +147,13 @@ export default function LoginPopup({ onClose }) {
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button button-primary button-full" disabled={busy}>{busy ? 'Verifying…' : challenge.type === 'setup' ? 'Enable 2FA & sign in' : 'Verify & sign in'}</button>
       </form>
-      <p className="auth-switch"><button onClick={() => switchMode('login')}>Start sign-in again</button></p>
+      <p className="auth-switch"><button type="button" onClick={() => switchMode('login')}>Start sign-in again</button></p>
     </section>
   </div>;
 
-  return <div className="auth-overlay" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}>
-    <section className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-      <button className="auth-close icon-button" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
+  return <div ref={modalRef} className="auth-overlay" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}>
+    <section tabIndex="-1" className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <button type="button" className="auth-close icon-button" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
       <div className="auth-mark">T.</div>
       <div className="section-kicker">Welcome to Tomato</div>
       <h2 id="auth-title">{mode === 'login' ? 'Good to see you again' : mode === 'register' ? 'Create your account' : mode === 'forgot' ? 'Reset your password' : 'Check your email'}</h2>
@@ -149,13 +168,13 @@ export default function LoginPopup({ onClose }) {
         {mode === 'register' && <label className="terms-check"><input type="checkbox" required /><span>I agree to the terms of use and privacy policy.</span></label>}
         <button className="button button-primary button-full" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'register' ? 'Create account' : 'Send reset link'}</button>
       </form>}
-      {mode === 'verification-sent' && <>{notice && <p className="auth-notice" role="status">{notice}</p>}{previewUrl && <a className="auth-dev-link" href={previewUrl}>Development preview link</a>}<button className="button button-secondary button-full" onClick={resendVerification} disabled={busy}>{busy ? 'Sending…' : 'Resend verification email'}</button></>}
-      {mode === 'login' && notice && <button className="button button-secondary button-full auth-secondary-action" onClick={resendVerification} disabled={busy}>Resend verification email</button>}
-      {mode === 'login' && <button className="auth-text-action" onClick={() => switchMode('forgot')}>Forgot password?</button>}
+      {mode === 'verification-sent' && <>{notice && <p className="auth-notice" role="status">{notice}</p>}{previewUrl && <a className="auth-dev-link" href={previewUrl}>Development preview link</a>}<button type="button" className="button button-secondary button-full" onClick={resendVerification} disabled={busy}>{busy ? 'Sending…' : 'Resend verification email'}</button></>}
+      {mode === 'login' && notice && <button type="button" className="button button-secondary button-full auth-secondary-action" onClick={resendVerification} disabled={busy}>Resend verification email</button>}
+      {mode === 'login' && <button type="button" className="auth-text-action" onClick={() => switchMode('forgot')}>Forgot password?</button>}
       {googleEnabled && ['login', 'register'].includes(mode) && <><div className="auth-divider" aria-hidden="true"><span>or continue with</span></div><GoogleSignInButton disabled={busy} onCredential={googleSignIn} onError={requestError => setError(requestError.message)} /></>}
-      {mode === 'login' && <p className="auth-switch">New to Tomato? <button onClick={() => switchMode('register')}>Create an account</button></p>}
-      {mode === 'register' && <p className="auth-switch">Already have an account? <button onClick={() => switchMode('login')}>Sign in</button></p>}
-      {['forgot', 'verification-sent'].includes(mode) && <p className="auth-switch"><button onClick={() => switchMode('login')}>Back to sign in</button></p>}
+      {mode === 'login' && <p className="auth-switch">New to Tomato? <button type="button" onClick={() => switchMode('register')}>Create an account</button></p>}
+      {mode === 'register' && <p className="auth-switch">Already have an account? <button type="button" onClick={() => switchMode('login')}>Sign in</button></p>}
+      {['forgot', 'verification-sent'].includes(mode) && <p className="auth-switch"><button type="button" onClick={() => switchMode('login')}>Back to sign in</button></p>}
     </section>
   </div>;
 }

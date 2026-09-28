@@ -22,4 +22,4 @@ Implemented sequentially so each release remains deployable and testable.
 - [x] 18 — Auth hardening: email verification, password reset, admin 2FA/session controls
 - [x] 19 — Production monitoring, structured error tracking and operational health checks
 - [x] 20 — SEO, Open Graph, sitemap, robots and structured restaurant/product metadata
-- [ ] Final — Cross-device QA, accessibility, security and deployment audit
+- [x] Final — Source QA, accessibility/security hardening and deployment audit (production cross-device checklist included)

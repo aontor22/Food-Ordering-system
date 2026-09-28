@@ -15,5 +15,8 @@
   "devDependencies": {
     "@preact/preset-vite": "^2.10.2",
     "vite": "^7.1.2"
+  },
+  "engines": {
+    "node": ">=20.19.0"
   }
 }

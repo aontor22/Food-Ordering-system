@@ -65,17 +65,17 @@ export default function AdminLayout() {
       </nav>
       <div className="admin-sidebar-footer">
         <Link to="/"><Icon name="store" size={18} />View storefront</Link>
-        <button onClick={logout}><Icon name="logout" size={18} />Sign out</button>
+        <button type="button" onClick={logout}><Icon name="logout" size={18} />Sign out</button>
       </div>
     </aside>
-    {open && <button className="admin-backdrop" aria-label="Close navigation" onClick={() => setOpen(false)} />}
+    {open && <button type="button" className="admin-backdrop" aria-label="Close navigation" onClick={() => setOpen(false)} />}
     <div className="admin-workspace">
       <header className="admin-topbar">
-        <button className="icon-button admin-menu-toggle" onClick={() => setOpen(true)} aria-label="Open navigation"><Icon name="menu" /></button>
+        <button type="button" className="icon-button admin-menu-toggle" onClick={() => setOpen(true)} aria-label="Open navigation"><Icon name="menu" /></button>
         <div><h1>{title}</h1><p>{subtitle}</p></div>
         <div className="admin-profile"><span>{user.name.charAt(0).toUpperCase()}</span><div><strong>{user.name}</strong><small>Administrator</small></div></div>
       </header>
-      <main className="admin-content"><Outlet /></main>
+      <main id="main-content" className="admin-content" tabIndex="-1"><Outlet /></main>
     </div>
   </div>;
 }

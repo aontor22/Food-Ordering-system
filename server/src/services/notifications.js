@@ -72,6 +72,8 @@ export async function sendTransactionalEmail({ to, subject, text, html, headers 
     text,
     html,
     headers,
+    disableFileAccess: true,
+    disableUrlAccess: true,
   });
   return { skipped: false, messageId: info.messageId || null };
 }

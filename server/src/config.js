@@ -1,13 +1,17 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+const DEVELOPMENT_ACCESS_SECRET = 'development-access-secret-change-me-123456';
+const DEVELOPMENT_REFRESH_SECRET = 'development-refresh-secret-change-me-12345';
+const DEVELOPMENT_DATABASE_URL = 'postgresql://tomato:tomato@localhost:5432/tomato?schema=public';
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   TEST_AUTH_BYPASS: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
   PORT: z.coerce.number().int().positive().default(4000),
-  DATABASE_URL: z.string().refine(value => /^postgres(?:ql)?:\/\//i.test(value), 'DATABASE_URL must be a PostgreSQL connection URL').default('postgresql://tomato:tomato@localhost:5432/tomato?schema=public'),
-  JWT_ACCESS_SECRET: z.string().min(32).default('development-access-secret-change-me-123456'),
-  JWT_REFRESH_SECRET: z.string().min(32).default('development-refresh-secret-change-me-12345'),
+  DATABASE_URL: z.string().refine(value => /^postgres(?:ql)?:\/\//i.test(value), 'DATABASE_URL must be a PostgreSQL connection URL').default(DEVELOPMENT_DATABASE_URL),
+  JWT_ACCESS_SECRET: z.string().min(32).default(DEVELOPMENT_ACCESS_SECRET),
+  JWT_REFRESH_SECRET: z.string().min(32).default(DEVELOPMENT_REFRESH_SECRET),
   AUTH_ENCRYPTION_KEY: z.string().min(32).optional().transform(value => value || undefined),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_DAYS: z.coerce.number().int().min(1).max(30).default(7),
@@ -44,6 +48,28 @@ export const isProduction = config.NODE_ENV === 'production';
 
 if (isProduction && !config.AUTH_ENCRYPTION_KEY) {
   throw new Error('AUTH_ENCRYPTION_KEY is required in production for encrypted admin 2FA secrets');
+}
+
+if (isProduction) {
+  if (config.DATABASE_URL === DEVELOPMENT_DATABASE_URL) {
+    throw new Error('Production DATABASE_URL must not use the bundled local development database');
+  }
+  if (config.JWT_ACCESS_SECRET === DEVELOPMENT_ACCESS_SECRET || config.JWT_REFRESH_SECRET === DEVELOPMENT_REFRESH_SECRET) {
+    throw new Error('Production JWT secrets must be explicitly configured and must not use development defaults');
+  }
+  if (config.JWT_ACCESS_SECRET === config.JWT_REFRESH_SECRET) {
+    throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different values');
+  }
+  const origins = config.CLIENT_ORIGIN.split(',').map(value => value.trim()).filter(Boolean);
+  if (!origins.length || origins.some(value => {
+    try { return new URL(value).protocol !== 'https:'; }
+    catch { return true; }
+  })) {
+    throw new Error('Production CLIENT_ORIGIN must contain only valid HTTPS origins');
+  }
+  if (!config.PUBLIC_API_URL.startsWith('https://')) {
+    throw new Error('Production PUBLIC_API_URL must use HTTPS');
+  }
 }
 
 if (config.SSLCOMMERZ_LIVE && (!config.SSLCOMMERZ_STORE_ID || !config.SSLCOMMERZ_STORE_PASSWORD)) {

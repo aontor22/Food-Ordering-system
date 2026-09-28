@@ -6,19 +6,27 @@ const DEFAULT_SITE_URL = 'https://food-ordering-system-ten-sable.vercel.app';
 const siteUrl = String(process.env.VITE_SITE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '') || DEFAULT_SITE_URL).replace(/\/$/, '');
 const apiUrl = String(process.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/$/, '');
 const currency = String(process.env.VITE_CURRENCY || 'USD').toUpperCase();
+const requireProductFeed = process.env.VERCEL_ENV === 'production';
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const absoluteUrl = value => !value ? `${siteUrl}/favicon-512.png` : /^https?:\/\//i.test(value) ? value : `${siteUrl}${value.startsWith('/') ? '' : '/'}${value}`;
 const xmlEscape = value => String(value ?? '').replace(/[<>&'\"]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[char]));
 
-async function fetchJson(endpoint) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    const response = await fetch(`${apiUrl}${endpoint}`, { signal: controller.signal, headers: { Accept: 'application/json' } });
-    if (!response.ok) throw new Error(`${endpoint} returned ${response.status}`);
-    return await response.json();
-  } finally { clearTimeout(timer); }
+async function fetchJson(endpoint, attempts = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(`${apiUrl}${endpoint}`, { signal: controller.signal, headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(`${endpoint} returned ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) await new Promise(resolve => setTimeout(resolve, 400 * attempt));
+    } finally { clearTimeout(timer); }
+  }
+  throw lastError;
 }
 
 function setTitle(html, value) {
@@ -103,7 +111,10 @@ try {
   store = storeData?.store || null;
   fulfillment = fulfillmentData || null;
 } catch (error) {
-  console.warn(`[seo] Product feed unavailable during build: ${error.message}. Home sitemap/robots will still be generated.`);
+  if (requireProductFeed) {
+    throw new Error(`[seo] Production build requires the product feed at ${apiUrl}/products: ${error.message}`);
+  }
+  console.warn(`[seo] Product feed unavailable during non-production build: ${error.message}. Home sitemap/robots will still be generated.`);
 }
 
 let indexHtml = await fs.readFile(path.join(DIST, 'index.html'), 'utf8');

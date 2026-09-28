@@ -53,6 +53,7 @@ export default function App() {
   const { pathname } = useLocation();
   const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
   return <div className="app-shell">
+    <a className="skip-link" href="#main-content">Skip to main content</a>
     <ScrollToTop />
     <SeoRoutePolicy />
     {showLogin && <LoginPopup onClose={() => setShowLogin(false)} />}
@@ -80,7 +81,7 @@ export default function App() {
       </Route>
     </Routes> : <>
       <Navbar onLogin={() => setShowLogin(true)} />
-      <main className="page-main page-container">
+      <main id="main-content" className="page-main page-container" tabIndex="-1">
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/menu/:slug" element={<ProductDetail />} />

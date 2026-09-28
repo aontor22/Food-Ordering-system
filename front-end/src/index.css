@@ -35,6 +35,11 @@ a { color: inherit; text-decoration: none; }
 h1, h2, h3, .display-font { font-family: 'Manrope', sans-serif; }
 :focus-visible { outline: 3px solid rgba(244, 81, 44, .28); outline-offset: 3px; }
 
+.skip-link { position: fixed; top: 10px; left: 10px; z-index: 10000; padding: 10px 14px; border-radius: 10px; background: var(--ink); color: #fff; font-weight: 800; transform: translateY(-160%); transition: transform .16s ease; }
+.skip-link:focus { transform: translateY(0); }
+#main-content:focus { outline: none; }
+
+
 .app-shell { min-height: calc(100vh - 340px); }
 .page-container { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
 .page-main { min-height: 65vh; padding-bottom: 48px; }
