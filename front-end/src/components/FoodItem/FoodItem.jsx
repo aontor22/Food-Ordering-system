@@ -1,4 +1,5 @@
 import { useContext, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { StoreContext } from '../../context/StoreContext';
 import { formatCurrency, formatDate } from '../../lib/format';
 import { api } from '../../lib/api';
@@ -50,7 +51,7 @@ export default function FoodItem({ item }) {
         <button className="food-rating" type="button" onClick={openReviews} aria-label={`${item.name}: ${ratingLabel}. View reviews`}><span>★</span>{item.reviewCount ? `${Number(item.reviewRating).toFixed(1)} · ${item.reviewCount}` : 'New'}</button>
       </div>
       <div className="food-card-body">
-        <div className="food-card-heading"><h3>{item.name}</h3><strong>{formatCurrency(item.price)}</strong></div>
+        <div className="food-card-heading"><h3><Link to={`/menu/${item.slug}`}>{item.name}</Link></h3><strong>{formatCurrency(item.price)}</strong></div>
         <p>{item.description}</p>
         {dietLabels.length > 0 && <div className="food-dietary-tags" aria-label="Dietary information">{dietLabels.slice(0, 3).map(label => <span key={label}>{label}</span>)}{dietLabels.length > 3 && <span>+{dietLabels.length - 3}</span>}</div>}
         {wishlistError && <p className="wishlist-error" role="alert">{wishlistError}</p>}

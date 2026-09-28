@@ -217,6 +217,7 @@ export const api = {
     });
     return request(`/products?${params.toString()}`);
   },
+  getProductBySlug: slug => request(`/products/slug/${encodeURIComponent(slug)}`),
   getStoreStatus: () => request('/store/status'),
   getDeliveryZones: () => request('/store/delivery-zones'),
   getFulfillmentOptions: () => request('/store/fulfillment'),

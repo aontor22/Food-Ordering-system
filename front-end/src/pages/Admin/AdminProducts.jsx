@@ -6,7 +6,7 @@ import { formatCurrency } from '../../lib/format';
 import Icon from '../../components/ui/Icon';
 import { AdminEmpty, AdminError, AdminLoading, AdminModal, AdminPageHeader, StatusBadge } from '../../components/admin/AdminUI';
 
-const emptyForm = { name: '', description: '', category: '', price: '', stock: '100', lowStockThreshold: '10', maxPerOrder: '20', isVegetarian: false, isVegan: false, isHalal: false, isGlutenFree: false, isAvailable: true, optionGroups: [] };
+const emptyForm = { name: '', slug: '', description: '', category: '', price: '', stock: '100', lowStockThreshold: '10', maxPerOrder: '20', isVegetarian: false, isVegan: false, isHalal: false, isGlutenFree: false, isAvailable: true, optionGroups: [] };
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 let localKeyCounter = 0;
 const localKey = prefix => `${prefix}-${Date.now()}-${localKeyCounter += 1}`;
@@ -116,7 +116,7 @@ export default function AdminProducts() {
   const openEdit = product => {
     resetImageState(); setEditing(product);
     setForm({
-      name: product.name, description: product.description, category: product.category,
+      name: product.name, slug: product.slug || '', description: product.description, category: product.category,
       price: (product.priceCents / 100).toFixed(2), stock: String(product.stock), lowStockThreshold: String(product.lowStockThreshold ?? 10), maxPerOrder: String(product.maxPerOrder ?? 20),
       isVegetarian: product.isVegetarian === true, isVegan: product.isVegan === true, isHalal: product.isHalal === true, isGlutenFree: product.isGlutenFree === true, isAvailable: product.isAvailable,
       optionGroups: (product.optionGroups || []).map(groupToForm),
@@ -200,7 +200,7 @@ export default function AdminProducts() {
     setSaving(true); setSaveStage('Saving…'); setFormError('');
     let uploaded = null;
     const body = {
-      name: form.name, description: form.description, category: form.category,
+      name: form.name, slug: form.slug.trim() || undefined, description: form.description, category: form.category,
       priceCents: Math.round(Number(form.price) * 100), lowStockThreshold: Number(form.lowStockThreshold), maxPerOrder: Number(form.maxPerOrder),
       isVegetarian: form.isVegetarian, isVegan: form.isVegan, isHalal: form.isHalal, isGlutenFree: form.isGlutenFree, isAvailable: form.isAvailable,
       ...(!editing ? { stock: Number(form.stock) } : {}),
@@ -275,6 +275,7 @@ export default function AdminProducts() {
     {form && <AdminModal wide title={editing ? 'Edit product' : 'Add a new product'} subtitle="Base price plus selected option price adjustments becomes the server-validated unit price." onClose={closeModal}>
       <form className="admin-form" onSubmit={save}>
         <div className="field-grid"><div className="field"><label htmlFor="product-name">Product name</label><input id="product-name" name="name" required minLength="2" maxLength="100" value={form.name} onChange={update} /></div><div className="field"><label htmlFor="product-category">Category</label><input id="product-category" name="category" required list="product-categories" value={form.category} onChange={update} /><datalist id="product-categories">{categories.map(category => <option key={category} value={category} />)}</datalist></div></div>
+        <div className="field-grid"><div className="field"><label htmlFor="product-slug">SEO URL slug</label><input id="product-slug" name="slug" maxLength="90" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={form.slug} onChange={update} placeholder="Auto-generated from product name" /><small>Public URL: /menu/{form.slug || 'auto-generated-slug'}. Keep an existing slug stable unless you intentionally want a new URL.</small></div><div className="field"><label>Search preview</label><div className="seo-preview-mini"><strong>{form.name || 'Product name'}</strong><small>/menu/{form.slug || 'auto-generated-slug'}</small></div></div></div>
         <div className="field"><label htmlFor="product-description">Description</label><textarea id="product-description" name="description" required minLength="5" maxLength="500" value={form.description} onChange={update} /></div>
         <div className="field-grid"><div className="field"><label htmlFor="product-price">Base price</label><input id="product-price" name="price" type="number" required min="0.01" max="100000" step="0.01" value={form.price} onChange={update} /></div><div className="field"><label htmlFor="product-stock">Units in stock</label><input id="product-stock" name="stock" type="number" required min="0" max="1000000" step="1" value={form.stock} onChange={update} disabled={Boolean(editing)} />{editing && <small>Stock is protected from stale edits. Change it in <Link to="/admin/inventory">Inventory</Link>.</small>}</div></div>
         <div className="field-grid"><div className="field"><label htmlFor="product-low-stock">Low-stock alert at</label><input id="product-low-stock" name="lowStockThreshold" type="number" required min="0" max="1000000" step="1" value={form.lowStockThreshold} onChange={update} /></div><div className="field"><label htmlFor="product-max-order">Maximum per order</label><input id="product-max-order" name="maxPerOrder" type="number" required min="1" max="20" step="1" value={form.maxPerOrder} onChange={update} /></div></div>

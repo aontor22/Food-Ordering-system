@@ -38,6 +38,8 @@ import ManualPayment from './pages/Payment/ManualPayment';
 import VerifyEmail from './pages/Auth/VerifyEmail';
 import ResetPassword from './pages/Auth/ResetPassword';
 import Security from './pages/Security/Security';
+import ProductDetail from './pages/ProductDetail/ProductDetail';
+import SeoRoutePolicy from './components/SeoRoutePolicy';
 import './responsive.css';
 
 function ScrollToTop() {
@@ -52,6 +54,7 @@ export default function App() {
   const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
   return <div className="app-shell">
     <ScrollToTop />
+    <SeoRoutePolicy />
     {showLogin && <LoginPopup onClose={() => setShowLogin(false)} />}
     {isAdmin ? <Routes>
       <Route path="/admin" element={<AdminGuard onLogin={() => setShowLogin(true)}><AdminLayout /></AdminGuard>}>
@@ -80,6 +83,7 @@ export default function App() {
       <main className="page-main page-container">
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/menu/:slug" element={<ProductDetail />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/order" element={<PlaceOrder onLogin={() => setShowLogin(true)} />} />
         <Route path="/orders" element={<Orders onLogin={() => setShowLogin(true)} />} />

@@ -103,6 +103,38 @@ router.get('/', validate(querySchema), async (req, res) => {
   });
 });
 
+
+router.get('/slug/:slug', async (req, res, next) => {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { slug: req.params.slug },
+      include: publicProductCustomizationInclude,
+    });
+    if (!product?.isAvailable) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+
+    const [rating, popularity] = await Promise.all([
+      prisma.review.aggregate({
+        where: { productId: product.id, status: 'PUBLISHED' },
+        _avg: { rating: true },
+        _count: { rating: true },
+      }),
+      prisma.orderItem.aggregate({
+        where: { productId: product.id, order: { status: 'DELIVERED' } },
+        _sum: { quantity: true },
+      }),
+    ]);
+
+    const serialized = serializeProductForClient({
+      ...product,
+      reviewRating: rating._avg.rating || 0,
+      reviewCount: rating._count.rating || 0,
+      popularityCount: popularity._sum.quantity || 0,
+    });
+    res.set('Cache-Control', 'no-store');
+    res.json({ product: { ...serialized, price: serialized.priceCents / 100 } });
+  } catch (error) { next(error); }
+});
+
 router.get('/categories', async (_req, res) => {
   const values = await prisma.product.findMany({ where: { isAvailable: true }, distinct: ['category'], select: { category: true }, orderBy: { category: 'asc' } });
   res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');

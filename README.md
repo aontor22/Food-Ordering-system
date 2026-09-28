@@ -227,3 +227,8 @@ Timers are derived from the already persisted order timestamps. NEW ASAP tickets
 ## Production monitoring (Step 19)
 
 Every API response now carries an `X-Request-ID`. Unexpected 5xx responses return the same identifier as a customer-facing Support ID and persist a redacted operational event for admin diagnosis. Slow requests, notification-worker failures, database-readiness failures and fatal process failures emit structured logs; recoverable operational incidents are retained in PostgreSQL for a configurable period. `GET /api/health` is a lightweight liveness endpoint, while `GET /api/health/ready` verifies PostgreSQL readiness and returns HTTP 503 if the database is unavailable. Admin → **Monitoring** summarizes database latency, uptime/memory, configured integrations, active workload, notification backlog and recent operational events. No monitoring vendor is required and no secret values are exposed. See `MONITORING_SETUP.md` and `STEP_19_VERIFICATION.md`.
+
+
+## Step 20 — SEO and structured metadata
+
+Public product URLs, Open Graph/Twitter metadata, Product/Restaurant JSON-LD, sitemap generation and robots/noindex controls are documented in `SEO_SETUP.md` and `STEP_20_VERIFICATION.md`.

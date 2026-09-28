@@ -22,6 +22,7 @@ async function main() {
       create: {
         id: String(index + 1),
         name,
+        slug: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}-${index + 1}`,
         category,
         priceCents: price * 100,
         stock: 100,

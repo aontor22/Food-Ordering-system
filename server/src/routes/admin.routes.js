@@ -25,6 +25,7 @@ import { getAdminAnalytics, getAdminAnalyticsCsv } from '../services/admin-analy
 import { buildOrderDocument, orderDocumentFilename, orderDocumentInclude, renderOrderDocumentHtml } from '../services/order-documents.js';
 import { refundReconciliation } from '../services/cancellation-policy.js';
 import { monitoringSnapshot } from '../services/observability.js';
+import { uniqueProductSlug } from '../services/seo.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -73,6 +74,7 @@ const optionGroupsInput = z.array(optionGroupInput).max(12).superRefine((groups,
 });
 const productFields = {
   name: z.string().trim().min(2).max(100),
+  slug: z.string().trim().min(2).max(90).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must contain lowercase letters, numbers and hyphens only').optional(),
   description: z.string().trim().min(5).max(500),
   category: z.string().trim().min(2).max(50),
   imageUrl,
@@ -217,11 +219,12 @@ async function syncProductCustomizations(tx, productId, groups) {
 
 router.post('/products', validate(productCreate), async (req, res, next) => {
   try {
-    const { id, optionGroups = [], ...rawValues } = req.validated.body;
+    const { id, optionGroups = [], slug: requestedSlug, ...rawValues } = req.validated.body;
     const values = normalizeProductMedia(normalizeDietaryClassification(rawValues));
     const productId = id || `prd_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`;
     const product = await withSerializableRetry(async tx => {
-      await tx.product.create({ data: { id: productId, ...values } });
+      const slug = await uniqueProductSlug(tx, requestedSlug || values.name);
+      await tx.product.create({ data: { id: productId, slug, ...values } });
       await syncProductCustomizations(tx, productId, optionGroups);
       const created = await tx.product.findUnique({ where: { id: productId }, include: adminProductCustomizationInclude });
       const openingAdjustments = [{
@@ -244,12 +247,13 @@ router.patch('/products/:id', validate(productUpdate), async (req, res, next) =>
   try {
     const existing = await prisma.product.findUnique({ where: { id: req.validated.params.id } });
     if (!existing) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
-    const { optionGroups, stock: submittedStock, ...rawValues } = req.validated.body;
+    const { optionGroups, stock: submittedStock, slug: requestedSlug, ...rawValues } = req.validated.body;
     if (submittedStock !== undefined && submittedStock !== existing.stock) {
       throw new AppError(409, 'USE_INVENTORY_ADJUSTMENT', 'Use Inventory to change stock so concurrent orders cannot be overwritten.');
     }
     const values = normalizeProductMedia(normalizeDietaryClassification(rawValues, existing));
     const product = await withSerializableRetry(async tx => {
+      if (requestedSlug !== undefined) values.slug = await uniqueProductSlug(tx, requestedSlug, { excludeId: existing.id });
       if (Object.keys(values).length) await tx.product.update({ where: { id: existing.id }, data: values });
       if (optionGroups) await syncProductCustomizations(tx, existing.id, optionGroups);
       return tx.product.findUnique({ where: { id: existing.id }, include: adminProductCustomizationInclude });

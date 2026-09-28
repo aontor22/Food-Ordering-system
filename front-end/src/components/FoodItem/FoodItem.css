@@ -36,3 +36,5 @@
 
 /* Step 13: customer-facing dietary metadata */
 .food-dietary-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.food-dietary-tags span{padding:4px 7px;border:1px solid #d8e8de;border-radius:999px;color:#2f6d4c;background:#f2faf5;font-size:.62rem;font-weight:800;line-height:1}
+.food-card-heading h3 a { color: inherit; text-decoration: none; }
+.food-card-heading h3 a:hover { color: var(--brand); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }

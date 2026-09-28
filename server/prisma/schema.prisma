@@ -91,6 +91,7 @@ model AuthToken {
 model Product {
   id String @id
   name String
+  slug String @unique @default(cuid())
   description String
   category String
   imageUrl String?
