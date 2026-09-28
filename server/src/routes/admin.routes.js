@@ -22,6 +22,7 @@ import { serializeOrderForClient, stripOrderSecrets } from '../services/order-vi
 import { adminProductCustomizationInclude, serializeProductForClient } from '../services/product-customizations.js';
 import { restoreOrderInventory, setInventoryLevel, withSerializableRetry } from '../services/inventory.js';
 import { getAdminAnalytics, getAdminAnalyticsCsv } from '../services/admin-analytics.js';
+import { buildOrderDocument, orderDocumentFilename, orderDocumentInclude, renderOrderDocumentHtml } from '../services/order-documents.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -377,6 +378,22 @@ router.get('/orders', async (_req, res) => {
     take: 250,
   });
   res.json({ orders: orders.map(serializeOrderForClient) });
+});
+
+router.get('/orders/:id/documents/:type', async (req, res, next) => {
+  try {
+    const order = await prisma.order.findUnique({ where: { id: req.params.id }, include: orderDocumentInclude });
+    if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+    const document = await buildOrderDocument(prisma, order, req.params.type);
+    const download = String(req.query.download || '') === '1';
+    const autoPrint = String(req.query.print || '') === '1';
+    res.set('Cache-Control', 'private, no-store');
+    res.set('Pragma', 'no-cache');
+    res.type('html');
+    res.set('Content-Disposition', `${download ? 'attachment' : 'inline'}; filename="${orderDocumentFilename(document)}"`);
+    if (download) await audit(req, 'ORDER_DOCUMENT_EXPORTED', 'Order', order.id, { type: document.type, documentNumber: document.documentNumber });
+    res.send(renderOrderDocumentHtml(document, { autoPrint }));
+  } catch (error) { next(error); }
 });
 
 router.get('/orders/live', (req, res) => {

@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { formatCurrency, humanizeStatus } from '../../lib/format';
 import Icon from '../../components/ui/Icon';
 import OrderItemCustomization from '../../components/orders/OrderItemCustomization';
+import OrderDocuments from '../../components/orders/OrderDocuments';
 import { api } from '../../lib/api';
 import './OrderSuccess.css';
 
@@ -46,7 +47,8 @@ export default function OrderSuccess() {
       {order.pointsRedeemed > 0 && <div><span>Points used</span><strong>{order.pointsRedeemed} · saved {formatCurrency(order.pointsDiscountCents / 100, order.payment?.currency)}</strong></div>}
       {loyalty && <div><span>Points balance</span><strong>{loyalty.pointsBalance}</strong></div>}
     </div>}
-    <div className="success-actions">{isOnline && order?.paymentStatus !== 'PAID' && <button className="button button-primary" onClick={retry} disabled={busy}>{busy ? 'Opening payment…' : 'Retry payment'}</button>}<Link to="/orders" className="button button-primary">View my orders</Link><Link to="/" className="button button-secondary">Back to menu</Link></div>
+    {order && <OrderDocuments order={order} />}
+        <div className="success-actions">{isOnline && order?.paymentStatus !== 'PAID' && <button className="button button-primary" onClick={retry} disabled={busy}>{busy ? 'Opening payment…' : 'Retry payment'}</button>}<Link to="/orders" className="button button-primary">View my orders</Link><Link to="/" className="button button-secondary">Back to menu</Link></div>
   </section>;
 }
 

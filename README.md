@@ -26,6 +26,8 @@ A working Preact storefront and responsive restaurant admin dashboard with a Nod
 - Stronger product/variant/add-on inventory controls with atomic reservations, checkout idempotency, optimistic admin stock updates, cancellation restoration, low-stock states, and an inventory ledger
 - Account-saved delivery addresses with a default location and one-click reorder that rebuilds the cart against current menu choices, prices, limits, and stock
 - Advanced menu discovery with full-catalog search, explicit Vegetarian/Vegan/Halal/Gluten-free product labels, price/rating filters, and price/rating/delivered-order popularity sorting
+- Live Kitchen Display System using the shared order lifecycle (`CONFIRMED`/NEW → `PREPARING` → `READY`) with preparation and handoff timers
+- Secure printable invoices and paid-only receipts for registered, guest and admin workflows, with standalone Unicode-safe downloads and browser Save-as-PDF printing
 
 ## Quick start
 
@@ -132,7 +134,7 @@ For email, configure backend-only generic SMTP variables (`SMTP_HOST`, `SMTP_POR
 | Store status | `GET /api/store/status` |
 | Auth | `POST /api/auth/register`, `login`, `refresh`, `logout`; `GET /me` |
 | Catalog | `GET /api/products`, `/api/products/categories` |
-| Orders | Authenticated `POST/GET /api/orders`, detail, cancellation, reviews, live tracking, and `POST /api/orders/:id/reorder`; guest quote/create/private tracking/cancel/link under `/api/orders/guest*` |
+| Orders | Authenticated `POST/GET /api/orders`, detail, cancellation, reviews, live tracking, reorder and secure invoice/receipt documents; guest quote/create/private tracking/cancel/link/documents under `/api/orders/guest*` |
 | Saved addresses | Account-owned CRUD under `/api/addresses`, including default-address selection |
 | Customer notifications | `GET /api/notifications`, preferences, push subscriptions, test delivery |
 | Payments | `GET /api/payments/options`; authenticated and private-token guest payment/manual routes; SSLCOMMERZ callback routes |
@@ -145,7 +147,7 @@ For email, configure backend-only generic SMTP variables (`SMTP_HOST`, `SMTP_POR
 | Admin store operations | `GET/PATCH /api/admin/store-operations`, `POST /api/admin/store-closures`, `DELETE /api/admin/store-closures/:id` |
 | Admin products | List, create, update, archive and restore under `/api/admin/products` |
 | Admin media | Cloudinary status/signature/cleanup/migration under `/api/admin/media` |
-| Admin orders | List and controlled status transitions under `/api/admin/orders` |
+| Admin orders | List, controlled status transitions, and secure invoice/receipt documents under `/api/admin/orders` |
 | Admin kitchen | Live KDS snapshot/SSE under `/api/admin/kitchen` and `/api/admin/kitchen/live` |
 | Admin customers | Account list and active-state management under `/api/admin/users` |
 | Admin coupons | List, create, update and disable under `/api/admin/coupons` |

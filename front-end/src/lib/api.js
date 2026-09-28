@@ -9,27 +9,34 @@ function buildQuery(params = {}) {
   return query ? `?${query}` : '';
 }
 
-async function downloadRequest(path, retry = true) {
+async function fetchDownloadResponse(path, options = {}, retry = true) {
+  const { authRetry = true, ...fetchOptions } = options;
   const response = await fetch(`${API_URL}${path}`, {
     credentials: 'include',
-    headers: { ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+    ...fetchOptions,
+    headers: { ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...(fetchOptions.headers || {}) },
   });
-  if (response.status === 401 && retry) {
+  if (response.status === 401 && retry && authRetry) {
     const refreshed = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
     if (refreshed.ok) {
       const data = await refreshed.json();
       setAccessToken(data.accessToken);
-      return downloadRequest(path, false);
+      return fetchDownloadResponse(path, options, false);
     }
   }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.error?.message || 'Download failed');
+    throw new Error(data.error?.message || 'Document request failed');
   }
+  return response;
+}
+
+async function downloadRequest(path, options = {}) {
+  const response = await fetchDownloadResponse(path, options);
   const blob = await response.blob();
   const disposition = response.headers.get('content-disposition') || '';
   const match = disposition.match(/filename="?([^";]+)"?/i);
-  const filename = match?.[1] || 'tomato-export.csv';
+  const filename = match?.[1] || 'tomato-document.html';
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -39,6 +46,24 @@ async function downloadRequest(path, retry = true) {
   anchor.remove();
   URL.revokeObjectURL(url);
   return filename;
+}
+
+async function openHtmlDocument(path, options = {}) {
+  const popup = window.open('', '_blank');
+  if (!popup) throw new Error('Allow pop-ups to print this document');
+  try { popup.opener = null; } catch { /* Browser may prevent opener reassignment. */ }
+  popup.document.write('<!doctype html><title>Preparing document…</title><p style="font-family:system-ui;padding:24px">Preparing secure order document…</p>');
+  try {
+    const response = await fetchDownloadResponse(path, options);
+    const html = await response.text();
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    return true;
+  } catch (error) {
+    popup.close();
+    throw error;
+  }
 }
 
 async function request(path, options = {}, retry = true) {
@@ -177,6 +202,10 @@ export const api = {
   setDefaultAddress: id => request(`/addresses/${id}/default`, { method: 'PUT' }),
   deleteAddress: id => request(`/addresses/${id}`, { method: 'DELETE' }),
   prepareReorder: id => request(`/orders/${id}/reorder`, { method: 'POST' }),
+  printOrderDocument: (id, type) => openHtmlDocument(`/orders/${id}/documents/${type}?print=1`),
+  downloadOrderDocument: (id, type) => downloadRequest(`/orders/${id}/documents/${type}?download=1`),
+  printGuestOrderDocument: (type, token) => openHtmlDocument(`/orders/guest/documents/${type}?print=1`, { authRetry: false, headers: { 'X-Order-Access-Token': token } }),
+  downloadGuestOrderDocument: (type, token) => downloadRequest(`/orders/guest/documents/${type}?download=1`, { authRetry: false, headers: { 'X-Order-Access-Token': token } }),
   getNotifications: () => request('/notifications'),
   updateNotificationPreferences: body => request('/notifications/preferences', { method: 'PATCH', body: JSON.stringify(body) }),
   savePushSubscription: body => request('/notifications/push-subscriptions', { method: 'POST', body: JSON.stringify(body) }),
@@ -229,6 +258,8 @@ export const api = {
   updateAdminProduct: (id, body) => request(`/admin/products/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   archiveAdminProduct: id => request(`/admin/products/${id}`, { method: 'DELETE' }),
   getAdminOrders: () => request('/admin/orders'),
+  printAdminOrderDocument: (id, type) => openHtmlDocument(`/admin/orders/${id}/documents/${type}?print=1`),
+  downloadAdminOrderDocument: (id, type) => downloadRequest(`/admin/orders/${id}/documents/${type}?download=1`),
   subscribeAdminOrders: handlers => subscribe('/admin/orders/live', handlers),
   getAdminKitchen: () => request('/admin/kitchen'),
   subscribeAdminKitchen: handlers => subscribe('/admin/kitchen/live', handlers),

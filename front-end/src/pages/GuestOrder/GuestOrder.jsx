@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { StoreContext } from '../../context/StoreContext';
 import OrderTracking from '../../components/orders/OrderTracking';
 import OrderItemCustomization from '../../components/orders/OrderItemCustomization';
+import OrderDocuments from '../../components/orders/OrderDocuments';
 import Icon from '../../components/ui/Icon';
 import { api } from '../../lib/api';
 import { formatCurrency, formatDate, humanizeStatus } from '../../lib/format';
@@ -104,6 +105,8 @@ export default function GuestOrder({ onLogin }) {
       <section className="surface-card guest-order-panel"><h2>Order summary</h2><div className="guest-order-items">{order.items?.map(item => <div className="guest-order-item" key={item.id}><div><span>{item.quantity} × {item.productName}</span><strong>{formatCurrency(item.lineTotalCents / 100, order.payment?.currency)}</strong></div><OrderItemCustomization compact item={item} currency={order.payment?.currency} /></div>)}</div><div className="guest-order-total"><span>Total</span><strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></div></section>
       <section className="surface-card guest-order-panel"><h2>{order.fulfillmentType === 'PICKUP' ? 'Pickup details' : 'Delivery details'}</h2><p><strong>{order.firstName} {order.lastName}</strong><br />{order.phone}<br />{order.email}</p>{order.fulfillmentType === 'DELIVERY' ? <p>{order.street}<br />{order.city}, {order.state} {order.postalCode}<br />{order.country}</p> : <p>{order.pickupAddressSnapshot || 'Restaurant pickup'}{order.pickupInstructionsSnapshot ? <><br />{order.pickupInstructionsSnapshot}</> : null}</p>}{order.notes && <p><strong>Note:</strong> {order.notes}</p>}</section>
     </div>
+
+    <OrderDocuments order={order} guestToken={token} />
 
     <section className="surface-card guest-account-link"><div><span className="guest-order-icon"><Icon name="user" size={22} /></span><div><h2>Keep this order with your account</h2><p>Anonymous checkout never receives or spends Tomato Points. Sign in or create an account with this same email to link the purchase safely. Once linked, an eligible delivered guest order receives the normal one-time points award and can qualify for account-only reviews.</p></div></div><button className="button button-secondary" disabled={busy === 'link'} onClick={linkAccount}>{busy === 'link' ? 'Linking…' : user ? 'Link to my account' : 'Sign in / create account'}</button></section>
 

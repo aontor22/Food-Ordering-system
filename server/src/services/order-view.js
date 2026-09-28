@@ -1,5 +1,6 @@
 import { serializePayment } from './payment.js';
 import { parseOrderItemCustomizations } from './product-customizations.js';
+import { orderDocumentAvailability } from './order-documents.js';
 
 export function stripOrderSecrets(order) {
   if (!order) return order;
@@ -20,5 +21,6 @@ export function serializeOrderForClient(order) {
     ...safe,
     items: Array.isArray(order.items) ? order.items.map(serializeOrderItem) : order.items,
     payment: serializePayment(order.payment),
+    documents: orderDocumentAvailability(order),
   };
 }

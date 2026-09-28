@@ -26,6 +26,7 @@ import { serializeOrderForClient } from '../services/order-view.js';
 import { resolveCustomizedCartLines } from '../services/product-customizations.js';
 import { reserveInventory, restoreOrderInventory, withSerializableRetry } from '../services/inventory.js';
 import { prepareReorderCart } from '../services/reorder.js';
+import { buildOrderDocument, orderDocumentFilename, orderDocumentInclude, renderOrderDocumentHtml } from '../services/order-documents.js';
 
 const router = Router();
 const orderInclude = {
@@ -33,6 +34,16 @@ const orderInclude = {
   payment: true,
   trackingEvents: { orderBy: { createdAt: 'asc' } },
 };
+
+function sendOrderDocument(res, document, query = {}) {
+  const download = String(query.download || '') === '1';
+  const autoPrint = String(query.print || '') === '1';
+  res.set('Cache-Control', 'private, no-store');
+  res.set('Pragma', 'no-cache');
+  res.type('html');
+  res.set('Content-Disposition', `${download ? 'attachment' : 'inline'}; filename="${orderDocumentFilename(document)}"`);
+  res.send(renderOrderDocumentHtml(document, { autoPrint }));
+}
 
 const customizationSelectionSchema = z.object({
   groupId: z.string().min(1).max(100),
@@ -508,6 +519,15 @@ router.get('/guest', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.get('/guest/documents/:type', async (req, res, next) => {
+  try {
+    const token = guestTokenFromRequest(req);
+    const order = await getGuestOrderByToken(token, { include: orderDocumentInclude });
+    const document = await buildOrderDocument(prisma, order, req.params.type);
+    sendOrderDocument(res, document, req.query);
+  } catch (error) { next(error); }
+});
+
 router.get('/guest/live', async (req, res, next) => {
   try {
     const token = guestTokenFromRequest(req);
@@ -584,6 +604,15 @@ router.get('/', async (req, res) => {
     orderBy: { createdAt: 'desc' },
   });
   res.json({ orders: orders.map(serializeOrderForClient) });
+});
+
+router.get('/:id/documents/:type', async (req, res, next) => {
+  try {
+    const order = await prisma.order.findFirst({ where: { id: req.params.id, userId: req.auth.sub }, include: orderDocumentInclude });
+    if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+    const document = await buildOrderDocument(prisma, order, req.params.type);
+    sendOrderDocument(res, document, req.query);
+  } catch (error) { next(error); }
 });
 
 router.post('/:id/reorder', async (req, res, next) => {
