@@ -3,10 +3,12 @@ import { z } from 'zod';
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  TEST_AUTH_BYPASS: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().refine(value => /^postgres(?:ql)?:\/\//i.test(value), 'DATABASE_URL must be a PostgreSQL connection URL').default('postgresql://tomato:tomato@localhost:5432/tomato?schema=public'),
   JWT_ACCESS_SECRET: z.string().min(32).default('development-access-secret-change-me-123456'),
   JWT_REFRESH_SECRET: z.string().min(32).default('development-refresh-secret-change-me-12345'),
+  AUTH_ENCRYPTION_KEY: z.string().min(32).optional().transform(value => value || undefined),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_DAYS: z.coerce.number().int().min(1).max(30).default(7),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
@@ -37,6 +39,10 @@ const schema = z.object({
 
 export const config = schema.parse(process.env);
 export const isProduction = config.NODE_ENV === 'production';
+
+if (isProduction && !config.AUTH_ENCRYPTION_KEY) {
+  throw new Error('AUTH_ENCRYPTION_KEY is required in production for encrypted admin 2FA secrets');
+}
 
 if (config.SSLCOMMERZ_LIVE && (!config.SSLCOMMERZ_STORE_ID || !config.SSLCOMMERZ_STORE_PASSWORD)) {
   throw new Error('SSLCOMMERZ_LIVE=true requires SSLCOMMERZ_STORE_ID and SSLCOMMERZ_STORE_PASSWORD');

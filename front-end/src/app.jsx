@@ -34,6 +34,9 @@ import AdminNotifications from './pages/Admin/AdminNotifications';
 import PaymentDemo from './pages/Payment/PaymentDemo';
 import PaymentResult from './pages/Payment/PaymentResult';
 import ManualPayment from './pages/Payment/ManualPayment';
+import VerifyEmail from './pages/Auth/VerifyEmail';
+import ResetPassword from './pages/Auth/ResetPassword';
+import Security from './pages/Security/Security';
 import './responsive.css';
 
 function ScrollToTop() {
@@ -67,6 +70,7 @@ export default function App() {
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="coupons" element={<AdminCoupons />} />
         <Route path="activity" element={<AdminActivity />} />
+        <Route path="security" element={<Security />} />
         <Route path="*" element={<AdminDashboard />} />
       </Route>
     </Routes> : <>
@@ -80,6 +84,9 @@ export default function App() {
         <Route path="/wishlist" element={<Wishlist />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/addresses" element={<Addresses onLogin={() => setShowLogin(true)} />} />
+        <Route path="/security" element={<Security />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
         <Route path="/guest-order/:orderNumber" element={<GuestOrder onLogin={() => setShowLogin(true)} />} />
         <Route path="/payment/demo/:transactionId" element={<PaymentDemo onLogin={() => setShowLogin(true)} />} />

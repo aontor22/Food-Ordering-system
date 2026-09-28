@@ -60,6 +60,21 @@ function getTransporter() {
   return transporter;
 }
 
+export async function sendTransactionalEmail({ to, subject, text, html, headers = {} }) {
+  const transport = getTransporter();
+  if (!transport) return { skipped: true, reason: 'SMTP is not configured' };
+  if (!to) return { skipped: true, reason: 'Recipient email is unavailable' };
+  const info = await transport.sendMail({
+    from: { name: config.EMAIL_FROM_NAME, address: config.EMAIL_FROM },
+    to,
+    subject,
+    text,
+    html,
+    headers,
+  });
+  return { skipped: false, messageId: info.messageId || null };
+}
+
 function configureWebPush() {
   if (!pushConfigured()) return false;
   webpush.setVapidDetails(config.VAPID_SUBJECT, config.VAPID_PUBLIC_KEY, config.VAPID_PRIVATE_KEY);

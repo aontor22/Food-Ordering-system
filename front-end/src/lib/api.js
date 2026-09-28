@@ -1,6 +1,46 @@
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 let accessToken = null;
+let refreshPromise = null;
 export const setAccessToken = value => { accessToken = value; };
+
+export class ApiError extends Error {
+  constructor(message, { code = 'REQUEST_FAILED', status = 0, details = null } = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.status = status;
+    this.details = details;
+  }
+}
+
+async function parseError(response, fallback = 'Request failed') {
+  const data = await response.json().catch(() => ({}));
+  return new ApiError(data.error?.message || fallback, { code: data.error?.code, status: response.status, details: data.error?.details });
+}
+
+async function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const response = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
+        if (response.ok) {
+          const data = await response.json();
+          setAccessToken(data.accessToken);
+          return data;
+        }
+        const error = await parseError(response, 'Session expired');
+        if (error.code === 'STALE_REFRESH_TOKEN' && attempt === 0) {
+          await new Promise(resolve => setTimeout(resolve, 120));
+          continue;
+        }
+        setAccessToken(null);
+        throw error;
+      }
+      throw new ApiError('Session expired', { code: 'INVALID_SESSION', status: 401 });
+    })().finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+}
 
 function buildQuery(params = {}) {
   const search = new URLSearchParams();
@@ -17,17 +57,10 @@ async function fetchDownloadResponse(path, options = {}, retry = true) {
     headers: { ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...(fetchOptions.headers || {}) },
   });
   if (response.status === 401 && retry && authRetry) {
-    const refreshed = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
-    if (refreshed.ok) {
-      const data = await refreshed.json();
-      setAccessToken(data.accessToken);
-      return fetchDownloadResponse(path, options, false);
-    }
+    try { await refreshAccessToken(); return fetchDownloadResponse(path, options, false); }
+    catch { /* Preserve the original document failure below. */ }
   }
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error?.message || 'Document request failed');
-  }
+  if (!response.ok) throw await parseError(response, 'Document request failed');
   return response;
 }
 
@@ -67,15 +100,19 @@ async function openHtmlDocument(path, options = {}) {
 }
 
 async function request(path, options = {}, retry = true) {
-  const response = await fetch(`${API_URL}${path}`, { credentials: 'include', ...options, headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...options.headers } });
-  if (response.status === 401 && retry && path !== '/auth/refresh') {
-    const refreshed = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
-    if (refreshed.ok) { const data = await refreshed.json(); setAccessToken(data.accessToken); return request(path, options, false); }
+  const { authRetry = true, ...fetchOptions } = options;
+  const response = await fetch(`${API_URL}${path}`, {
+    credentials: 'include',
+    ...fetchOptions,
+    headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...(fetchOptions.headers || {}) },
+  });
+  if (response.status === 401 && retry && authRetry) {
+    try { await refreshAccessToken(); return request(path, options, false); }
+    catch { /* Fall through to the original response. */ }
   }
   if (response.status === 204) return null;
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error?.message || 'Request failed');
-  return data;
+  if (!response.ok) throw await parseError(response);
+  return response.json().catch(() => ({}));
 }
 
 function parseSseBlock(block) {
@@ -108,15 +145,13 @@ function subscribe(path, { onEvent, onState, headers = {}, authRetry = true } = 
           headers: { Accept: 'text/event-stream', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...headers },
         });
         if (response.status === 401 && authRetry) {
-          const refreshed = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
-          if (refreshed.ok) {
-            const data = await refreshed.json();
-            setAccessToken(data.accessToken);
+          try {
+            const data = await refreshAccessToken();
             response = await fetch(`${API_URL}${path}`, {
               method: 'GET', credentials: 'include', signal: controller.signal,
               headers: { Accept: 'text/event-stream', Authorization: `Bearer ${data.accessToken}`, ...headers },
             });
-          }
+          } catch { /* Connection loop will retry or surface the unauthenticated state. */ }
         }
         if (!response.ok || !response.body) throw new Error(`Live connection failed (${response.status})`);
         onState?.('connected');
@@ -181,11 +216,23 @@ export const api = {
   getStoreStatus: () => request('/store/status'),
   getDeliveryZones: () => request('/store/delivery-zones'),
   getFulfillmentOptions: () => request('/store/fulfillment'),
-  register: body => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
-  login: body => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
-  googleLogin: credential => request('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
-  refresh: () => request('/auth/refresh', { method: 'POST' }, false),
-  logout: () => request('/auth/logout', { method: 'POST' }),
+  register: body => request('/auth/register', { method: 'POST', body: JSON.stringify(body), authRetry: false }),
+  login: body => request('/auth/login', { method: 'POST', body: JSON.stringify(body), authRetry: false }),
+  googleLogin: credential => request('/auth/google', { method: 'POST', body: JSON.stringify({ credential }), authRetry: false }),
+  resendVerification: email => request('/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }), authRetry: false }),
+  verifyEmail: token => request('/auth/verify-email', { method: 'POST', body: JSON.stringify({ token }), authRetry: false }),
+  forgotPassword: email => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }), authRetry: false }),
+  resetPassword: (token, password) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }), authRetry: false }),
+  getAdmin2faSetup: challengeToken => request('/auth/admin-2fa/setup', { method: 'POST', body: JSON.stringify({ challengeToken }), authRetry: false }),
+  enableAdmin2fa: (challengeToken, code) => request('/auth/admin-2fa/enable', { method: 'POST', body: JSON.stringify({ challengeToken, code }), authRetry: false }),
+  verifyAdmin2fa: (challengeToken, code) => request('/auth/admin-2fa/verify', { method: 'POST', body: JSON.stringify({ challengeToken, code }), authRetry: false }),
+  regenerateAdminRecoveryCodes: body => request('/auth/admin-2fa/recovery-codes', { method: 'POST', body: JSON.stringify(body) }),
+  refresh: () => refreshAccessToken(),
+  logout: () => request('/auth/logout', { method: 'POST', authRetry: false }),
+  changePassword: body => request('/auth/change-password', { method: 'POST', body: JSON.stringify(body) }),
+  getSessions: () => request('/auth/sessions'),
+  revokeSession: id => request(`/auth/sessions/${id}`, { method: 'DELETE' }),
+  revokeOtherSessions: () => request('/auth/sessions/revoke-others', { method: 'POST' }),
   createOrder: body => request('/orders', { method: 'POST', body: JSON.stringify(body) }),
   quoteOrder: body => request('/orders/quote', { method: 'POST', body: JSON.stringify(body) }),
   createGuestOrder: body => request('/orders/guest', { method: 'POST', body: JSON.stringify(body) }, false),

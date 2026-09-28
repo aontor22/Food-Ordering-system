@@ -15,6 +15,7 @@ testUrl.searchParams.set('schema', schemaName);
 const env = {
   ...process.env,
   NODE_ENV: 'test',
+  TEST_AUTH_BYPASS: 'true',
   DATABASE_URL: testUrl.toString(),
   PAYMENT_CURRENCY: 'USD',
   ENABLE_DEMO_PAYMENTS: 'true',
@@ -32,7 +33,7 @@ try {
     ['npm', ['run', 'db:generate']],
     ['npm', ['run', 'db:migrate']],
     ['npm', ['run', 'db:seed']],
-    [process.execPath, ['--test', '--test-concurrency=1', 'test/api.test.js', 'test/gateway.test.js', 'test/manual.test.js', 'test/loyalty-review.test.js', 'test/wishlist.test.js', 'test/store-availability.test.js', 'test/delivery-zones.test.js', 'test/fulfillment-scheduling.test.js', 'test/order-tracking.test.js', 'test/notifications.test.js', 'test/guest-checkout.test.js', 'test/product-customization.test.js', 'test/inventory-concurrency.test.js', 'test/saved-address-reorder.test.js', 'test/product-discovery.test.js', 'test/admin-analytics.test.js', 'test/kitchen-display.test.js']]
+    [process.execPath, ['--test', '--test-concurrency=1', 'test/api.test.js', 'test/gateway.test.js', 'test/manual.test.js', 'test/loyalty-review.test.js', 'test/wishlist.test.js', 'test/store-availability.test.js', 'test/delivery-zones.test.js', 'test/fulfillment-scheduling.test.js', 'test/order-tracking.test.js', 'test/notifications.test.js', 'test/guest-checkout.test.js', 'test/product-customization.test.js', 'test/inventory-concurrency.test.js', 'test/saved-address-reorder.test.js', 'test/product-discovery.test.js', 'test/admin-analytics.test.js', 'test/kitchen-display.test.js', 'test/auth-hardening.test.js']]
   ]) {
     const result = run(command, args, { shell: process.platform === 'win32' });
     status = result.status ?? 1;

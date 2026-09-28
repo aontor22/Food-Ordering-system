@@ -21,6 +21,7 @@ const navigation = [
   { to: '/admin/loyalty', label: 'Tomato Points', icon: 'gift' },
   { to: '/admin/coupons', label: 'Coupons', icon: 'coupon' },
   { to: '/admin/activity', label: 'Activity log', icon: 'activity' },
+  { to: '/admin/security', label: 'Security', icon: 'shield' },
 ];
 
 const titles = {
@@ -40,6 +41,7 @@ const titles = {
   '/admin/loyalty': ['Tomato Points', 'Control rewards, redemption thresholds and point value.'],
   '/admin/coupons': ['Coupons & offers', 'Create and manage customer promotions.'],
   '/admin/activity': ['Activity log', 'Review sensitive administrative actions.'],
+  '/admin/security': ['Security & sessions', 'Manage active devices, password security and administrator recovery codes.'],
 };
 
 export default function AdminLayout() {

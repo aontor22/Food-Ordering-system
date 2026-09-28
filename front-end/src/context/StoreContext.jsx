@@ -121,6 +121,15 @@ export default function StoreContextProvider({ children }) {
     return linked;
   };
 
+  const acceptAuthSession = async data => {
+    if (!data?.accessToken || !data?.user) return data;
+    setAccessToken(data.accessToken);
+    setUser(data.user);
+    try { await mergeGuestWishlist(); } catch { /* Keep authentication successful if wishlist sync is temporarily unavailable. */ }
+    try { await syncGuestOrdersToAccount(); } catch { /* Keep authentication successful if guest-order linking is temporarily unavailable. */ }
+    return data;
+  };
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -230,19 +239,13 @@ export default function StoreContextProvider({ children }) {
 
   const authenticate = async (mode, values) => {
     const data = await api[mode](values);
-    setAccessToken(data.accessToken);
-    setUser(data.user);
-    try { await mergeGuestWishlist(); } catch { /* Keep authentication successful if wishlist sync is temporarily unavailable. */ }
-    try { await syncGuestOrdersToAccount(); } catch { /* Keep authentication successful if order linking is temporarily unavailable. */ }
+    if (data?.accessToken) await acceptAuthSession(data);
     return data;
   };
 
   const authenticateWithGoogle = async credential => {
     const data = await api.googleLogin(credential);
-    setAccessToken(data.accessToken);
-    setUser(data.user);
-    try { await mergeGuestWishlist(); } catch { /* Keep authentication successful if wishlist sync is temporarily unavailable. */ }
-    try { await syncGuestOrdersToAccount(); } catch { /* Keep authentication successful if order linking is temporarily unavailable. */ }
+    if (data?.accessToken) await acceptAuthSession(data);
     return data;
   };
 
@@ -304,19 +307,22 @@ export default function StoreContextProvider({ children }) {
   const wishlistProducts = user ? (accountWishlistProducts.length || !wishlistIds.length ? accountWishlistProducts : guestWishlistProducts) : guestWishlistProducts;
   const wishlistCount = wishlistIds.length;
 
-  const logout = async () => {
-    await detachPushOnLogout();
-    await api.logout();
+  const clearLocalAuth = () => {
     setAccessToken(null);
     setUser(null);
     setAccountWishlistProducts([]);
     setWishlistIds(loadGuestWishlist());
   };
 
+  const logout = async () => {
+    try { await detachPushOnLogout(); } catch { /* Local sign-out must continue. */ }
+    try { await api.logout(); } finally { clearLocalAuth(); }
+  };
+
   return <StoreContext.Provider value={{
     food_list, cartItems, cartProducts, cartCount, cartProductQuantity, cartOptionQuantity, setCartItems, setQuantity,
     addToCart, updateCartLine, removeFromCart, removeItem, getTotalCartAmount,
-    user, setUser, loading, authenticate, authenticateWithGoogle, logout,
+    user, setUser, loading, authenticate, authenticateWithGoogle, acceptAuthSession, clearLocalAuth, logout,
     searchQuery, setSearchQuery, couponCode, setCouponCode,
     createOrder, reorderOrder, getOrders: api.getOrders, refreshProducts,
     wishlistProducts, wishlistIds, wishlistCount, wishlistBusy,

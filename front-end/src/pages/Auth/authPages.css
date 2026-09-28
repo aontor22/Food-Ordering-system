@@ -1,0 +1,7 @@
+.auth-page-card { max-width: 620px; margin: 54px auto 80px; padding: 34px; text-align: center; }
+.auth-page-card h1 { margin: 8px 0 10px; }
+.auth-page-card > p { color: #6b6b66; line-height: 1.65; }
+.auth-page-icon { width: 70px; height: 70px; display: grid; place-items: center; margin: 0 auto 18px; border-radius: 22px; background: #eef8f0; color: #2f7a43; }
+.auth-page-icon.is-error { background: #fff0ed; color: #c3432c; }
+.auth-page-actions { margin-top: 24px; display: flex; justify-content: center; }
+.auth-page-form { max-width: 430px; margin: 26px auto 0; text-align: left; }

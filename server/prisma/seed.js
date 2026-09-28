@@ -104,6 +104,7 @@ async function main() {
     update: {
       role: 'ADMIN',
       isActive: true,
+      emailVerifiedAt: new Date(),
       // On Render, setting ADMIN_PASSWORD now also repairs an admin account that
       // was created by an earlier deployment with a different password.
       ...(configuredPassword ? { passwordHash } : {})
@@ -113,6 +114,7 @@ async function main() {
       email,
       role: 'ADMIN',
       isActive: true,
+      emailVerifiedAt: new Date(),
       passwordHash
     }
   });

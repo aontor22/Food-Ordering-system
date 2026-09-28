@@ -127,13 +127,17 @@ Step 07 adds transactional email and browser Web Push for order lifecycle events
 
 For email, configure backend-only generic SMTP variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME`). For browser push, run `npm run push:keys -w server` and configure `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` on Render. Never place SMTP credentials or the VAPID private key in Vercel/frontend variables. See `NOTIFICATIONS_SETUP.md` and `STEP_07_VERIFICATION.md`.
 
+## Authentication security
+
+Step 18 adds verified-email password accounts, one-time password reset, mandatory administrator TOTP with one-time recovery codes, and server-bound device sessions. Existing pre-Step-18 users are grandfathered as verified by migration; new password registrations must verify email before login. Account/Admin → **Security & sessions** can revoke devices and change passwords. Administrator TOTP secrets are encrypted at rest using the backend-only `AUTH_ENCRYPTION_KEY`; keep this key stable and never expose it to Vercel. Production password registration/reset also requires working SMTP. See `AUTH_HARDENING_SETUP.md` and `STEP_18_VERIFICATION.md`.
+
 ## API map
 
 | Area | Endpoints |
 | --- | --- |
 | Health | `GET /api/health` |
 | Store status | `GET /api/store/status` |
-| Auth | `POST /api/auth/register`, `login`, `refresh`, `logout`; `GET /me` |
+| Auth | Registration/login/Google, email verify/resend, forgot/reset password, rotating refresh/logout, `/me`, session list/revoke, password change, and mandatory admin TOTP/recovery under `/api/auth/*` |
 | Catalog | `GET /api/products`, `/api/products/categories` |
 | Orders | Authenticated `POST/GET /api/orders`, detail, cancellation, reviews, live tracking, reorder and secure invoice/receipt documents; guest quote/create/private tracking/cancel/link/documents under `/api/orders/guest*` |
 | Saved addresses | Account-owned CRUD under `/api/addresses`, including default-address selection |
@@ -164,6 +168,7 @@ For email, configure backend-only generic SMTP variables (`SMTP_HOST`, `SMTP_POR
 6. Configure and validate SSLCOMMERZ sandbox callbacks, currency, public HTTPS URLs, risk-review handling, and refund flow before enabling live online payments. Register the Render service public IP with SSLCOMMERZ if required for live refund API access.
 7. Configure SMTP and/or VAPID Web Push, verify test notifications, and monitor Admin → Notifications before relying on customer messaging.
 8. Keep `JWT_ACCESS_SECRET` stable during normal deployments because Step 09 guest-order access tokens are signed with it; rotating the secret intentionally invalidates outstanding guest tracking links.
+9. Keep Step 18 `AUTH_ENCRYPTION_KEY` server-side and stable; it encrypts administrator TOTP secrets. Generate a separate random value and configure it on Render before deploying Step 18.
 
 ## Structure
 
