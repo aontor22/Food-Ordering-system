@@ -3,8 +3,8 @@ import { humanizeStatus } from '../../lib/format';
 import Icon from '../ui/Icon';
 import './OrderTracking.css';
 
-const deliverySteps = ['PENDING', 'CONFIRMED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED'];
-const pickupSteps = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'DELIVERED'];
+const deliverySteps = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED'];
+const pickupSteps = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERED'];
 
 function useClock(active = true) {
   const [now, setNow] = useState(Date.now());
@@ -32,6 +32,7 @@ function etaCopy(order, now) {
     const minutes = minutesUntil(order.estimatedReadyAt, now);
     return minutes > 1 ? `Estimated ready in ${minutes} min` : 'Expected to be ready very soon';
   }
+  if (order.status === 'READY') return order.fulfillmentType === 'PICKUP' ? 'Ready now — you can collect your order' : 'Food is ready — waiting for delivery dispatch';
   if (order.status === 'OUT_FOR_DELIVERY' && order.estimatedDeliveryAt) {
     const minutes = minutesUntil(order.estimatedDeliveryAt, now);
     return minutes > 1 ? `Estimated arrival in ${minutes} min` : 'Your rider should arrive very soon';
@@ -42,9 +43,10 @@ function etaCopy(order, now) {
 
 export default function OrderTracking({ order, compact = false }) {
   const steps = order.fulfillmentType === 'PICKUP' ? pickupSteps : deliverySteps;
+  const normalizedStatus = order.status === 'READY_FOR_PICKUP' ? 'READY' : order.status;
   const now = useClock(['PREPARING', 'OUT_FOR_DELIVERY'].includes(order.status));
   const eta = etaCopy(order, now);
-  const currentIndex = steps.indexOf(order.status);
+  const currentIndex = steps.indexOf(normalizedStatus);
   const events = useMemo(() => [...(order.trackingEvents || [])].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [order.trackingEvents]);
 
   if (order.status === 'CANCELLED') {
@@ -61,7 +63,7 @@ export default function OrderTracking({ order, compact = false }) {
         const active = currentIndex === index;
         return <div className={`tracking-step ${complete ? 'is-complete' : ''} ${active ? 'is-active' : ''}`} key={step}>
           <div className="tracking-step-mark">{complete && !active ? <Icon name="check" size={13} /> : index + 1}</div>
-          <span>{step === 'OUT_FOR_DELIVERY' ? 'On the way' : step === 'READY_FOR_PICKUP' ? 'Ready' : humanizeStatus(step)}</span>
+          <span>{step === 'OUT_FOR_DELIVERY' ? 'On the way' : step === 'READY' ? 'Ready' : humanizeStatus(step)}</span>
         </div>;
       })}
     </div>

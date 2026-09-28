@@ -230,6 +230,8 @@ export const api = {
   archiveAdminProduct: id => request(`/admin/products/${id}`, { method: 'DELETE' }),
   getAdminOrders: () => request('/admin/orders'),
   subscribeAdminOrders: handlers => subscribe('/admin/orders/live', handlers),
+  getAdminKitchen: () => request('/admin/kitchen'),
+  subscribeAdminKitchen: handlers => subscribe('/admin/kitchen/live', handlers),
   updateAdminOrderStatus: (id, status, options = {}) => request(`/admin/orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, ...options }) }),
   updateAdminOrderEta: (id, minutes, note) => request(`/admin/orders/${id}/eta`, { method: 'PATCH', body: JSON.stringify({ minutes, ...(note ? { note } : {}) }) }),
   getAdminUsers: () => request('/admin/users'),

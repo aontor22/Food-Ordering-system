@@ -68,6 +68,12 @@ test('admin status changes create timeline events and preparation ETA', async ()
   assert.ok(response.body.order.preparingAt);
   assert.ok(response.body.order.estimatedReadyAt);
   assert.equal(response.body.order.trackingEvents.at(-1).status, 'PREPARING');
+
+  const kitchen = await request(app).get('/api/admin/kitchen').set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(kitchen.status, 200);
+  const kitchenOrder = kitchen.body.orders.find(item => item.id === orderId);
+  assert.ok(kitchenOrder);
+  assert.equal(kitchenOrder.kitchenLane, 'PREPARING');
 });
 
 test('admin can revise ETA without changing order status', async () => {
@@ -79,7 +85,7 @@ test('admin can revise ETA without changing order status', async () => {
 });
 
 test('pickup order completes through ready and delivered with full timeline', async () => {
-  let response = await request(app).patch(`/api/admin/orders/${orderId}/status`).set('Authorization', `Bearer ${adminToken}`).send({ status: 'READY_FOR_PICKUP' });
+  let response = await request(app).patch(`/api/admin/orders/${orderId}/status`).set('Authorization', `Bearer ${adminToken}`).send({ status: 'READY' });
   assert.equal(response.status, 200);
   assert.ok(response.body.order.readyAt);
 

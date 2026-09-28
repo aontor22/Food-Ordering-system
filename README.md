@@ -146,6 +146,7 @@ For email, configure backend-only generic SMTP variables (`SMTP_HOST`, `SMTP_POR
 | Admin products | List, create, update, archive and restore under `/api/admin/products` |
 | Admin media | Cloudinary status/signature/cleanup/migration under `/api/admin/media` |
 | Admin orders | List and controlled status transitions under `/api/admin/orders` |
+| Admin kitchen | Live KDS snapshot/SSE under `/api/admin/kitchen` and `/api/admin/kitchen/live` |
 | Admin customers | Account list and active-state management under `/api/admin/users` |
 | Admin coupons | List, create, update and disable under `/api/admin/coupons` |
 | Admin audit | `GET /api/admin/audit-logs` |
@@ -203,4 +204,10 @@ Popularity is derived from the total quantity in **DELIVERED** orders only; pend
 Admin → **Analytics** adds range-aware reporting for delivered revenue, average order value, placed/cancelled orders, guest-vs-registered demand, repeat customers, fulfillment/scheduling/payment mix, top customers, product/category performance and low-velocity active products. Revenue is recognized only when an order is delivered; product performance uses delivered `OrderItem` quantity and line totals so Step 10 customization price deltas are reflected. Reporting follows the restaurant timezone and supports 7/30/90-day presets plus custom ranges up to 366 days.
 
 Administrators can export Daily sales, Orders, Products and Customers CSV files for the selected period. Exports are authenticated, rate-limited, audited, `no-store`, and spreadsheet-formula-safe. Step 14 is read-only apart from its audit-log entry and adds no Prisma migration or environment variables. See `ANALYTICS_EXPORTS_SETUP.md` and `STEP_14_VERIFICATION.md`.
+
+## Kitchen Display System (Step 15)
+
+Admin → **Kitchen display** provides a live three-lane production board: **NEW**, **PREPARING**, and **READY**. It does not create a second kitchen-only database state. Instead, the lanes map to the shared order lifecycle (`CONFIRMED` → `PREPARING` → `READY`), so the existing payment gates, tracking events, notifications, admin audit trail, inventory/cancellation rules, COD settlement and loyalty logic stay authoritative.
+
+Timers are derived from the already persisted order timestamps. NEW ASAP tickets show confirmation wait time; scheduled NEW tickets show the requested schedule without being falsely marked overdue; PREPARING tickets compare against the live `estimatedReadyAt`; and READY tickets show how long the finished order has been waiting for pickup or delivery dispatch. Pickup can complete directly from READY, while delivery moves from READY to `OUT_FOR_DELIVERY` with a selectable ETA. Historical `READY_FOR_PICKUP` orders remain supported for backwards compatibility. Step 15 adds no Prisma migration or environment variable. See `KITCHEN_DISPLAY_SETUP.md` and `STEP_15_VERIFICATION.md`.
 

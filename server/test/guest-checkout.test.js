@@ -193,7 +193,7 @@ test('admin sees guest provenance without receiving the guest secret', async () 
 });
 
 test('delivered anonymous order earns no points, wrong account cannot claim, matching token+email can link and then review', async () => {
-  for (const status of ['CONFIRMED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED']) {
+  for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED']) {
     const updated = await request(app).patch(`/api/admin/orders/${guestOrder.id}/status`).set('Authorization', `Bearer ${adminToken}`).send({ status });
     assert.equal(updated.status, 200, `${status}: ${JSON.stringify(updated.body)}`);
   }

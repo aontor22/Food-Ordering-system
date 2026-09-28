@@ -75,7 +75,7 @@ test('admin configures Tomato Points and delivered orders award points once', as
   deliveredOrderId = response.body.order.id;
   deliveredItemId = response.body.order.items[0].id;
 
-  for (const status of ['CONFIRMED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED']) {
+  for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED']) {
     response = await request(app).patch(`/api/admin/orders/${deliveredOrderId}/status`).set('Authorization', `Bearer ${adminToken}`).send({ status });
     assert.equal(response.status, 200, `expected ${status} transition to succeed`);
   }

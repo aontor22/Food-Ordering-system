@@ -7,11 +7,36 @@ const TITLES = {
   PENDING: 'Order placed',
   CONFIRMED: 'Order confirmed',
   PREPARING: 'Food is being prepared',
+  READY: 'Food is ready',
   READY_FOR_PICKUP: 'Ready for pickup',
   OUT_FOR_DELIVERY: 'Out for delivery',
   DELIVERED: 'Order completed',
   CANCELLED: 'Order cancelled',
 };
+
+export const KITCHEN_STATUSES = ['CONFIRMED', 'PREPARING', 'READY'];
+
+export function kitchenLaneForStatus(status) {
+  if (status === 'CONFIRMED') return 'NEW';
+  if (status === 'PREPARING') return 'PREPARING';
+  if (status === 'READY') return 'READY';
+  return null;
+}
+
+export function allowedOrderTransitions(order) {
+  const transitions = {
+    PENDING: ['CONFIRMED', 'CANCELLED'],
+    CONFIRMED: ['PREPARING', 'CANCELLED'],
+    PREPARING: ['READY', 'CANCELLED'],
+    READY: [order.fulfillmentType === 'PICKUP' ? 'DELIVERED' : 'OUT_FOR_DELIVERY', 'CANCELLED'],
+    // Backwards compatibility for pickup orders created before Step 15.
+    READY_FOR_PICKUP: ['DELIVERED'],
+    OUT_FOR_DELIVERY: ['DELIVERED'],
+    DELIVERED: [],
+    CANCELLED: [],
+  };
+  return transitions[order.status] || [];
+}
 
 export const trackingInclude = {
   trackingEvents: { orderBy: { createdAt: 'asc' } },
@@ -43,7 +68,7 @@ export function trackingTimestampData(status, order, { estimateMinutes = null, n
     const minutes = Number.isInteger(estimateMinutes) ? estimateMinutes : 25;
     data.estimatedReadyAt = new Date(now.getTime() + minutes * 60_000);
   }
-  if (status === 'READY_FOR_PICKUP') {
+  if (status === 'READY' || status === 'READY_FOR_PICKUP') {
     data.readyAt = order.readyAt || now;
     data.estimatedReadyAt = now;
   }

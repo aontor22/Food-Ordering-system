@@ -16,7 +16,7 @@ import { migrateLegacyProductImages } from '../services/product-media.js';
 import { getStoreAvailability, getStoreOperationsConfig, isLocalDateTimeKey, isRealDateKey, isValidTimezone, saveStoreOperations, timeToMinute } from '../services/store-availability.js';
 import { findDeliveryPostalOverlap, listAllDeliveryZones, normalizePostalCodes, serializeDeliveryZone } from '../services/delivery-zones.js';
 import { getFulfillmentAdminConfig } from '../services/fulfillment-scheduling.js';
-import { etaUpdateData, openOrderSseStream, publishOrderChange, trackingEventData, trackingTimestampData } from '../services/order-tracking.js';
+import { KITCHEN_STATUSES, allowedOrderTransitions, etaUpdateData, kitchenLaneForStatus, openOrderSseStream, publishOrderChange, trackingEventData, trackingTimestampData } from '../services/order-tracking.js';
 import { notificationCapabilities, processPendingNotifications, retryNotificationDelivery, safeEnqueueOrderNotification } from '../services/notifications.js';
 import { serializeOrderForClient, stripOrderSecrets } from '../services/order-view.js';
 import { adminProductCustomizationInclude, serializeProductForClient } from '../services/product-customizations.js';
@@ -396,21 +396,42 @@ router.get('/orders/live', (req, res) => {
   });
 });
 
-function allowedOrderTransitions(order) {
-  const transitions = {
-    PENDING: ['CONFIRMED', 'CANCELLED'],
-    CONFIRMED: ['PREPARING', 'CANCELLED'],
-    PREPARING: [order.fulfillmentType === 'PICKUP' ? 'READY_FOR_PICKUP' : 'OUT_FOR_DELIVERY', 'CANCELLED'],
-    READY_FOR_PICKUP: ['DELIVERED'],
-    OUT_FOR_DELIVERY: ['DELIVERED'],
-    DELIVERED: [],
-    CANCELLED: [],
-  };
-  return transitions[order.status] || [];
+const kitchenOrderInclude = {
+  items: true,
+  payment: true,
+  trackingEvents: { orderBy: { createdAt: 'asc' } },
+  user: { select: { id: true, name: true, email: true } },
+};
+
+async function loadKitchenOrders() {
+  const orders = await prisma.order.findMany({
+    where: { status: { in: KITCHEN_STATUSES } },
+    include: kitchenOrderInclude,
+    orderBy: [{ confirmedAt: 'asc' }, { createdAt: 'asc' }],
+    take: 100,
+  });
+  return orders.map(order => ({ ...serializeOrderForClient(order), kitchenLane: kitchenLaneForStatus(order.status) }));
 }
+
+router.get('/kitchen', async (_req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.json({ orders: await loadKitchenOrders() });
+});
+
+router.get('/kitchen/live', (req, res) => {
+  openOrderSseStream(req, res, {
+    loadSnapshot: async () => {
+      const orders = await loadKitchenOrders();
+      return {
+        data: { orders },
+        signature: orders.map(order => [order.id, order.status, order.statusUpdatedAt, order.estimatedReadyAt, order.readyAt, order.trackingEvents?.at(-1)?.createdAt]),
+      };
+    },
+  });
+});
 const statusUpdate = z.object({
   body: z.object({
-    status: z.enum(['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+    status: z.enum(['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
     estimateMinutes: z.number().int().min(5).max(240).optional(),
     note: z.string().trim().max(240).optional(),
   }),
@@ -1088,7 +1109,7 @@ router.get('/dashboard', async (_req, res) => {
     prisma.wishlistItem.count(),
     prisma.order.aggregate({ where: { status: 'DELIVERED' }, _sum: { totalCents: true } }),
     prisma.order.count({ where: { createdAt: { gte: startOfToday } } }),
-    prisma.order.count({ where: { status: { in: ['PENDING', 'CONFIRMED', 'PREPARING'] } } }),
+    prisma.order.count({ where: { status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] } } }),
     prisma.product.findMany({ where: { isAvailable: true }, select: { stock: true, lowStockThreshold: true } }),
     prisma.order.findMany({ include: { user: { select: { name: true, email: true } } }, orderBy: { createdAt: 'desc' }, take: 6 }),
     prisma.order.groupBy({ by: ['status'], _count: { status: true } }),

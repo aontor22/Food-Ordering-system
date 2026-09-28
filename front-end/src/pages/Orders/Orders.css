@@ -35,3 +35,4 @@
 
 /* Step 12: reorder */
 .order-reorder-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:12px;border-top:1px solid var(--line)}.order-reorder-row .button{display:inline-flex;align-items:center;gap:7px}.order-reorder-row small{color:var(--muted);font-size:.7rem;text-align:right;line-height:1.4}@media(max-width:560px){.order-reorder-row{align-items:stretch;flex-direction:column}.order-reorder-row small{text-align:left}}
+.status-ready { background:#f0eaff; color:#6a45a1; }
