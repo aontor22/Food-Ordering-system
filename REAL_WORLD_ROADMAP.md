@@ -15,7 +15,7 @@ Implemented sequentially so each release remains deployable and testable.
 - [x] 11 — Stronger stock/availability controls and concurrency safeguards
 - [x] 12 — Saved addresses and one-click reorder
 - [x] 13 — Advanced search, dietary filters, price/rating/popularity sorting
-- [ ] 14 — Expanded admin sales/customer/product analytics + CSV export
+- [x] 14 — Expanded admin sales/customer/product analytics + CSV export
 - [ ] 15 — Kitchen display mode (NEW / PREPARING / READY) with timers
 - [ ] 16 — Printable/downloadable invoice and receipt workflow
 - [ ] 17 — Customer cancellation windows + admin refund/reconciliation rules

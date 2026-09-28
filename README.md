@@ -140,6 +140,7 @@ For email, configure backend-only generic SMTP variables (`SMTP_HOST`, `SMTP_POR
 | Manual customer payments | `GET /api/payments/manual/:orderId`, `POST /api/payments/manual/:orderId/submit` |
 | Manual admin operations | `GET/POST /api/admin/payment-channels`, `PATCH /api/admin/payment-channels/:id`, `POST /api/admin/payments/:id/manual-review`, `manual-refunded` |
 | Admin dashboard | `GET /api/admin/dashboard` |
+| Admin analytics | Range-aware dashboard and CSV exports under `/api/admin/analytics` |
 | Admin notifications | Delivery monitor, queue processing and retry under `/api/admin/notifications` |
 | Admin store operations | `GET/PATCH /api/admin/store-operations`, `POST /api/admin/store-closures`, `DELETE /api/admin/store-closures/:id` |
 | Admin products | List, create, update, archive and restore under `/api/admin/products` |
@@ -196,3 +197,10 @@ Signed-in customers can store up to ten delivery addresses, mark one as the defa
 The public catalogue now exposes explicit **Vegetarian**, **Vegan**, **Halal** and **Gluten-free** attributes maintained by administrators. Existing products migrate as unclassified (`false`) rather than being guessed from names, so production dietary claims remain an explicit restaurant decision. The customer menu supports multi-term search across product name, description, category, customization group names and option names, plus dietary filters, optional price range, minimum rating, and sorting by base price, verified-review rating or popularity.
 
 Popularity is derived from the total quantity in **DELIVERED** orders only; pending, failed and cancelled orders do not inflate it. Ratings use only `PUBLISHED` verified-order reviews. The product API remains `Cache-Control: no-store` because the same response carries Step 11 live stock/option availability. See `PRODUCT_DISCOVERY_SETUP.md` and `STEP_13_VERIFICATION.md`.
+
+## Admin analytics & CSV exports (Step 14)
+
+Admin → **Analytics** adds range-aware reporting for delivered revenue, average order value, placed/cancelled orders, guest-vs-registered demand, repeat customers, fulfillment/scheduling/payment mix, top customers, product/category performance and low-velocity active products. Revenue is recognized only when an order is delivered; product performance uses delivered `OrderItem` quantity and line totals so Step 10 customization price deltas are reflected. Reporting follows the restaurant timezone and supports 7/30/90-day presets plus custom ranges up to 366 days.
+
+Administrators can export Daily sales, Orders, Products and Customers CSV files for the selected period. Exports are authenticated, rate-limited, audited, `no-store`, and spreadsheet-formula-safe. Step 14 is read-only apart from its audit-log entry and adds no Prisma migration or environment variables. See `ANALYTICS_EXPORTS_SETUP.md` and `STEP_14_VERIFICATION.md`.
+

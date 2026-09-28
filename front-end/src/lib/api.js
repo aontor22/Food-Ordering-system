@@ -2,6 +2,45 @@ const API_URL = import.meta.env.VITE_API_URL || '/api';
 let accessToken = null;
 export const setAccessToken = value => { accessToken = value; };
 
+function buildQuery(params = {}) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== null && value !== '') search.set(key, String(value));
+  const query = search.toString();
+  return query ? `?${query}` : '';
+}
+
+async function downloadRequest(path, retry = true) {
+  const response = await fetch(`${API_URL}${path}`, {
+    credentials: 'include',
+    headers: { ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+  });
+  if (response.status === 401 && retry) {
+    const refreshed = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
+    if (refreshed.ok) {
+      const data = await refreshed.json();
+      setAccessToken(data.accessToken);
+      return downloadRequest(path, false);
+    }
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error?.message || 'Download failed');
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get('content-disposition') || '';
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  const filename = match?.[1] || 'tomato-export.csv';
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+  return filename;
+}
+
 async function request(path, options = {}, retry = true) {
   const response = await fetch(`${API_URL}${path}`, { credentials: 'include', ...options, headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...options.headers } });
   if (response.status === 401 && retry && path !== '/auth/refresh') {
@@ -162,6 +201,8 @@ export const api = {
   getGuestManualPayment: (orderId, token) => request(`/payments/guest/manual/${orderId}`, { headers: { 'X-Order-Access-Token': token } }, false),
   submitGuestManualPayment: (orderId, body, token) => request(`/payments/guest/manual/${orderId}/submit`, { method: 'POST', body: JSON.stringify(body), headers: { 'X-Order-Access-Token': token } }, false),
   getAdminDashboard: () => request('/admin/dashboard'),
+  getAdminAnalytics: params => request(`/admin/analytics${buildQuery(params)}`),
+  downloadAdminAnalyticsCsv: (type, params) => downloadRequest(`/admin/analytics/export${buildQuery({ ...params, type })}`),
   getAdminNotifications: () => request('/admin/notifications'),
   processAdminNotifications: () => request('/admin/notifications/process', { method: 'POST' }),
   retryAdminNotification: id => request(`/admin/notifications/${id}/retry`, { method: 'POST' }),

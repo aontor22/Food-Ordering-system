@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
+import { rateLimit } from 'express-rate-limit';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
@@ -20,6 +21,7 @@ import { notificationCapabilities, processPendingNotifications, retryNotificatio
 import { serializeOrderForClient, stripOrderSecrets } from '../services/order-view.js';
 import { adminProductCustomizationInclude, serializeProductForClient } from '../services/product-customizations.js';
 import { restoreOrderInventory, setInventoryLevel, withSerializableRetry } from '../services/inventory.js';
+import { getAdminAnalytics, getAdminAnalyticsCsv } from '../services/admin-analytics.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -1032,6 +1034,45 @@ router.get('/audit-logs', async (_req, res) => {
     take: 100,
   });
   res.json({ logs });
+});
+
+const analyticsRangeFields = {
+  days: z.coerce.number().int().refine(value => [7, 30, 90].includes(value), 'Use 7, 30, or 90 days').optional(),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+};
+const analyticsRangeRefinement = (value, ctx) => {
+  if ((value.from && !value.to) || (!value.from && value.to)) ctx.addIssue({ code: 'custom', message: 'Provide both from and to dates' });
+  if (value.days && (value.from || value.to)) ctx.addIssue({ code: 'custom', message: 'Use either a preset day range or custom dates, not both' });
+};
+const analyticsRangeQuery = z.object(analyticsRangeFields).superRefine(analyticsRangeRefinement);
+const analyticsExportLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false });
+
+router.get('/analytics', validate(z.object({ body: empty, params: empty, query: analyticsRangeQuery })), async (req, res, next) => {
+  try {
+    const analytics = await getAdminAnalytics(req.validated.query);
+    res.set('Cache-Control', 'private, no-store');
+    res.set('Pragma', 'no-cache');
+    res.json(analytics);
+  } catch (error) { next(error); }
+});
+
+router.get('/analytics/export', analyticsExportLimiter, validate(z.object({
+  body: empty,
+  params: empty,
+  query: z.object({ ...analyticsRangeFields, type: z.enum(['daily-sales', 'orders', 'products', 'customers']) }).superRefine(analyticsRangeRefinement),
+})), async (req, res, next) => {
+  try {
+    const { type, ...range } = req.validated.query;
+    const result = await getAdminAnalyticsCsv(type, range);
+    await audit(req, 'ANALYTICS_CSV_EXPORTED', 'Analytics', type, { type, range: result.range, rowCount: result.rowCount });
+    res.set('Cache-Control', 'private, no-store');
+    res.set('Pragma', 'no-cache');
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.send(result.csv);
+  } catch (error) { next(error); }
 });
 
 router.get('/dashboard', async (_req, res) => {

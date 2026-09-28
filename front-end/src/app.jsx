@@ -16,6 +16,7 @@ import EmptyState from './components/ui/EmptyState';
 import AdminGuard from './components/admin/AdminGuard';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/Admin/AdminDashboard';
+import AdminAnalytics from './pages/Admin/AdminAnalytics';
 import AdminProducts from './pages/Admin/AdminProducts';
 import AdminInventory from './pages/Admin/AdminInventory';
 import AdminOrders from './pages/Admin/AdminOrders';
@@ -50,6 +51,7 @@ export default function App() {
     {isAdmin ? <Routes>
       <Route path="/admin" element={<AdminGuard onLogin={() => setShowLogin(true)}><AdminLayout /></AdminGuard>}>
         <Route index element={<AdminDashboard />} />
+        <Route path="analytics" element={<AdminAnalytics />} />
         <Route path="products" element={<AdminProducts />} />
         <Route path="inventory" element={<AdminInventory />} />
         <Route path="orders" element={<AdminOrders />} />

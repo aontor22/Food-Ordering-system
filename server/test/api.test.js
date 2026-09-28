@@ -111,6 +111,19 @@ test('enforces admin authorization and supports management operations', async ()
   assert.ok(r.body.metrics);
   assert.ok(Array.isArray(r.body.revenueByDay));
 
+  r = await request(app).get('/api/admin/analytics').query({ days: 7 }).set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.range.days, 7);
+  assert.ok(r.body.metrics);
+  assert.ok(Array.isArray(r.body.salesSeries));
+  assert.match(r.headers['cache-control'], /no-store/);
+
+  r = await request(app).get('/api/admin/analytics/export').query({ days: 7, type: 'orders' }).set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(r.status, 200);
+  assert.match(r.headers['content-type'], /text\/csv/);
+  assert.match(r.headers['content-disposition'], /tomato-orders-/);
+  assert.match(r.text, /order_number/);
+
   r = await request(app).get('/api/admin/media').set('Authorization', `Bearer ${adminToken}`);
   assert.equal(r.status, 200);
   assert.equal(r.body.configured, false);
