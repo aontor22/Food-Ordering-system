@@ -60,7 +60,10 @@ export default function GoogleSignInButton({ disabled = false, onCredential, onE
       const renderButton = () => {
         if (cancelled || !slotRef.current) return;
         const measuredWidth = Math.floor(slotRef.current.getBoundingClientRect().width || 0);
-        const width = Math.max(240, Math.min(400, measuredWidth || 340));
+        // Google Identity Services owns the iframe dimensions. Passing the actual
+        // available width keeps personalized buttons ("Continue as …") intact
+        // instead of stretching their internal layout with CSS.
+        const width = Math.max(200, Math.min(400, measuredWidth || 340));
         if (width === lastWidth) return;
         lastWidth = width;
 

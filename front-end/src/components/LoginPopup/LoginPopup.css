@@ -1,5 +1,13 @@
-.auth-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(28, 23, 19, .62); backdrop-filter: blur(7px); }
-.auth-modal { width: min(440px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; position: relative; padding: 38px; border-radius: 26px; background: #fff; box-shadow: 0 35px 100px rgba(0,0,0,.25); animation: fade-up .28s ease; }
+.auth-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px; background: rgba(28, 23, 19, .62); backdrop-filter: blur(7px); }
+.auth-modal { width: min(440px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; -ms-overflow-style: none; position: relative; padding: 34px 38px; border-radius: 26px; background: #fff; box-shadow: 0 35px 100px rgba(0,0,0,.25); animation: fade-up .28s ease; }
+.auth-modal::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.auth-modal.auth-modal-login { padding-top: 30px; padding-bottom: 28px; }
+.auth-modal.auth-modal-login .auth-mark { width: 48px; height: 48px; margin-bottom: 16px; border-radius: 15px; }
+.auth-modal.auth-modal-login > p { margin: 6px 0 18px; line-height: 1.5; }
+.auth-modal.auth-modal-login form { gap: 13px; }
+.auth-modal.auth-modal-login .auth-text-action { margin-top: 10px; }
+.auth-modal.auth-modal-login .auth-divider { margin: 14px 0 12px; }
+.auth-modal.auth-modal-login .auth-switch { margin-top: 14px !important; }
 .auth-close { position: absolute; right: 18px; top: 18px; }
 .auth-mark { width: 52px; height: 52px; margin-bottom: 22px; display: grid; place-items: center; border-radius: 17px; color: #fff; background: var(--brand); font-family: 'Manrope'; font-size: 1.35rem; font-weight: 800; }
 .auth-modal h2 { font-size: 1.85rem; letter-spacing: -.04em; }
@@ -15,19 +23,34 @@
 .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .auth-divider span { line-height: 1; }
 
-.google-signin-shell { position: relative; width: 100%; min-height: 46px; display: flex; align-items: center; justify-content: center; border-radius: 999px; overflow: hidden; transition: opacity .2s, transform .2s, box-shadow .2s; }
+.google-signin-shell { position: relative; width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 999px; transition: opacity .2s, transform .2s, box-shadow .2s; }
 .google-signin-shell:hover:not(.is-disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(39, 35, 28, .08); }
 .google-signin-shell.is-disabled { opacity: .55; pointer-events: none; }
-.google-signin-slot { width: 100%; min-height: 46px; display: flex; align-items: center; justify-content: center; }
-.google-signin-slot > div { width: 100% !important; max-width: 100% !important; }
-.google-signin-slot iframe { width: 100% !important; max-width: 100% !important; }
+.google-signin-slot { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: center; line-height: 0; overflow: visible; }
+.google-signin-slot > div { max-width: 100% !important; }
+.google-signin-slot iframe { display: block; max-width: 100% !important; border: 0; }
 .google-signin-placeholder { position: absolute; inset: 0; border: 1px solid #dadce0; border-radius: 999px; background: #fff; }
 .google-signin-placeholder::before { content: ''; position: absolute; left: 18px; top: 50%; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #e6e6e6; border-top-color: #9aa0a6; transform: translateY(-50%); animation: spin .75s linear infinite; }
 .google-signin-shell.is-ready .google-signin-placeholder { display: none; }
 
+@media (max-height: 780px) and (min-width: 501px) {
+  .auth-modal-login { padding: 24px 38px 25px; }
+  .auth-modal-login .auth-mark { width: 44px; height: 44px; margin-bottom: 12px; }
+  .auth-modal-login .section-kicker { margin-bottom: 5px; }
+  .auth-modal-login h2 { font-size: 1.72rem; }
+  .auth-modal-login > p { margin: 4px 0 14px; line-height: 1.42; }
+  .auth-modal-login form { gap: 10px; }
+  .auth-modal-login .field { gap: 6px; }
+  .auth-modal-login .field input { min-height: 48px; }
+  .auth-modal-login .auth-text-action { margin-top: 8px; }
+  .auth-modal-login .auth-divider { margin: 11px 0 10px; }
+  .auth-modal-login .auth-switch { margin-top: 11px !important; }
+}
+
 @media (max-width: 500px) {
   .auth-overlay { align-items: end; padding: 0; }
-  .auth-modal { width: 100%; max-height: 92vh; border-radius: 28px 28px 0 0; padding: 34px 22px; }
+  .auth-modal { width: 100%; max-height: 92dvh; border-radius: 28px 28px 0 0; padding: 30px 22px calc(26px + env(safe-area-inset-bottom)); }
+  .auth-modal-login .auth-mark { margin-bottom: 14px; }
 }
 .auth-modal-wide { max-width: 540px; }
 .auth-notice { margin: 12px 0; padding: 12px 14px; border-radius: 12px; background: #eef8f0; color: #285c35; font-size: 14px; line-height: 1.5; }
