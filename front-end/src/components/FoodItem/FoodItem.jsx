@@ -5,6 +5,7 @@ import { api } from '../../lib/api';
 import Icon from '../ui/Icon';
 import ProductCustomizer from '../ProductCustomizer/ProductCustomizer';
 import { productPurchaseLimit } from '../../lib/productCustomizations';
+import { dietaryLabels } from '../../lib/productDiscovery';
 import './FoodItem.css';
 
 export default function FoodItem({ item }) {
@@ -38,6 +39,7 @@ export default function FoodItem({ item }) {
   };
 
   const ratingLabel = item.reviewCount ? `${Number(item.reviewRating).toFixed(1)} (${item.reviewCount})` : 'No reviews';
+  const dietLabels = dietaryLabels(item);
 
   return <>
     <article className="food-card">
@@ -50,6 +52,7 @@ export default function FoodItem({ item }) {
       <div className="food-card-body">
         <div className="food-card-heading"><h3>{item.name}</h3><strong>{formatCurrency(item.price)}</strong></div>
         <p>{item.description}</p>
+        {dietLabels.length > 0 && <div className="food-dietary-tags" aria-label="Dietary information">{dietLabels.slice(0, 3).map(label => <span key={label}>{label}</span>)}{dietLabels.length > 3 && <span>+{dietLabels.length - 3}</span>}</div>}
         {wishlistError && <p className="wishlist-error" role="alert">{wishlistError}</p>}
         <div className="food-card-footer">
           <div className="food-card-meta"><span className="delivery-time"><Icon name="clock" size={16} />20–30 min</span><button className="food-review-link" type="button" onClick={openReviews}>{item.reviewCount ? `${item.reviewCount} review${item.reviewCount === 1 ? '' : 's'}` : 'No reviews yet'}</button></div>

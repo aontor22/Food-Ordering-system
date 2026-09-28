@@ -25,6 +25,7 @@ A working Preact storefront and responsive restaurant admin dashboard with a Nod
 - Product variants/sizes, add-ons, per-item kitchen instructions, server-authoritative customization pricing, and immutable order-item snapshots
 - Stronger product/variant/add-on inventory controls with atomic reservations, checkout idempotency, optimistic admin stock updates, cancellation restoration, low-stock states, and an inventory ledger
 - Account-saved delivery addresses with a default location and one-click reorder that rebuilds the cart against current menu choices, prices, limits, and stock
+- Advanced menu discovery with full-catalog search, explicit Vegetarian/Vegan/Halal/Gluten-free product labels, price/rating filters, and price/rating/delivered-order popularity sorting
 
 ## Quick start
 
@@ -189,3 +190,9 @@ Signed-in customers can store up to ten delivery addresses, mark one as the defa
 
 **Reorder** on My Orders never duplicates the historical order record or copies its old total, coupon, points redemption, payment status, delivery fee or schedule. The API reconstructs cart lines from immutable `OrderItem` product/customization snapshots and validates those product/option IDs against the current menu and Step 11 inventory rules. Fully valid orders reload in one click; if some lines are no longer orderable, only the validated lines are loaded and the customer is told what was skipped. Account-linked former guest orders can use the same reorder path because normal order ownership applies after linking. See `SAVED_ADDRESSES_REORDER_SETUP.md` and `STEP_12_VERIFICATION.md`.
 
+
+## Advanced search & dietary discovery (Step 13)
+
+The public catalogue now exposes explicit **Vegetarian**, **Vegan**, **Halal** and **Gluten-free** attributes maintained by administrators. Existing products migrate as unclassified (`false`) rather than being guessed from names, so production dietary claims remain an explicit restaurant decision. The customer menu supports multi-term search across product name, description, category, customization group names and option names, plus dietary filters, optional price range, minimum rating, and sorting by base price, verified-review rating or popularity.
+
+Popularity is derived from the total quantity in **DELIVERED** orders only; pending, failed and cancelled orders do not inflate it. Ratings use only `PUBLISHED` verified-order reviews. The product API remains `Cache-Control: no-store` because the same response carries Step 11 live stock/option availability. See `PRODUCT_DISCOVERY_SETUP.md` and `STEP_13_VERIFICATION.md`.

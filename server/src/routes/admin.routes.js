@@ -76,6 +76,10 @@ const productFields = {
   stock: z.number().int().nonnegative().max(1_000_000),
   lowStockThreshold: z.number().int().nonnegative().max(1_000_000).default(10),
   maxPerOrder: z.number().int().min(1).max(20).default(20),
+  isVegetarian: z.boolean().default(false),
+  isVegan: z.boolean().default(false),
+  isHalal: z.boolean().default(false),
+  isGlutenFree: z.boolean().default(false),
   isAvailable: z.boolean(),
   optionGroups: optionGroupsInput.optional(),
 };
@@ -97,6 +101,15 @@ router.get('/products', async (_req, res) => {
   });
   res.json({ products: products.map(({ _count, ...product }) => ({ ...product, wishlistCount: _count.wishlistItems })) });
 });
+
+function normalizeDietaryClassification(values, existing = {}) {
+  const next = { ...values };
+  const vegan = next.isVegan !== undefined ? next.isVegan : existing.isVegan;
+  const vegetarian = next.isVegetarian !== undefined ? next.isVegetarian : existing.isVegetarian;
+  if (vegan === true && vegetarian !== true) next.isVegetarian = true;
+  if (next.isVegetarian === false && existing.isVegan === true && next.isVegan === undefined) next.isVegan = false;
+  return next;
+}
 
 function normalizeProductMedia(values) {
   const next = { ...values };
@@ -200,7 +213,7 @@ async function syncProductCustomizations(tx, productId, groups) {
 router.post('/products', validate(productCreate), async (req, res, next) => {
   try {
     const { id, optionGroups = [], ...rawValues } = req.validated.body;
-    const values = normalizeProductMedia(rawValues);
+    const values = normalizeProductMedia(normalizeDietaryClassification(rawValues));
     const productId = id || `prd_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`;
     const product = await withSerializableRetry(async tx => {
       await tx.product.create({ data: { id: productId, ...values } });
@@ -230,7 +243,7 @@ router.patch('/products/:id', validate(productUpdate), async (req, res, next) =>
     if (submittedStock !== undefined && submittedStock !== existing.stock) {
       throw new AppError(409, 'USE_INVENTORY_ADJUSTMENT', 'Use Inventory to change stock so concurrent orders cannot be overwritten.');
     }
-    const values = normalizeProductMedia(rawValues);
+    const values = normalizeProductMedia(normalizeDietaryClassification(rawValues, existing));
     const product = await withSerializableRetry(async tx => {
       if (Object.keys(values).length) await tx.product.update({ where: { id: existing.id }, data: values });
       if (optionGroups) await syncProductCustomizations(tx, existing.id, optionGroups);

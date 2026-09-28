@@ -119,13 +119,26 @@ test('enforces admin authorization and supports management operations', async ()
   assert.equal(r.status, 503);
   assert.equal(r.body.error.code, 'CLOUDINARY_NOT_CONFIGURED');
 
-  r = await request(app).post('/api/admin/products').set('Authorization', `Bearer ${adminToken}`).send({ id: testProductId, name: 'Test Meal', description: 'Created by the API integration test', category: 'Test', imageUrl: null, priceCents: 1299, stock: 5, isAvailable: true });
+  r = await request(app).post('/api/admin/products').set('Authorization', `Bearer ${adminToken}`).send({ id: testProductId, name: 'Test Vegan Meal', description: 'Created by the API integration test with a large option', category: 'Test', imageUrl: null, priceCents: 1299, stock: 5, isVegan: true, isHalal: true, isAvailable: true, optionGroups: [{ name: 'Size', kind: 'VARIANT', minSelections: 1, maxSelections: 1, isAvailable: true, options: [{ name: 'Large', priceDeltaCents: 200, isDefault: true, isAvailable: true }] }] });
   assert.equal(r.status, 201);
   assert.equal(r.body.product.id, testProductId);
+  assert.equal(r.body.product.isVegan, true);
+  assert.equal(r.body.product.isVegetarian, true);
 
   r = await request(app).patch(`/api/admin/products/${testProductId}`).set('Authorization', `Bearer ${adminToken}`).send({ stock: 9 });
+  assert.equal(r.status, 409);
+  assert.equal(r.body.error.code, 'USE_INVENTORY_ADJUSTMENT');
+  r = await request(app).post('/api/admin/inventory/adjust').set('Authorization', `Bearer ${adminToken}`).send({ targetType: 'PRODUCT', productId: testProductId, expectedVersion: 0, newStock: 9, reason: 'CORRECTION', note: 'API integration test' });
   assert.equal(r.status, 200);
-  assert.equal(r.body.product.stock, 9);
+  assert.equal(r.body.target.stock, 9);
+
+  r = await request(app).get('/api/products').query({ search: 'large', dietary: 'vegan,halal', minPrice: 10, maxPrice: 20, sort: 'PRICE_ASC' });
+  assert.equal(r.status, 200);
+  assert.ok(r.body.products.some(product => product.id === testProductId));
+  const discoveredProduct = r.body.products.find(product => product.id === testProductId);
+  assert.ok(discoveredProduct.dietaryTags.includes('vegan'));
+  assert.ok(discoveredProduct.dietaryTags.includes('halal'));
+  assert.equal(typeof discoveredProduct.popularityCount, 'number');
 
   r = await request(app).post('/api/admin/coupons').set('Authorization', `Bearer ${adminToken}`).send({ code: testCouponCode, percentOff: 15, minimumCents: 1000, active: true, expiresAt: null });
   assert.equal(r.status, 201);

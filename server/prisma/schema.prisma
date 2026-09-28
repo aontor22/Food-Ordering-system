@@ -78,6 +78,10 @@ model Product {
   lowStockThreshold Int @default(10)
   maxPerOrder Int @default(20)
   inventoryVersion Int @default(0)
+  isVegetarian Boolean @default(false)
+  isVegan Boolean @default(false)
+  isHalal Boolean @default(false)
+  isGlutenFree Boolean @default(false)
   isAvailable Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -88,6 +92,10 @@ model Product {
   inventoryAdjustments InventoryAdjustment[]
   @@index([category, isAvailable])
   @@index([isAvailable, stock])
+  @@index([isVegetarian, isAvailable])
+  @@index([isVegan, isAvailable])
+  @@index([isHalal, isAvailable])
+  @@index([isGlutenFree, isAvailable])
   @@index([imagePublicId])
 }
 

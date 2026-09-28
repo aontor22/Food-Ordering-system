@@ -6,7 +6,7 @@ import { formatCurrency } from '../../lib/format';
 import Icon from '../../components/ui/Icon';
 import { AdminEmpty, AdminError, AdminLoading, AdminModal, AdminPageHeader, StatusBadge } from '../../components/admin/AdminUI';
 
-const emptyForm = { name: '', description: '', category: '', price: '', stock: '100', lowStockThreshold: '10', maxPerOrder: '20', isAvailable: true, optionGroups: [] };
+const emptyForm = { name: '', description: '', category: '', price: '', stock: '100', lowStockThreshold: '10', maxPerOrder: '20', isVegetarian: false, isVegan: false, isHalal: false, isGlutenFree: false, isAvailable: true, optionGroups: [] };
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 let localKeyCounter = 0;
 const localKey = prefix => `${prefix}-${Date.now()}-${localKeyCounter += 1}`;
@@ -97,7 +97,7 @@ export default function AdminProducts() {
 
   const categories = useMemo(() => [...new Set(products.map(product => product.category))].sort(), [products]);
   const visible = useMemo(() => products.filter(product => {
-    const matchSearch = `${product.name} ${product.category} ${(product.optionGroups || []).map(group => `${group.name} ${group.options.map(option => option.name).join(' ')}`).join(' ')}`.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = `${product.name} ${product.category} ${product.isVegetarian ? 'vegetarian' : ''} ${product.isVegan ? 'vegan' : ''} ${product.isHalal ? 'halal' : ''} ${product.isGlutenFree ? 'gluten free' : ''} ${(product.optionGroups || []).map(group => `${group.name} ${group.options.map(option => option.name).join(' ')}`).join(' ')}`.toLowerCase().includes(search.toLowerCase());
     const matchAvailability = availability === 'all' || (availability === 'active' ? product.isAvailable : !product.isAvailable);
     return matchSearch && matchAvailability;
   }), [products, search, availability]);
@@ -117,7 +117,8 @@ export default function AdminProducts() {
     resetImageState(); setEditing(product);
     setForm({
       name: product.name, description: product.description, category: product.category,
-      price: (product.priceCents / 100).toFixed(2), stock: String(product.stock), lowStockThreshold: String(product.lowStockThreshold ?? 10), maxPerOrder: String(product.maxPerOrder ?? 20), isAvailable: product.isAvailable,
+      price: (product.priceCents / 100).toFixed(2), stock: String(product.stock), lowStockThreshold: String(product.lowStockThreshold ?? 10), maxPerOrder: String(product.maxPerOrder ?? 20),
+      isVegetarian: product.isVegetarian === true, isVegan: product.isVegan === true, isHalal: product.isHalal === true, isGlutenFree: product.isGlutenFree === true, isAvailable: product.isAvailable,
       optionGroups: (product.optionGroups || []).map(groupToForm),
     });
     setImagePreview(displayImage(product) || ''); setFormError('');
@@ -127,7 +128,13 @@ export default function AdminProducts() {
     resetImageState(); setEditing(null); setForm(null); setFormError(''); setSaveStage('');
   };
 
-  const update = event => setForm(previous => ({ ...previous, [event.target.name]: event.target.type === 'checkbox' ? event.target.checked : event.target.value }));
+  const update = event => setForm(previous => {
+    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
+    const next = { ...previous, [event.target.name]: value };
+    if (event.target.name === 'isVegan' && value === true) next.isVegetarian = true;
+    if (event.target.name === 'isVegetarian' && value === false) next.isVegan = false;
+    return next;
+  });
 
   const addGroup = kind => setForm(previous => ({ ...previous, optionGroups: [...previous.optionGroups, { ...newGroup(kind), sortOrder: previous.optionGroups.length }] }));
   const removeGroup = key => setForm(previous => ({ ...previous, optionGroups: previous.optionGroups.filter(group => group._key !== key) }));
@@ -194,7 +201,8 @@ export default function AdminProducts() {
     let uploaded = null;
     const body = {
       name: form.name, description: form.description, category: form.category,
-      priceCents: Math.round(Number(form.price) * 100), lowStockThreshold: Number(form.lowStockThreshold), maxPerOrder: Number(form.maxPerOrder), isAvailable: form.isAvailable,
+      priceCents: Math.round(Number(form.price) * 100), lowStockThreshold: Number(form.lowStockThreshold), maxPerOrder: Number(form.maxPerOrder),
+      isVegetarian: form.isVegetarian, isVegan: form.isVegan, isHalal: form.isHalal, isGlutenFree: form.isGlutenFree, isAvailable: form.isAvailable,
       ...(!editing ? { stock: Number(form.stock) } : {}),
       optionGroups: serializeGroups(form.optionGroups),
     };
@@ -255,7 +263,7 @@ export default function AdminProducts() {
           const image = displayImage(product); const optionCount = (product.optionGroups || []).reduce((sum, group) => sum + group.options.length, 0);
           return <tr key={product.id}>
             <td><div className="product-cell"><span className="product-thumb">{image ? <img src={image} alt="" loading="lazy" /> : <Icon name="products" />}</span><div><strong>{product.name}</strong><small>{product.description}</small></div></div></td>
-            <td>{product.category}</td><td><strong>{formatCurrency(product.priceCents / 100)}</strong></td><td><span className={product.stock <= product.lowStockThreshold ? 'stock-low' : 'stock-ok'}>{product.stock}</span><small> alert ≤ {product.lowStockThreshold}</small></td>
+            <td><strong>{product.category}</strong><small>{[product.isVegetarian && 'Vegetarian', product.isVegan && 'Vegan', product.isHalal && 'Halal', product.isGlutenFree && 'Gluten-free'].filter(Boolean).join(' · ') || 'No dietary labels'}</small></td><td><strong>{formatCurrency(product.priceCents / 100)}</strong></td><td><span className={product.stock <= product.lowStockThreshold ? 'stock-low' : 'stock-ok'}>{product.stock}</span><small> alert ≤ {product.lowStockThreshold}</small></td>
             <td><strong>{product.optionGroups?.length || 0} groups</strong><small>{optionCount} choices</small></td>
             <td><strong>{product.wishlistCount || 0}</strong><small> saves</small></td><td><StatusBadge value={product.isAvailable ? 'ACTIVE' : 'INACTIVE'} /></td>
             <td><div className="admin-table-actions"><button className="admin-icon-action" onClick={() => openEdit(product)} title="Edit product" aria-label={`Edit ${product.name}`}><Icon name="edit" size={17} /></button><button className={`admin-icon-action ${product.isAvailable ? 'is-danger' : 'is-success'}`} onClick={() => toggleAvailability(product)} title={product.isAvailable ? 'Archive product' : 'Restore product'} aria-label={`${product.isAvailable ? 'Archive' : 'Restore'} ${product.name}`}><Icon name={product.isAvailable ? 'archive' : 'refresh'} size={17} /></button></div></td>
@@ -270,6 +278,16 @@ export default function AdminProducts() {
         <div className="field"><label htmlFor="product-description">Description</label><textarea id="product-description" name="description" required minLength="5" maxLength="500" value={form.description} onChange={update} /></div>
         <div className="field-grid"><div className="field"><label htmlFor="product-price">Base price</label><input id="product-price" name="price" type="number" required min="0.01" max="100000" step="0.01" value={form.price} onChange={update} /></div><div className="field"><label htmlFor="product-stock">Units in stock</label><input id="product-stock" name="stock" type="number" required min="0" max="1000000" step="1" value={form.stock} onChange={update} disabled={Boolean(editing)} />{editing && <small>Stock is protected from stale edits. Change it in <Link to="/admin/inventory">Inventory</Link>.</small>}</div></div>
         <div className="field-grid"><div className="field"><label htmlFor="product-low-stock">Low-stock alert at</label><input id="product-low-stock" name="lowStockThreshold" type="number" required min="0" max="1000000" step="1" value={form.lowStockThreshold} onChange={update} /></div><div className="field"><label htmlFor="product-max-order">Maximum per order</label><input id="product-max-order" name="maxPerOrder" type="number" required min="1" max="20" step="1" value={form.maxPerOrder} onChange={update} /></div></div>
+
+        <section className="admin-dietary-editor">
+          <div><h3>Dietary labels</h3><p>Only mark a label when the recipe and restaurant handling policy support that claim. These labels power customer filters.</p></div>
+          <div className="admin-dietary-grid">
+            <label><input type="checkbox" name="isVegetarian" checked={form.isVegetarian} onChange={update} /><span><strong>Vegetarian</strong><small>No meat or fish ingredients</small></span></label>
+            <label><input type="checkbox" name="isVegan" checked={form.isVegan} onChange={update} /><span><strong>Vegan</strong><small>No animal-derived ingredients</small></span></label>
+            <label><input type="checkbox" name="isHalal" checked={form.isHalal} onChange={update} /><span><strong>Halal</strong><small>Prepared under your halal policy</small></span></label>
+            <label><input type="checkbox" name="isGlutenFree" checked={form.isGlutenFree} onChange={update} /><span><strong>Gluten-free</strong><small>Recipe is classified gluten-free</small></span></label>
+          </div>
+        </section>
 
         <section className="product-options-editor">
           <div className="product-options-editor-head"><div><h3>Sizes, variants & add-ons</h3><p>Variants are single-choice groups such as Size or Crust. Add-ons can allow multiple selections.</p></div><div><button type="button" className="button button-secondary button-small" onClick={() => addGroup('VARIANT')}><Icon name="plus" />Variant</button><button type="button" className="button button-secondary button-small" onClick={() => addGroup('ADDON')}><Icon name="plus" />Add-ons</button></div></div>

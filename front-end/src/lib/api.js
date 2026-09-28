@@ -105,7 +105,15 @@ async function uploadProductImage(file) {
 }
 
 export const api = {
-  getProducts: () => request('/products'),
+  getProducts: (filters = null) => {
+    if (!filters || !Object.keys(filters).length) return request('/products');
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length)) return;
+      params.set(key, Array.isArray(value) ? value.join(',') : String(value));
+    });
+    return request(`/products?${params.toString()}`);
+  },
   getStoreStatus: () => request('/store/status'),
   getDeliveryZones: () => request('/store/delivery-zones'),
   getFulfillmentOptions: () => request('/store/fulfillment'),

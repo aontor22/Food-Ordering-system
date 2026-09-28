@@ -33,3 +33,6 @@
 .food-rating { top: 58px; right: 13px; }
 .wishlist-error { min-height: 0 !important; margin: -8px 0 10px !important; color: var(--danger) !important; font-size: .72rem !important; }
 .food-stock-badge{position:absolute;right:12px;bottom:12px;z-index:2;padding:6px 9px;border-radius:999px;background:#fff7e8;color:#955a17;font-size:.66rem;font-weight:900;box-shadow:0 4px 14px rgba(33,39,35,.1)}.food-stock-badge.is-sold-out{background:#fff0ee;color:#a33a2d}.food-card:has(.food-stock-badge.is-sold-out) .food-card-media img{filter:grayscale(.3);opacity:.7}
+
+/* Step 13: customer-facing dietary metadata */
+.food-dietary-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.food-dietary-tags span{padding:4px 7px;border:1px solid #d8e8de;border-radius:999px;color:#2f6d4c;background:#f2faf5;font-size:.62rem;font-weight:800;line-height:1}

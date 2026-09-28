@@ -26,6 +26,8 @@ async function main() {
         priceCents: price * 100,
         stock: 100,
         description: 'Freshly prepared with quality ingredients',
+        isVegetarian: category === 'Pure Veg' || /\bveg(?:an)?\b/i.test(name),
+        isVegan: /\bvegan\b/i.test(name),
         imageUrl: `/seed-food/food_${index + 1}.webp`
       }
     });
