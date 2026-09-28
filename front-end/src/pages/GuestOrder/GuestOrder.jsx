@@ -52,14 +52,17 @@ export default function GuestOrder({ onLogin }) {
     });
   }, [token]);
 
-  const canCancel = order && ['PENDING', 'CONFIRMED'].includes(order.status) && !(order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID') && !(order.paymentMethod === 'MANUAL' && order.paymentStatus === 'REVIEW');
+  const canCancel = Boolean(order?.cancellation?.allowed || order?.cancellation?.refundRequired);
   const canRetryOnline = order?.paymentMethod === 'ONLINE' && !['PAID', 'REFUNDED', 'REFUND_PENDING', 'REVIEW'].includes(order.paymentStatus) && !['CANCELLED', 'DELIVERED'].includes(order.status);
   const scheduleText = useMemo(() => order?.fulfillmentMode === 'SCHEDULED' && order.scheduledForLocal ? formatScheduled(order.scheduledForLocal) : 'ASAP', [order]);
 
   const cancel = async () => {
-    if (!token || !confirm('Cancel this order?')) return;
+    if (!token) return;
+    const reason = prompt('Why are you cancelling this order?', 'Changed my mind');
+    if (reason === null) return;
+    if (reason.trim().length < 3) { setError('Please enter a short cancellation reason.'); return; }
     setBusy('cancel'); setError('');
-    try { const data = await api.cancelGuestOrder(token); setOrder(data.order); }
+    try { const data = await api.cancelGuestOrder(token, { reason: reason.trim() }); setOrder(data.order); if (data.cancellationRequested) setLinkMessage('Cancellation requested. Refund/reconciliation is required before final cancellation.'); }
     catch (requestError) { setError(requestError.message); }
     finally { setBusy(''); }
   };
@@ -110,6 +113,9 @@ export default function GuestOrder({ onLogin }) {
 
     <section className="surface-card guest-account-link"><div><span className="guest-order-icon"><Icon name="user" size={22} /></span><div><h2>Keep this order with your account</h2><p>Anonymous checkout never receives or spends Tomato Points. Sign in or create an account with this same email to link the purchase safely. Once linked, an eligible delivered guest order receives the normal one-time points award and can qualify for account-only reviews.</p></div></div><button className="button button-secondary" disabled={busy === 'link'} onClick={linkAccount}>{busy === 'link' ? 'Linking…' : user ? 'Link to my account' : 'Sign in / create account'}</button></section>
 
+    {order.cancellationRequestedAt && order.status !== 'CANCELLED' && <p className="form-success">Cancellation requested. The restaurant must finish payment refund/reconciliation before the order can be cancelled.</p>}
+    {order.cancellation?.allowed && !order.cancellationRequestedAt && <p className="guest-private-note">Self-cancellation is available for about {order.cancellation.minutesRemaining} more minute{order.cancellation.minutesRemaining === 1 ? '' : 's'}.</p>}
+    {order.cancellation?.refundRequired && !order.cancellationRequestedAt && <p className="guest-private-note">This paid order is still inside the cancellation policy. Submitting cancellation will create a refund/reconciliation request.</p>}
     <div className="guest-order-actions">
       {order.paymentMethod === 'MANUAL' && !['PAID', 'REFUNDED'].includes(order.paymentStatus) && <Link className="button button-primary" to={`/payment/manual/${order.id}`}>Payment details</Link>}
       {canRetryOnline && <button className="button button-primary" disabled={Boolean(busy)} onClick={retryPayment}>{busy === 'payment' ? 'Opening payment…' : 'Continue / retry payment'}</button>}

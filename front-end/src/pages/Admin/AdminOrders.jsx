@@ -47,9 +47,16 @@ export default function AdminOrders() {
   }), [orders, search, status]);
 
   const updateStatus = async (order, nextStatus) => {
+    let cancellationNote = '';
+    if (nextStatus === 'CANCELLED') {
+      const value = window.prompt('Cancellation reason for the audit trail', order.cancellationRequestReason || 'Customer requested cancellation');
+      if (value === null) return;
+      if (value.trim().length < 3) { setError('A cancellation reason is required.'); return; }
+      cancellationNote = value.trim();
+    }
     setBusy(`${order.id}:${nextStatus}`); setError('');
     try {
-      const options = nextStatus === 'PREPARING' ? { estimateMinutes: 25 } : nextStatus === 'OUT_FOR_DELIVERY' ? { estimateMinutes: 30 } : {};
+      const options = nextStatus === 'PREPARING' ? { estimateMinutes: 25 } : nextStatus === 'OUT_FOR_DELIVERY' ? { estimateMinutes: 30 } : nextStatus === 'CANCELLED' ? { note: cancellationNote } : {};
       const { order: updated } = await api.updateAdminOrderStatus(order.id, nextStatus, options);
       setOrders(previous => previous.map(item => item.id === updated.id ? updated : item));
     } catch (requestError) { setError(requestError.message); }
@@ -87,7 +94,7 @@ function OrderRows({ order, expanded, onExpand, onStatus, onEta, busy }) {
   const availableTransitions = transitionsFor(order).filter(nextStatus => {
     if (nextStatus === 'CANCELLED' && order.paymentMethod === 'MANUAL' && order.paymentStatus === 'REVIEW') return false;
     if (nextStatus === 'CANCELLED' && order.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW', 'REFUND_PENDING'].includes(order.paymentStatus)) return false;
-    if (nextStatus === 'CANCELLED' && order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID') return false;
+    if (nextStatus === 'CANCELLED' && order.paymentStatus === 'PAID') return false;
     if (nextStatus !== 'CANCELLED' && order.paymentMethod !== 'COD' && order.paymentStatus !== 'PAID') return false;
     return true;
   });
@@ -102,7 +109,8 @@ function OrderRows({ order, expanded, onExpand, onStatus, onEta, busy }) {
       <div className="order-tracking-admin"><h4>Live tracking</h4><OrderTracking order={order} /></div>
       <div><h4>Order items</h4><ul>{order.items.map(item => <li key={item.id}><span>{item.quantity} × {item.productName} — {formatCurrency(item.lineTotalCents / 100, order.payment?.currency)}</span><OrderItemCustomization compact item={item} currency={order.payment?.currency} /></li>)}</ul>{order.discountCents > 0 && <p>Promo discount: −{formatCurrency(order.discountCents / 100)} ({order.couponCode})</p>}{order.pointsRedeemed > 0 && <p>Points discount: −{formatCurrency(order.pointsDiscountCents / 100, order.payment?.currency)} ({order.pointsRedeemed} points)</p>}{order.pointsEarned > 0 && <p><strong>Reward:</strong> +{order.pointsEarned} points earned</p>}</div>
       <div><h4>{order.fulfillmentType === 'PICKUP' ? 'Pickup' : 'Delivery'} details</h4><p><strong>{order.fulfillmentType === 'PICKUP' ? 'Pickup' : 'Delivery'}:</strong> {order.fulfillmentMode === 'SCHEDULED' ? formatScheduled(order.scheduledForLocal) : 'ASAP'}{order.schedulingTimezone ? ` (${order.schedulingTimezone})` : ''}</p>{order.deliveryZoneName && <p><strong>Zone:</strong> {order.deliveryZoneName}<br /><strong>Delivery fee:</strong> {formatCurrency(order.deliveryFeeCents / 100, order.payment?.currency)}</p>}{order.fulfillmentType === 'DELIVERY' ? <p>{order.firstName} {order.lastName}<br />{order.street}<br />{order.city}, {order.state} {order.postalCode}<br />{order.country}<br />{order.phone}</p> : <p>{order.firstName} {order.lastName}<br />{order.phone}<br />Customer will collect from the restaurant.{order.pickupAddressSnapshot ? <><br /><strong>Pickup address:</strong> {order.pickupAddressSnapshot}</> : null}{order.pickupInstructionsSnapshot ? <><br /><strong>Instructions:</strong> {order.pickupInstructionsSnapshot}</> : null}</p>}{order.notes && <p><strong>Note:</strong> {order.notes}</p>}</div>
-      <div><h4>Update status</h4><div className="order-actions">{availableTransitions.map(nextStatus => <button key={nextStatus} className={`button button-small ${nextStatus === 'CANCELLED' ? 'button-secondary' : 'button-primary'}`} disabled={Boolean(busy)} onClick={() => onStatus(nextStatus)}>{busy === `${order.id}:${nextStatus}` ? 'Updating…' : humanizeStatus(nextStatus)}</button>)}{!availableTransitions.length && <StatusBadge value={order.status} />}</div>{order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID' && ['PENDING','CONFIRMED','PREPARING','READY'].includes(order.status) && <p>Paid orders require a refund before cancellation.</p>}{['PREPARING','OUT_FOR_DELIVERY'].includes(order.status) && <div className="eta-admin-control"><strong>{order.status === 'PREPARING' ? 'Ready-time estimate' : 'Delivery ETA'}</strong><div>{(order.status === 'PREPARING' ? [10,20,30,45] : [10,20,30,45,60]).map(minutes => <button key={minutes} type="button" disabled={Boolean(busy)} onClick={() => onEta(minutes)}>{busy === `${order.id}:eta` ? '…' : `${minutes}m`}</button>)}</div></div>}</div>
+      <div><h4>Update status</h4><div className="order-actions">{availableTransitions.map(nextStatus => <button key={nextStatus} className={`button button-small ${nextStatus === 'CANCELLED' ? 'button-secondary' : 'button-primary'}`} disabled={Boolean(busy)} onClick={() => onStatus(nextStatus)}>{busy === `${order.id}:${nextStatus}` ? 'Updating…' : humanizeStatus(nextStatus)}</button>)}{!availableTransitions.length && <StatusBadge value={order.status} />}</div>{order.paymentStatus === 'PAID' && ['PENDING','CONFIRMED','PREPARING','READY'].includes(order.status) && <p>Paid orders require a reconciled refund before cancellation.</p>}{['PREPARING','OUT_FOR_DELIVERY'].includes(order.status) && <div className="eta-admin-control"><strong>{order.status === 'PREPARING' ? 'Ready-time estimate' : 'Delivery ETA'}</strong><div>{(order.status === 'PREPARING' ? [10,20,30,45] : [10,20,30,45,60]).map(minutes => <button key={minutes} type="button" disabled={Boolean(busy)} onClick={() => onEta(minutes)}>{busy === `${order.id}:eta` ? '…' : `${minutes}m`}</button>)}</div></div>}</div>
+      {order.cancellationRequestedAt && order.status !== 'CANCELLED' && <div><h4>Cancellation request</h4><p><strong>Customer requested cancellation.</strong><br />{order.cancellationRequestReason || 'No reason provided.'}<br />{order.paymentStatus === 'PAID' ? 'Refund the payment first; after it is reconciled, cancel the order from this page.' : 'Payment does not require a completed refund before cancellation.'}</p></div>}
       <div><h4>Payment & total</h4><p>{order.paymentMethod === 'MANUAL' ? `Manual · ${order.payment?.manualDestination?.provider || ''}` : order.paymentMethod === 'ONLINE' ? order.payment?.provider || 'Online' : 'Cash on delivery'} · {humanizeStatus(order.paymentStatus)}<br />Transaction: {order.payment?.transactionId || 'Legacy order'}<br />Attempts: {order.payment?.attempts || 0}<br /><strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></p>{order.payment?.failureReason && <p><strong>Payment note:</strong> {order.payment.failureReason}</p>}</div>
       <div><h4>Documents</h4><OrderDocuments order={order} admin compact /></div>
     </div></td></tr>}

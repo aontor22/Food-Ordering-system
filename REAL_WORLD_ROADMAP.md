@@ -18,7 +18,7 @@ Implemented sequentially so each release remains deployable and testable.
 - [x] 14 — Expanded admin sales/customer/product analytics + CSV export
 - [x] 15 — Kitchen display mode (NEW / PREPARING / READY) with timers
 - [x] 16 — Printable/downloadable invoice and receipt workflow
-- [ ] 17 — Customer cancellation windows + admin refund/reconciliation rules
+- [x] 17 — Customer cancellation windows + admin refund/reconciliation rules
 - [ ] 18 — Auth hardening: email verification, password reset, admin 2FA/session controls
 - [ ] 19 — Production monitoring, structured error tracking and operational health checks
 - [ ] 20 — SEO, Open Graph, sitemap, robots and structured restaurant/product metadata

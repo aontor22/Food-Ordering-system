@@ -1,3 +1,4 @@
+- Configurable customer cancellation windows, prepaid cancellation requests, mandatory refund-before-final-cancel reconciliation, and an admin refund queue
 # Food Ordering System — Full Stack
 
 A working Preact storefront and responsive restaurant admin dashboard with a Node.js/Express API, PostgreSQL database, secure authentication, inventory-aware ordering, coupons, and audited management workflows.

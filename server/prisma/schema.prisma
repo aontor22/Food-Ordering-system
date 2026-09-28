@@ -238,6 +238,10 @@ model Order {
   outForDeliveryAt DateTime?
   deliveredAt DateTime?
   cancelledAt DateTime?
+  cancellationReason String?
+  cancelledBy String?
+  cancellationRequestedAt DateTime?
+  cancellationRequestReason String?
   estimatedReadyAt DateTime?
   estimatedDeliveryAt DateTime?
   totalCents Int
@@ -444,6 +448,8 @@ model RestaurantSetting {
   temporaryClosed Boolean @default(false)
   temporaryClosedReason String?
   temporaryClosedUntilLocal String?
+  customerCancelWindowMinutes Int @default(10)
+  scheduledCancelLeadMinutes Int @default(60)
   updatedAt DateTime @updatedAt
 }
 

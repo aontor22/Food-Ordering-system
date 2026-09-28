@@ -72,10 +72,12 @@ export default function Orders({ onLogin }) {
   };
 
   const cancel = async order => {
-    if (!window.confirm(`Cancel order ${order.orderNumber}?`)) return;
+    const reason = window.prompt(`Why are you cancelling ${order.orderNumber}?`, 'Changed my mind');
+    if (reason === null) return;
+    if (reason.trim().length < 3) { setError('Please enter a short cancellation reason.'); return; }
     setBusy(`cancel:${order.id}`); setError('');
     try {
-      const result = await api.cancelOrder(order.id);
+      const result = await api.cancelOrder(order.id, { reason: reason.trim() });
       setOrders(previous => previous.map(item => item.id === order.id ? result.order : item));
       if (result.loyalty) {
         setLoyalty(result.loyalty);
@@ -124,11 +126,13 @@ export default function Orders({ onLogin }) {
         </div>}
         <div className="order-card-foot"><span><Icon name={order.fulfillmentType === 'PICKUP' ? 'store' : 'delivery'} />{order.status === 'DELIVERED' ? (order.fulfillmentType === 'PICKUP' ? 'Picked up' : 'Delivered') : order.status === 'CANCELLED' ? 'Order cancelled' : ['READY','READY_FOR_PICKUP'].includes(order.status) ? (order.fulfillmentType === 'PICKUP' ? 'Ready for pickup' : 'Food ready for dispatch') : order.status === 'PENDING' ? 'Awaiting confirmation' : order.fulfillmentType === 'PICKUP' ? 'Pickup order in progress' : 'Delivery in progress'}</span><p>Total <strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong></p></div>
         <div className="order-reorder-row"><button className="button button-secondary" type="button" disabled={Boolean(busy)} onClick={() => reorder(order)}><Icon name="repeat" size={17} />{busy === `reorder:${order.id}` ? 'Checking availability…' : 'Reorder'}</button><small>Rebuilds this cart using today’s menu, prices and stock.</small></div>
-        <OrderDocuments order={order} />
+        {order.cancellationRequestedAt && order.status !== 'CANCELLED' && <p className="cancellation-note"><strong>Cancellation requested.</strong> {order.paymentStatus === 'PAID' ? 'Refund/reconciliation is required before final cancellation.' : 'Restaurant review is pending.'}</p>}<OrderDocuments order={order} />
         {(order.paymentMethod === 'MANUAL' || (order.paymentMethod === 'ONLINE' && !['PAID', 'REFUNDED', 'REFUND_PENDING', 'REVIEW'].includes(order.paymentStatus) && !['CANCELLED', 'DELIVERED'].includes(order.status)) || (['PENDING', 'CONFIRMED'].includes(order.status) && !(order.paymentMethod !== 'COD' && (order.paymentStatus === 'PAID' || order.paymentStatus === 'REFUND_PENDING' || order.paymentStatus === 'REVIEW' || (order.payment?.provider === 'SSLCOMMERZ' && order.paymentStatus === 'PROCESSING'))))) && <div className="order-customer-actions">
           {order.paymentMethod === 'MANUAL' && <Link className="button button-primary" to={`/payment/manual/${order.id}`}><Icon name="cash" />{['PENDING','REJECTED'].includes(order.paymentStatus) && order.status !== 'CANCELLED' ? 'Submit payment details' : 'Payment details'}</Link>}
           {order.paymentMethod === 'ONLINE' && !['PAID', 'REFUNDED', 'REFUND_PENDING', 'REVIEW'].includes(order.paymentStatus) && !['CANCELLED', 'DELIVERED'].includes(order.status) && <button className="button button-primary" disabled={Boolean(busy)} onClick={() => pay(order)}><Icon name="card" />{busy === `pay:${order.id}` ? 'Opening payment…' : order.paymentStatus === 'PROCESSING' ? 'Check / continue payment' : order.paymentStatus === 'PENDING' ? 'Pay now' : 'Retry payment'}</button>}
-          {['PENDING', 'CONFIRMED'].includes(order.status) && !(order.paymentMethod !== 'COD' && (order.paymentStatus === 'PAID' || order.paymentStatus === 'REFUND_PENDING' || order.paymentStatus === 'REVIEW' || (order.payment?.provider === 'SSLCOMMERZ' && order.paymentStatus === 'PROCESSING'))) && <button className="button button-secondary" disabled={Boolean(busy)} onClick={() => cancel(order)}>{busy === `cancel:${order.id}` ? 'Cancelling…' : 'Cancel order'}</button>}
+          {order.cancellation?.allowed && !order.cancellationRequestedAt && <small className="cancellation-window">Cancellation available for about {order.cancellation.minutesRemaining} more minute{order.cancellation.minutesRemaining === 1 ? '' : 's'}.</small>}
+          {order.cancellation?.refundRequired && !order.cancellationRequestedAt && <small className="cancellation-window">Cancellation is within policy, but this paid order needs refund reconciliation.</small>}
+          {(order.cancellation?.allowed || order.cancellation?.refundRequired) && !order.cancellationRequestedAt && <button className="button button-secondary" disabled={Boolean(busy)} onClick={() => cancel(order)}>{busy === `cancel:${order.id}` ? 'Cancelling…' : 'Cancel order'}</button>}
         </div>}
       </article>)}
     </div>}

@@ -20,13 +20,15 @@ export default function AdminPayments() {
   const [gatewayRefund, setGatewayRefund] = useState(null);
   const [gatewayRefundReason, setGatewayRefundReason] = useState('');
   const [gatewayRefundConfirmed, setGatewayRefundConfirmed] = useState(false);
+  const [reconciliation, setReconciliation] = useState([]);
 
   const load = useCallback(async () => {
     setError('');
     try {
-      const result = await api.getAdminPayments();
+      const [result, reconciliationResult] = await Promise.all([api.getAdminPayments(), api.getAdminRefundReconciliation()]);
       setPayments(result.payments);
       setGateway(result.gateway || null);
+      setReconciliation(reconciliationResult.items || []);
     } catch (requestError) { setError(requestError.message); }
     finally { setLoading(false); }
   }, []);
@@ -52,6 +54,7 @@ export default function AdminPayments() {
     try {
       const result = action === 'check' ? await api.checkAdminPayment(payment.id) : action === 'paid' ? await api.confirmAdminCashPayment(payment.id) : await api.refundAdminCashPayment(payment.id);
       updatePayment(result);
+      await load();
     } catch (requestError) { setError(requestError.message); }
     finally { setBusy(''); }
   };
@@ -93,6 +96,7 @@ export default function AdminPayments() {
       const result = await api.refundAdminGatewayPayment(gatewayRefund.id, { reason: gatewayRefundReason });
       updatePayment(result);
       setGatewayRefund(null);
+      await load();
     } catch (e) { setError(e.message); }
     finally { setBusy(''); }
   };
@@ -109,6 +113,7 @@ export default function AdminPayments() {
       <article className="admin-card metric-card"><span className="metric-icon is-gold"><Icon name="clock" /></span><div><p>Needs attention</p><strong>{metrics.pending}</strong><small>Payment, review or refund pending</small></div></article>
       <article className="admin-card metric-card"><span className="metric-icon is-orange"><Icon name="alert" /></span><div><p>Failed/cancelled</p><strong>{metrics.failed}</strong><small>May require retry or follow-up</small></div></article>
     </section>
+    {reconciliation.length > 0 && <section className="admin-card manual-review-panel"><h2>Cancellation & refund reconciliation</h2><p>These orders have a customer cancellation request or a refund still requiring follow-up.</p><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Order</th><th>Payment</th><th>Customer request</th><th>Next action</th></tr></thead><tbody>{reconciliation.map(item => <tr key={item.payment.id}><td><strong>{item.order.orderNumber}</strong><small>{item.order.firstName} {item.order.lastName}</small></td><td><StatusBadge value={item.payment.status} /><small>{item.payment.provider}</small></td><td><small>{item.order.cancellationRequestReason || 'Refund reconciliation'}</small></td><td><strong>{humanizeStatus(item.reconciliation.action)}</strong><small>{item.reconciliation.settled ? 'Payment side reconciled' : 'Action required'}</small></td></tr>)}</tbody></table></div></section>}
     {error && <p className="form-error" role="alert">{error}</p>}
 
     {gatewayRefund && <section className="admin-card manual-review-panel"><h2>Refund SSLCOMMERZ payment</h2><p><strong>{gatewayRefund.order.orderNumber}</strong> · Full refund {formatCurrency(gatewayRefund.amountCents / 100, gatewayRefund.currency)} ({gatewayRefund.currency})</p><p>Bank transaction: <strong>{gatewayRefund.gatewayTransactionId || 'Not available'}</strong></p><form onSubmit={submitGatewayRefund}><div className="field"><label htmlFor="gateway-refund-reason">Refund reason</label><textarea id="gateway-refund-reason" required minLength={5} maxLength={255} value={gatewayRefundReason} onChange={event => setGatewayRefundReason(event.target.value)} placeholder="Example: Customer cancelled before preparation" /></div><label className="manual-checkbox"><input type="checkbox" required checked={gatewayRefundConfirmed} onChange={event => setGatewayRefundConfirmed(event.target.checked)} />I understand this sends a real full-refund request to the configured SSLCOMMERZ environment. The order will remain refund-pending until the gateway confirms completion.</label><div className="order-actions"><button className="button button-primary" disabled={Boolean(busy)}>{busy ? 'Requesting refund…' : 'Request full refund'}</button><button type="button" className="button button-secondary" disabled={Boolean(busy)} onClick={() => setGatewayRefund(null)}>Close</button></div></form></section>}

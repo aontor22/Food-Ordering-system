@@ -144,6 +144,8 @@ function defaultSettings() {
     temporaryClosed: false,
     temporaryClosedReason: null,
     temporaryClosedUntilLocal: null,
+    customerCancelWindowMinutes: 10,
+    scheduledCancelLeadMinutes: 60,
   };
 }
 
@@ -281,6 +283,8 @@ export async function saveStoreOperations(db, values) {
       temporaryClosed: values.temporaryClosed,
       temporaryClosedReason: values.temporaryClosed ? (values.temporaryClosedReason || null) : null,
       temporaryClosedUntilLocal: values.temporaryClosed ? (values.temporaryClosedUntilLocal || null) : null,
+      customerCancelWindowMinutes: values.customerCancelWindowMinutes,
+      scheduledCancelLeadMinutes: values.scheduledCancelLeadMinutes,
     },
     create: {
       id: 'default',
@@ -289,6 +293,8 @@ export async function saveStoreOperations(db, values) {
       temporaryClosed: values.temporaryClosed,
       temporaryClosedReason: values.temporaryClosed ? (values.temporaryClosedReason || null) : null,
       temporaryClosedUntilLocal: values.temporaryClosed ? (values.temporaryClosedUntilLocal || null) : null,
+      customerCancelWindowMinutes: values.customerCancelWindowMinutes,
+      scheduledCancelLeadMinutes: values.scheduledCancelLeadMinutes,
     },
   });
 

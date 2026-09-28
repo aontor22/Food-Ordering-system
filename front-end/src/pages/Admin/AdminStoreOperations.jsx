@@ -10,6 +10,8 @@ function toForm(data) {
     temporaryClosed: data.settings.temporaryClosed,
     temporaryClosedReason: data.settings.temporaryClosedReason || '',
     temporaryClosedUntilLocal: data.settings.temporaryClosedUntilLocal || '',
+    customerCancelWindowMinutes: data.settings.customerCancelWindowMinutes ?? 10,
+    scheduledCancelLeadMinutes: data.settings.scheduledCancelLeadMinutes ?? 60,
     hours: data.hours.map(hour => ({
       dayOfWeek: hour.dayOfWeek,
       dayName: hour.dayName,
@@ -62,6 +64,8 @@ export default function AdminStoreOperations() {
         temporaryClosed: form.temporaryClosed,
         temporaryClosedReason: form.temporaryClosedReason.trim() || null,
         temporaryClosedUntilLocal: form.temporaryClosedUntilLocal || null,
+        customerCancelWindowMinutes: Number(form.customerCancelWindowMinutes),
+        scheduledCancelLeadMinutes: Number(form.scheduledCancelLeadMinutes),
         hours: form.hours.map(({ dayOfWeek, isClosed, open24Hours, openTime, closeTime }) => ({ dayOfWeek, isClosed, open24Hours, openTime, closeTime })),
       });
       setData(result); setForm(toForm(result)); setMessage('Store availability settings saved. Checkout rules are active immediately.');
@@ -111,6 +115,10 @@ export default function AdminStoreOperations() {
             <div className="field"><label htmlFor="temporaryClosedReason">Closure message</label><input id="temporaryClosedReason" name="temporaryClosedReason" maxLength="160" value={form.temporaryClosedReason} onChange={updateSetting} placeholder="e.g. Kitchen maintenance" /></div>
             <div className="field"><label htmlFor="temporaryClosedUntilLocal">Reopen automatically <span className="muted">(optional)</span></label><input id="temporaryClosedUntilLocal" name="temporaryClosedUntilLocal" type="datetime-local" value={form.temporaryClosedUntilLocal} onChange={updateSetting} /><small>Interpreted in the restaurant timezone below.</small></div>
           </div>}
+          <div className="field-grid cancellation-policy-grid">
+            <div className="field"><label htmlFor="customerCancelWindowMinutes">ASAP self-cancel window</label><input id="customerCancelWindowMinutes" name="customerCancelWindowMinutes" type="number" min="0" max="120" value={form.customerCancelWindowMinutes} onChange={updateSetting} /><small>Minutes after checkout while a PENDING/CONFIRMED ASAP order can be cancelled by the customer. Set 0 to disable ASAP self-cancellation.</small></div>
+            <div className="field"><label htmlFor="scheduledCancelLeadMinutes">Scheduled cancellation cutoff</label><input id="scheduledCancelLeadMinutes" name="scheduledCancelLeadMinutes" type="number" min="0" max="10080" value={form.scheduledCancelLeadMinutes} onChange={updateSetting} /><small>Scheduled orders can be cancelled until this many minutes before the booked slot, while preparation has not started.</small></div>
+          </div>
           <div className="field"><label htmlFor="storeTimezone">Restaurant timezone</label><input id="storeTimezone" name="timezone" required value={form.timezone} onChange={updateSetting} placeholder="Asia/Dhaka" /><small>Use an IANA timezone such as Asia/Dhaka, Asia/Kolkata, Europe/London, or America/New_York.</small></div>
         </div>
       </section>

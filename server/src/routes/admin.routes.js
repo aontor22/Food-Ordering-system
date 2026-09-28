@@ -23,6 +23,7 @@ import { adminProductCustomizationInclude, serializeProductForClient } from '../
 import { restoreOrderInventory, setInventoryLevel, withSerializableRetry } from '../services/inventory.js';
 import { getAdminAnalytics, getAdminAnalyticsCsv } from '../services/admin-analytics.js';
 import { buildOrderDocument, orderDocumentFilename, orderDocumentInclude, renderOrderDocumentHtml } from '../services/order-documents.js';
+import { refundReconciliation } from '../services/cancellation-policy.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('ADMIN'));
@@ -475,8 +476,9 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
       if (!allowedOrderTransitions(existing).includes(nextStatus)) {
         throw new AppError(409, 'INVALID_STATUS_TRANSITION', `Order cannot move from ${existing.status} to ${nextStatus}`);
       }
-      if (nextStatus === 'CANCELLED' && existing.paymentMethod !== 'COD' && existing.paymentStatus === 'PAID') {
-        throw new AppError(409, 'REFUND_REQUIRED', 'Record the refund before cancelling this prepaid order');
+      if (nextStatus === 'CANCELLED' && !req.validated.body.note?.trim()) throw new AppError(400, 'CANCELLATION_REASON_REQUIRED', 'Add a cancellation reason for the audit trail');
+      if (nextStatus === 'CANCELLED' && existing.paymentStatus === 'PAID') {
+        throw new AppError(409, 'REFUND_REQUIRED', 'Record the refund before cancelling this paid order');
       }
       if (existing.paymentMethod !== 'COD' && existing.paymentStatus !== 'PAID' && nextStatus !== 'CANCELLED') {
         throw new AppError(409, 'PAYMENT_REQUIRED', 'Payment must be verified before fulfilment can begin');
@@ -500,6 +502,7 @@ router.patch('/orders/:id/status', validate(statusUpdate), async (req, res, next
           ...trackingTimestampData(nextStatus, existing, { estimateMinutes: req.validated.body.estimateMinutes }),
           ...(settleCod ? { paymentStatus: 'PAID' } : {}),
           ...(nextStatus === 'CANCELLED' && !['PAID', 'REFUNDED'].includes(existing.paymentStatus) ? { paymentStatus: 'CANCELLED' } : {}),
+          ...(nextStatus === 'CANCELLED' ? { cancellationReason: req.validated.body.note.trim(), cancelledBy: 'ADMIN' } : {}),
           trackingEvents: { create: trackingEventData(nextStatus, {
             actorType: 'ADMIN', actorLabel: req.auth.email || 'Restaurant team', note: req.validated.body.note || null,
           }) },
@@ -548,6 +551,21 @@ router.patch('/orders/:id/eta', validate(etaUpdate), async (req, res, next) => {
     const latestEvent = order.trackingEvents?.at(-1);
     await safeEnqueueOrderNotification(order.id, `ETA:${latestEvent?.id || Date.now()}`, { etaNote: latestEvent?.note || null }, req.log);
     res.json({ order: serializeOrderForClient(order) });
+  } catch (error) { next(error); }
+});
+
+router.get('/refund-reconciliation', async (_req, res, next) => {
+  try {
+    res.set('Cache-Control', 'private, no-store');
+    const payments = await prisma.payment.findMany({
+      where: { OR: [
+        { status: { in: ['PROCESSING', 'REVIEW', 'REFUND_PENDING', 'PAID', 'REFUNDED'] }, order: { cancellationRequestedAt: { not: null } } },
+        { status: 'REFUND_PENDING' },
+      ] },
+      include: { order: { select: { id: true, orderNumber: true, status: true, paymentStatus: true, paymentMethod: true, cancellationRequestedAt: true, cancellationRequestReason: true, email: true, firstName: true, lastName: true, totalCents: true } } },
+      orderBy: { updatedAt: 'asc' }, take: 250,
+    });
+    res.json({ items: payments.map(payment => ({ payment: serializePayment(payment), order: payment.order, reconciliation: refundReconciliation(payment, payment.order) })) });
   } catch (error) { next(error); }
 });
 
@@ -718,6 +736,8 @@ const storeOperationsUpdate = z.object({
     temporaryClosed: z.boolean(),
     temporaryClosedReason: z.union([z.string().trim().max(160), z.null()]).optional().transform(value => value || null),
     temporaryClosedUntilLocal: z.union([z.string().trim().max(16), z.null()]).optional().transform(value => value || null).refine(isLocalDateTimeKey, 'Temporary reopening time must be YYYY-MM-DDTHH:MM'),
+    customerCancelWindowMinutes: z.number().int().min(0).max(120),
+    scheduledCancelLeadMinutes: z.number().int().min(0).max(10080),
     hours: z.array(z.object({
       dayOfWeek: z.number().int().min(0).max(6),
       isClosed: z.boolean(),
@@ -752,6 +772,8 @@ router.patch('/store-operations', validate(storeOperationsUpdate), async (req, r
       acceptingOrders: values.acceptingOrders,
       temporaryClosed: values.temporaryClosed,
       temporaryClosedUntilLocal: values.temporaryClosedUntilLocal,
+      customerCancelWindowMinutes: values.customerCancelWindowMinutes,
+      scheduledCancelLeadMinutes: values.scheduledCancelLeadMinutes,
       hours: normalizedHours,
     });
     res.json(await getStoreOperationsConfig());

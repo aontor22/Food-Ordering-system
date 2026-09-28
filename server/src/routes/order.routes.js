@@ -27,6 +27,7 @@ import { resolveCustomizedCartLines } from '../services/product-customizations.j
 import { reserveInventory, restoreOrderInventory, withSerializableRetry } from '../services/inventory.js';
 import { prepareReorderCart } from '../services/reorder.js';
 import { buildOrderDocument, orderDocumentFilename, orderDocumentInclude, renderOrderDocumentHtml } from '../services/order-documents.js';
+import { cancellationPolicy, getCancellationSettings } from '../services/cancellation-policy.js';
 
 const router = Router();
 const orderInclude = {
@@ -34,6 +35,16 @@ const orderInclude = {
   payment: true,
   trackingEvents: { orderBy: { createdAt: 'asc' } },
 };
+
+async function serializeWithCancellation(order, db = prisma) {
+  const settings = await getCancellationSettings(db);
+  return { ...serializeOrderForClient(order), cancellation: cancellationPolicy(order, settings) };
+}
+
+async function serializeManyWithCancellation(orders, db = prisma) {
+  const settings = await getCancellationSettings(db);
+  return orders.map(order => ({ ...serializeOrderForClient(order), cancellation: cancellationPolicy(order, settings) }));
+}
 
 function sendOrderDocument(res, document, query = {}) {
   const download = String(query.download || '') === '1';
@@ -447,13 +458,28 @@ async function createOrder(req, data, { userId = null, guest = false } = {}) {
   };
 }
 
-async function cancelOrderInTransaction(tx, order) {
+async function cancelOrderInTransaction(tx, order, { reason = null } = {}) {
   if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
-  if (!['PENDING', 'CONFIRMED'].includes(order.status)) throw new AppError(409, 'CANNOT_CANCEL', 'This order can no longer be cancelled');
-  if (order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID') throw new AppError(409, 'REFUND_REQUIRED', 'Prepaid orders must be refunded before cancellation');
-  if (order.paymentMethod === 'MANUAL' && order.paymentStatus === 'REVIEW') throw new AppError(409, 'PAYMENT_UNDER_REVIEW', 'Wait for payment review before cancelling');
-  if (order.payment?.provider === 'SSLCOMMERZ' && ['PROCESSING', 'REVIEW', 'REFUND_PENDING'].includes(order.payment.status)) {
-    throw new AppError(409, 'PAYMENT_PROCESSING', 'Wait for gateway payment/refund verification before cancelling');
+  const settings = await getCancellationSettings(tx);
+  const policy = cancellationPolicy(order, settings);
+  if (!policy.allowed) {
+    if (policy.refundRequired) {
+      const requested = await tx.order.update({
+        where: { id: order.id },
+        data: {
+          cancellationRequestedAt: order.cancellationRequestedAt || new Date(),
+          cancellationRequestReason: reason || order.cancellationRequestReason || 'Customer requested cancellation within the allowed window.',
+          trackingEvents: { create: trackingEventData(order.status, {
+            kind: 'CANCELLATION_REQUEST', title: 'Cancellation requested', actorType: 'CUSTOMER',
+            actorLabel: `${order.firstName} ${order.lastName}`,
+            note: 'Payment refund/reconciliation is required before the order can be cancelled.',
+          }) },
+        },
+        include: orderInclude,
+      });
+      return { order: requested, requested: true, policy };
+    }
+    throw new AppError(409, policy.code, policy.reason, { cancellation: policy });
   }
 
   await restoreOrderInventory(tx, order, {
@@ -471,20 +497,25 @@ async function cancelOrderInTransaction(tx, order) {
     where: { id: order.id },
     data: {
       status: 'CANCELLED',
+      cancellationReason: reason || 'Cancelled by customer',
+      cancelledBy: 'CUSTOMER',
+      cancellationRequestedAt: order.cancellationRequestedAt || new Date(),
+      cancellationRequestReason: reason || order.cancellationRequestReason || 'Cancelled by customer',
       paymentStatus: ['PAID', 'REFUNDED'].includes(order.paymentStatus) ? order.paymentStatus : 'CANCELLED',
       ...trackingTimestampData('CANCELLED', order),
       trackingEvents: {
         create: trackingEventData('CANCELLED', {
-          actorType: 'CUSTOMER',
-          actorLabel: `${order.firstName} ${order.lastName}`,
-          note: 'Cancelled by customer.',
+          actorType: 'CUSTOMER', actorLabel: `${order.firstName} ${order.lastName}`,
+          note: reason ? `Cancelled by customer: ${reason}` : 'Cancelled by customer.',
         }),
       },
     },
   });
   await restoreCancelledOrderPoints(tx, order);
-  return tx.order.findUnique({ where: { id: order.id }, include: orderInclude });
+  return { order: await tx.order.findUnique({ where: { id: order.id }, include: orderInclude }), requested: false, policy };
 }
+
+const cancelRequestSchema = z.object({ reason: z.string().trim().min(3).max(240).optional() });
 
 router.use('/guest', (_req, res, next) => {
   res.set('Cache-Control', 'no-store');
@@ -515,7 +546,7 @@ router.get('/guest', async (req, res, next) => {
   try {
     const token = guestTokenFromRequest(req);
     const order = await getGuestOrderByToken(token, { include: orderInclude });
-    res.json({ order: serializeOrderForClient(order) });
+    res.json({ order: await serializeWithCancellation(order) });
   } catch (error) { next(error); }
 });
 
@@ -536,7 +567,7 @@ router.get('/guest/live', async (req, res, next) => {
       matches: change => change.orderId === initial.id,
       loadSnapshot: async () => {
         const order = await getGuestOrderByToken(token, { include: orderInclude });
-        const serialized = serializeOrderForClient(order);
+        const serialized = await serializeWithCancellation(order);
         return {
           data: { order: serialized },
           signature: [serialized.id, serialized.status, serialized.paymentStatus, serialized.updatedAt, serialized.payment?.updatedAt, serialized.trackingEvents?.at(-1)?.createdAt, serialized.estimatedReadyAt, serialized.estimatedDeliveryAt],
@@ -549,14 +580,15 @@ router.get('/guest/live', async (req, res, next) => {
 router.post('/guest/cancel', async (req, res, next) => {
   try {
     const token = guestTokenFromRequest(req);
-    const updated = await withSerializableRetry(async tx => {
+    const input = cancelRequestSchema.parse(req.body || {});
+    const result = await withSerializableRetry(async tx => {
       const order = await getGuestOrderByToken(token, { db: tx, include: { items: true, payment: true } });
-      return cancelOrderInTransaction(tx, order);
+      return cancelOrderInTransaction(tx, order, input);
     });
-    await audit(req, 'ORDER_CANCELLED', 'Order', updated.id, { customerType: 'GUEST', pointsRestored: 0 });
-    publishOrderChange(updated);
-    await safeEnqueueOrderNotification(updated.id, 'CANCELLED', {}, req.log);
-    res.json({ order: serializeOrderForClient(updated) });
+    await audit(req, result.requested ? 'ORDER_CANCELLATION_REQUESTED' : 'ORDER_CANCELLED', 'Order', result.order.id, { customerType: 'GUEST', pointsRestored: 0 });
+    publishOrderChange(result.order);
+    if (!result.requested) await safeEnqueueOrderNotification(result.order.id, 'CANCELLED', {}, req.log);
+    res.json({ order: await serializeWithCancellation(result.order), cancellationRequested: result.requested });
   } catch (error) { next(error); }
 });
 
@@ -603,7 +635,7 @@ router.get('/', async (req, res) => {
     include: orderInclude,
     orderBy: { createdAt: 'desc' },
   });
-  res.json({ orders: orders.map(serializeOrderForClient) });
+  res.json({ orders: await serializeManyWithCancellation(orders) });
 });
 
 router.get('/:id/documents/:type', async (req, res, next) => {
@@ -644,7 +676,7 @@ router.get('/live', (req, res) => {
         prisma.order.findMany({ where: { userId: req.auth.sub }, include: orderInclude, orderBy: { createdAt: 'desc' } }),
         getLoyaltySnapshot(req.auth.sub),
       ]);
-      const serialized = orders.map(serializeOrderForClient);
+      const serialized = await serializeManyWithCancellation(orders);
       return {
         data: { orders: serialized, loyalty: { ...loyalty, currency: config.PAYMENT_CURRENCY } },
         signature: serialized.map(order => [order.id, order.status, order.paymentStatus, order.updatedAt, order.payment?.updatedAt, order.trackingEvents?.at(-1)?.createdAt, order.estimatedReadyAt, order.estimatedDeliveryAt, order.pointsEarned]),
@@ -684,19 +716,20 @@ router.delete('/:orderId/items/:itemId/review', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   const order = await prisma.order.findFirst({ where: { id: req.params.id, userId: req.auth.sub }, include: orderInclude });
   if (!order) return next(new AppError(404, 'ORDER_NOT_FOUND', 'Order not found'));
-  res.json({ order: serializeOrderForClient(order) });
+  res.json({ order: await serializeWithCancellation(order) });
 });
 
 router.post('/:id/cancel', async (req, res, next) => {
   try {
-    const updated = await withSerializableRetry(async tx => {
+    const input = cancelRequestSchema.parse(req.body || {});
+    const result = await withSerializableRetry(async tx => {
       const order = await tx.order.findFirst({ where: { id: req.params.id, userId: req.auth.sub }, include: { items: true, payment: true } });
-      return cancelOrderInTransaction(tx, order);
+      return cancelOrderInTransaction(tx, order, input);
     });
-    await audit(req, 'ORDER_CANCELLED', 'Order', updated.id, { pointsRestored: updated.pointsRedeemed || 0 });
-    publishOrderChange(updated);
-    await safeEnqueueOrderNotification(updated.id, 'CANCELLED', {}, req.log);
-    res.json({ order: serializeOrderForClient(updated), loyalty: { ...(await getLoyaltySnapshot(req.auth.sub)), currency: config.PAYMENT_CURRENCY } });
+    await audit(req, result.requested ? 'ORDER_CANCELLATION_REQUESTED' : 'ORDER_CANCELLED', 'Order', result.order.id, { pointsRestored: result.requested ? 0 : (result.order.pointsRedeemed || 0) });
+    publishOrderChange(result.order);
+    if (!result.requested) await safeEnqueueOrderNotification(result.order.id, 'CANCELLED', {}, req.log);
+    res.json({ order: await serializeWithCancellation(result.order), cancellationRequested: result.requested, loyalty: { ...(await getLoyaltySnapshot(req.auth.sub)), currency: config.PAYMENT_CURRENCY } });
   } catch (error) { next(error); }
 });
 
