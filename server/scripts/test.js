@@ -33,18 +33,42 @@ const testFiles = readdirSync(new URL('../test/', import.meta.url))
   .sort()
   .map(name => `test/${name}`);
 
+const resetCode = `
+import { PrismaClient } from '@prisma/client';
+const p = new PrismaClient();
+try {
+  const rows = await p.$queryRawUnsafe(\`SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename <> '_prisma_migrations'\`);
+  if (rows.length) {
+    const names = rows.map(({ tablename }) => '"' + String(tablename).replaceAll('"', '""') + '"').join(', ');
+    await p.$executeRawUnsafe('TRUNCATE TABLE ' + names + ' RESTART IDENTITY CASCADE');
+  }
+} finally { await p.$disconnect(); }
+`;
+
 console.log(`Running ${testFiles.length} server test files in isolated schema ${schemaName}`);
-let status = 1;
+let status = 0;
 try {
   for (const [command, args] of [
     ['npm', ['run', 'db:generate']],
     ['npm', ['run', 'db:migrate']],
-    ['npm', ['run', 'db:seed']],
-    [process.execPath, ['--test', '--test-concurrency=1', ...testFiles]]
   ]) {
     const result = run(command, args, { shell: process.platform === 'win32' });
     status = result.status ?? 1;
     if (status) break;
+  }
+
+  if (!status) {
+    for (const file of testFiles) {
+      console.log(`\n=== ${file} ===`);
+      let result = run(process.execPath, ['--input-type=module', '-e', resetCode]);
+      if ((result.status ?? 1) !== 0) { status = result.status ?? 1; break; }
+
+      result = run('npm', ['run', 'db:seed'], { shell: process.platform === 'win32' });
+      if ((result.status ?? 1) !== 0) { status = result.status ?? 1; break; }
+
+      result = run(process.execPath, ['--test', '--test-concurrency=1', file]);
+      if ((result.status ?? 1) !== 0) status = result.status ?? 1;
+    }
   }
 } finally {
   const cleanupUrl = new URL(baseUrl);

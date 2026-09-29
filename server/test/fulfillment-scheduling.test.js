@@ -28,7 +28,8 @@ before(async () => {
 
   response = await request(app).patch('/api/admin/store-operations').set('Authorization', `Bearer ${adminToken}`).send({
     timezone: 'Asia/Dhaka', acceptingOrders: true, temporaryClosed: false,
-    temporaryClosedReason: null, temporaryClosedUntilLocal: null, hours: allDayHours,
+    temporaryClosedReason: null, temporaryClosedUntilLocal: null,
+    customerCancelWindowMinutes: 10, scheduledCancelLeadMinutes: 60, hours: allDayHours,
   });
   assert.equal(response.status, 200);
 

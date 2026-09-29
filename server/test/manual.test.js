@@ -1,14 +1,15 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
+import bcrypt from 'bcryptjs';
 process.env.PAYMENT_CURRENCY = 'BDT';
 const { app } = await import('../src/app.js');
 const { prisma } = await import('../src/lib/prisma.js');
-const { signAccessToken } = await import('../src/lib/tokens.js');
 
 let customer, other, admin, channel, first, submission;
 const credentials = {};
 const run = Date.now();
+const password = 'StrongPass123!';
 const channelValues = { provider: 'BKASH', label: 'Test merchant (not real)', account: 'TEST-ACCOUNT-ONLY', instructions: 'Test instructions only. Do not send real money.', active: true };
 const delivery = { firstName: 'Manual', lastName: 'Test', email: 'manual@example.com', phone: '01700000000', street: 'Test street', city: 'Dhaka', state: 'Dhaka', postalCode: '1200', country: 'Bangladesh' };
 const create = () => request(app).post('/api/orders').set('Authorization', credentials.customer).send({ items: [{ productId: '1', quantity: 1 }], paymentMethod: 'MANUAL', manualChannelId: channel.id, delivery });
@@ -16,9 +17,13 @@ const submit = (order, reference) => request(app).post(`/api/payments/manual/${o
 const review = (order, id, decision, note = 'Checked test receiving account') => request(app).post(`/api/admin/payments/${order.payment.id}/manual-review`).set('Authorization', credentials.admin).send({ submissionId: id, decision, note, confirmedReceived: true });
 
 before(async () => {
+  await prisma.$connect();
   for (const [key, role] of [['customer','CUSTOMER'],['other','CUSTOMER'],['admin','ADMIN']]) {
-    const user = await prisma.user.create({ data: { name: key, email: `${key}-manual-${run}@example.com`, passwordHash: 'unused', role } });
-    credentials[key] = `Bearer ${signAccessToken(user)}`;
+    const email = `${key}-manual-${run}@example.com`;
+    const user = await prisma.user.create({ data: { name: key, email, passwordHash: await bcrypt.hash(password, 4), role, emailVerifiedAt: new Date() } });
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200);
+    credentials[key] = `Bearer ${login.body.accessToken}`;
     if (key === 'customer') customer = user;
     if (key === 'other') other = user;
     if (key === 'admin') admin = user;

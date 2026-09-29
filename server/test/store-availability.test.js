@@ -28,6 +28,8 @@ async function saveOperations(values = {}) {
       temporaryClosed: false,
       temporaryClosedReason: null,
       temporaryClosedUntilLocal: null,
+      customerCancelWindowMinutes: 10,
+      scheduledCancelLeadMinutes: 60,
       hours: allDayHours,
       ...values,
     });

@@ -91,8 +91,10 @@ test('supports a server-controlled online payment journey', async () => {
   assert.equal(r.body.order.status, 'CONFIRMED');
 
   r = await request(app).post(`/api/orders/${onlineOrder.id}/cancel`).set('Authorization', `Bearer ${token}`);
-  assert.equal(r.status, 409);
-  assert.equal(r.body.error.code, 'REFUND_REQUIRED');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.cancellationRequested, true);
+  assert.equal(r.body.order.status, 'CONFIRMED');
+  assert.equal(r.body.order.paymentStatus, 'PAID');
   r = await request(app).post(`/api/admin/payments/${onlineOrder.payment.id}/cash-received`).set('Authorization', `Bearer ${adminToken}`);
   assert.equal(r.status, 409);
   assert.equal(r.body.error.code, 'GATEWAY_VERIFICATION_REQUIRED');
@@ -216,7 +218,7 @@ test('disabling an account invalidates its existing access token', async () => {
   await prisma.user.update({ where: { id: user.id }, data: { isActive: false } });
   const r = await request(app).get('/api/orders').set('Authorization', `Bearer ${token}`);
   assert.equal(r.status, 401);
-  assert.equal(r.body.error.code, 'ACCOUNT_DISABLED');
+  assert.equal(r.body.error.code, 'INVALID_SESSION');
 });
 
 test('COD orders keep a one-to-one payment ledger record', async () => {
