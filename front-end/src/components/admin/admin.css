@@ -255,3 +255,283 @@
 .monitoring-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.monitoring-auto{display:flex;align-items:center;gap:7px;font-size:13px;color:#667085}.monitoring-auto input{accent-color:#ff5a32}.monitoring-banner{display:flex;align-items:center;gap:13px;border:1px solid #dce8df;background:#f5fbf7;border-radius:16px;padding:15px 18px;margin-bottom:18px}.monitoring-banner.is-degraded{background:#fff9ed;border-color:#f4dba0}.monitoring-banner.is-critical{background:#fff3f2;border-color:#f4b6b1}.monitoring-banner strong{display:block;font-size:15px;color:#18232d}.monitoring-banner p{margin:3px 0 0;color:#667085;font-size:12px}.monitoring-pulse{width:11px;height:11px;border-radius:50%;background:#20a35a;box-shadow:0 0 0 5px rgba(32,163,90,.12);flex:0 0 auto}.is-degraded .monitoring-pulse{background:#d9910a;box-shadow:0 0 0 5px rgba(217,145,10,.12)}.is-critical .monitoring-pulse{background:#d92d20;box-shadow:0 0 0 5px rgba(217,45,32,.12)}.monitoring-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.monitoring-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);gap:18px;margin-bottom:18px}.monitoring-runtime{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}.monitoring-runtime>div,.monitoring-integrations>div,.monitoring-source-list>div,.monitoring-event-counts>div{border:1px solid #edf0f2;border-radius:12px;padding:11px 12px}.monitoring-runtime span,.monitoring-integrations small{display:block;color:#7a8490;font-size:11px}.monitoring-runtime strong{display:block;margin-top:4px;color:#1d2939}.monitoring-integrations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.monitoring-integrations>div{display:flex;gap:10px;align-items:center}.monitoring-integrations strong{display:block;font-size:13px}.monitoring-dot{width:9px;height:9px;border-radius:50%;background:#98a2b3;flex:0 0 auto}.monitoring-dot.is-ok{background:#20a35a}.monitoring-dot.is-off{background:#d0d5dd}.monitoring-event-counts{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-bottom:14px}.monitoring-event-counts>div{display:flex;align-items:center;justify-content:space-between}.monitoring-level{display:inline-flex;align-items:center;border-radius:999px;padding:3px 8px;font-size:10px;font-weight:800;letter-spacing:.04em;background:#eef2f6;color:#475467}.monitoring-level.is-error,.monitoring-level.is-fatal{background:#fee4e2;color:#b42318}.monitoring-level.is-warn{background:#fef0c7;color:#b54708}.monitoring-level.is-info{background:#eaf3ff;color:#175cd3}.monitoring-source-list{display:grid;gap:7px}.monitoring-source-list>div{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;font-size:12px}.monitoring-table code{font-size:11px;background:#f2f4f7;padding:2px 5px;border-radius:5px}.monitoring-table td small{display:block;color:#98a2b3;margin-top:3px}.monitoring-message{max-width:320px}.monitoring-table td{vertical-align:top}
 @media(max-width:1050px){.monitoring-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.monitoring-grid{grid-template-columns:1fr}}@media(max-width:640px){.monitoring-metrics{grid-template-columns:1fr}.monitoring-runtime,.monitoring-integrations{grid-template-columns:1fr}.monitoring-actions{width:100%;justify-content:space-between}.monitoring-banner{align-items:flex-start}}
 .seo-preview-mini{min-height:44px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fafafa;display:flex;flex-direction:column;justify-content:center;gap:2px}.seo-preview-mini strong{font-size:.88rem}.seo-preview-mini small{color:#5f6b64;overflow-wrap:anywhere}
+
+/* Final UI stability pass — admin layout, responsive overflow and alignment */
+.admin-app {
+  width: 100%;
+  max-width: 100vw;
+  min-width: 0;
+  overflow-x: clip;
+}
+.admin-sidebar {
+  overflow: hidden;
+}
+.admin-sidebar nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 3px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.18) transparent;
+}
+.admin-sidebar nav::-webkit-scrollbar { width: 6px; }
+.admin-sidebar nav::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255,255,255,.18); }
+.admin-sidebar-footer { flex: 0 0 auto; }
+.admin-sidebar nav a,
+.admin-sidebar-footer a,
+.admin-sidebar-footer button { width: 100%; min-width: 0; }
+.admin-sidebar nav a svg,
+.admin-sidebar-footer svg { flex: 0 0 auto; }
+
+.admin-workspace,
+.admin-topbar,
+.admin-content,
+.admin-page-header,
+.admin-card,
+.admin-card-header,
+.admin-toolbar,
+.admin-grid,
+.admin-metrics { max-width: 100%; }
+
+.admin-topbar { width: 100%; }
+.admin-topbar > div:first-of-type { min-width: 0; flex: 1 1 auto; }
+.admin-topbar h1,
+.admin-topbar p { max-width: 100%; overflow-wrap: anywhere; }
+.admin-profile { flex: 0 0 auto; min-width: 0; }
+.admin-profile div { min-width: 0; }
+.admin-profile strong,
+.admin-profile small { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.admin-content { box-sizing: border-box; }
+.admin-page-header { align-items: flex-start; flex-wrap: wrap; }
+.admin-page-header > div:first-child { flex: 1 1 360px; min-width: 0; }
+.admin-page-header > .admin-header-actions,
+.admin-page-header > .button,
+.admin-page-header > .admin-live-actions { flex: 0 1 auto; }
+.admin-header-actions,
+.admin-live-actions { flex-wrap: wrap; justify-content: flex-end; }
+
+.admin-metrics,
+.payment-metrics,
+.loyalty-metrics,
+.delivery-zone-metrics,
+.inventory-metrics,
+.notification-admin-metrics,
+.analytics-metrics,
+.monitoring-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+}
+.metric-card { min-width: 0; }
+.metric-card > div:last-child { min-width: 0; }
+.metric-card p,
+.metric-card small,
+.metric-card strong { overflow-wrap: anywhere; }
+
+.admin-card { min-width: 0; }
+.admin-card-header { flex-wrap: wrap; align-items: flex-start; }
+.admin-card-header > div:first-child { min-width: min(280px, 100%); flex: 1 1 280px; }
+.admin-card-header > :last-child:not(:first-child) { max-width: 100%; }
+
+.admin-grid,
+.admin-grid.equal,
+.analytics-primary-grid,
+.monitoring-grid { min-width: 0; }
+.admin-grid > *,
+.admin-grid.equal > *,
+.analytics-primary-grid > *,
+.monitoring-grid > * { min-width: 0; }
+
+.admin-toolbar { flex-wrap: wrap; align-items: stretch; }
+.admin-search { flex: 1 1 280px; min-width: min(240px, 100%); }
+.admin-toolbar select { flex: 0 1 190px; width: auto; min-width: min(170px, 100%); }
+.admin-toolbar > .button { flex: 0 0 auto; }
+
+.admin-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+.admin-table { width: 100%; min-width: max-content; }
+.admin-table th,
+.admin-table td { max-width: min(420px, 45vw); }
+.admin-table td > *,
+.admin-table th > * { max-width: 100%; }
+.admin-table-actions,
+.order-actions { flex-wrap: wrap; }
+.audit-metadata,
+.monitoring-message,
+.notification-admin-error,
+.payment-failure { overflow-wrap: anywhere; word-break: break-word; }
+
+/* Long admin forms and dialogs scroll at the overlay level, avoiding nested scrollbars. */
+.admin-modal-overlay {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.admin-modal {
+  margin: auto;
+  max-height: none;
+  overflow: visible;
+}
+.admin-modal > header { position: relative; }
+.admin-modal > header > div { min-width: 0; }
+.admin-modal > header .icon-button { flex: 0 0 auto; }
+.admin-form,
+.admin-form .field,
+.admin-form .field-grid { min-width: 0; }
+.admin-form-footer { flex-wrap: wrap; }
+
+/* Keep complex editors inside their cards instead of widening the whole page. */
+.product-options-editor,
+.product-option-group,
+.product-option-list,
+.inventory-product,
+.inventory-options,
+.analytics-chart-scroll,
+.kds-lane,
+.kds-lane-orders { min-width: 0; max-width: 100%; }
+.product-option-list { overflow-x: auto; overscroll-behavior-inline: contain; }
+.product-option-list-head,
+.product-option-row { max-width: 100%; }
+.product-image-uploader > * { min-width: 0; }
+.product-image-copy { flex: 1 1 auto; }
+
+.weekly-hour-row,
+.closure-add-form,
+.fulfillment-override-form,
+.fulfillment-number-grid,
+.delivery-money-grid,
+.product-option-group-grid,
+.inventory-product-main,
+.inventory-option-row,
+.analytics-controls,
+.analytics-custom-range,
+.kds-ticket-actions,
+.monitoring-runtime,
+.monitoring-integrations { max-width: 100%; }
+
+.store-save-bar { max-width: 100%; }
+.closure-list article > div,
+.fulfillment-override-list article > div,
+.inventory-product-copy,
+.inventory-option-row > div:first-child { min-width: 0; }
+
+.kds-ticket-top > div:first-child,
+.kds-ticket-meta,
+.kds-item > div:first-child { min-width: 0; }
+.kds-item > div:first-child > span,
+.kds-order-note p { overflow-wrap: anywhere; }
+
+.analytics-controls { min-width: 0; }
+.analytics-presets,
+.analytics-export-actions { min-width: 0; }
+.analytics-chart-scroll { width: 100%; }
+.monitoring-source-list > div,
+.monitoring-event-counts > div { gap: 10px; }
+.monitoring-source-list > div > *,
+.monitoring-event-counts > div > * { min-width: 0; }
+
+/* Switch to the drawer layout before the fixed sidebar starts squeezing real admin content. */
+@media (max-width: 1040px) {
+  .admin-app { grid-template-columns: 1fr; }
+  .admin-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: min(286px, 86vw);
+    height: 100dvh;
+    transform: translateX(-105%);
+    transition: transform .25s ease;
+    box-shadow: 20px 0 50px rgba(5,12,8,.18);
+  }
+  .admin-sidebar.is-open { transform: translateX(0); }
+  .admin-backdrop { display: block; position: fixed; inset: 0; z-index: 35; border: 0; background: rgba(12,18,15,.46); }
+  .admin-menu-toggle { display: grid; }
+  .admin-topbar { min-height: 76px; padding: 12px 20px; }
+  .admin-content { padding: 24px 20px 44px; }
+  .admin-grid,
+  .admin-grid.equal,
+  .analytics-primary-grid,
+  .monitoring-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  .admin-topbar { gap: 10px; padding-left: 14px; padding-right: 14px; }
+  .admin-topbar p { display: none; }
+  .admin-profile div { display: none; }
+  .admin-profile { margin-left: 0; }
+  .admin-content { padding: 20px 14px 38px; }
+  .admin-page-header { gap: 14px; margin-bottom: 18px; }
+  .admin-page-header > div:first-child { flex-basis: 100%; }
+  .admin-page-header > .admin-header-actions,
+  .admin-page-header > .button,
+  .admin-page-header > .admin-live-actions { width: 100%; }
+  .admin-header-actions,
+  .admin-live-actions { justify-content: flex-start; }
+  .admin-header-actions .button,
+  .admin-live-actions .button { flex: 1 1 150px; }
+  .admin-toolbar > * { flex: 1 1 100%; width: 100%; }
+  .admin-toolbar select { width: 100%; }
+  .admin-card-header { gap: 10px; padding-left: 16px; padding-right: 16px; }
+  .admin-card-header > div:first-child { min-width: 0; flex-basis: 100%; }
+  .admin-card-header > :last-child:not(:first-child) { width: 100%; }
+  .admin-table th,
+  .admin-table td { max-width: 72vw; }
+  .admin-modal-overlay { padding: 12px 0 0; align-items: flex-end; }
+  .admin-modal {
+    width: 100%;
+    margin: auto 0 0;
+    border-radius: 24px 24px 0 0;
+  }
+  .admin-modal > header,
+  .admin-form { padding-left: 18px; padding-right: 18px; }
+  .admin-form-footer { flex-direction: column-reverse; }
+  .admin-form-footer .button { width: 100%; }
+  .store-save-bar { left: 0; right: 0; }
+  .analytics-export-actions .button { flex: 1 1 140px; }
+  .monitoring-actions { justify-content: flex-start; }
+}
+
+@media (max-width: 560px) {
+  .admin-content { padding-left: 10px; padding-right: 10px; }
+  .admin-topbar h1 { font-size: 1rem; }
+  .admin-metrics,
+  .payment-metrics,
+  .loyalty-metrics,
+  .delivery-zone-metrics,
+  .inventory-metrics,
+  .notification-admin-metrics,
+  .analytics-metrics,
+  .monitoring-metrics { grid-template-columns: 1fr; }
+  .metric-card { padding: 15px; }
+  .admin-card { border-radius: 14px; }
+  .admin-card-header { min-height: 0; }
+  .admin-page-header h2 { font-size: 1.55rem; }
+  .order-detail { padding: 16px; }
+  .weekly-hour-row { padding-left: 14px; padding-right: 14px; }
+  .closure-list,
+  .closure-add-form,
+  .fulfillment-override-form,
+  .fulfillment-settings-body { padding-left: 14px; padding-right: 14px; }
+  .inventory-product-main { padding-left: 14px; padding-right: 14px; }
+  .kds-page:fullscreen { padding: 10px; }
+}
+@media (max-width: 1040px) {
+  body.admin-nav-open { overflow: hidden; }
+}
+.admin-table { min-width: 760px; white-space: normal; }
+.admin-table th { white-space: nowrap; }
+.admin-table td { white-space: normal; }
+.status-badge { white-space: nowrap; }
+.admin-table-wrap { scrollbar-width: thin; scrollbar-color: #cfd7d2 transparent; }
+.admin-table-wrap::-webkit-scrollbar { height: 8px; }
+.admin-table-wrap::-webkit-scrollbar-thumb { border-radius: 999px; background: #cfd7d2; }

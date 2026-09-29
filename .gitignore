@@ -5,9 +5,3 @@ node_modules/
 front-end/dist/
 coverage/
 *.log
-
-# Playwright local test artifacts
-test-results/
-playwright-report/
-blob-report/
-login-modal-*.png

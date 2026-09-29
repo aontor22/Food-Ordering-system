@@ -152,7 +152,7 @@ export default function LoginPopup({ onClose }) {
   </div>;
 
   return <div ref={modalRef} className="auth-overlay" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}>
-    <section tabIndex="-1" className={`auth-modal auth-modal-${mode}`} role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <section tabIndex="-1" className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
       <button type="button" className="auth-close icon-button" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
       <div className="auth-mark">T.</div>
       <div className="section-kicker">Welcome to Tomato</div>

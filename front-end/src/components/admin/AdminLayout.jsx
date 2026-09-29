@@ -54,8 +54,19 @@ export default function AdminLayout() {
 
   useEffect(() => setOpen(false), [location.pathname]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    document.body.classList.add('admin-nav-open');
+    const closeOnEscape = event => event.key === 'Escape' && setOpen(false);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.classList.remove('admin-nav-open');
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
   return <div className="admin-app">
-    <aside className={`admin-sidebar ${open ? 'is-open' : ''}`}>
+    <aside id="admin-navigation" className={`admin-sidebar ${open ? 'is-open' : ''}`}>
       <Link to="/admin" className="admin-brand"><span>T.</span><div>Tomato<small>Restaurant OS</small></div></Link>
       <nav aria-label="Admin navigation">
         <p>Workspace</p>
@@ -71,7 +82,7 @@ export default function AdminLayout() {
     {open && <button type="button" className="admin-backdrop" aria-label="Close navigation" onClick={() => setOpen(false)} />}
     <div className="admin-workspace">
       <header className="admin-topbar">
-        <button type="button" className="icon-button admin-menu-toggle" onClick={() => setOpen(true)} aria-label="Open navigation"><Icon name="menu" /></button>
+        <button type="button" className="icon-button admin-menu-toggle" onClick={() => setOpen(true)} aria-label="Open navigation" aria-controls="admin-navigation" aria-expanded={open}><Icon name="menu" /></button>
         <div><h1>{title}</h1><p>{subtitle}</p></div>
         <div className="admin-profile"><span>{user.name.charAt(0).toUpperCase()}</span><div><strong>{user.name}</strong><small>Administrator</small></div></div>
       </header>

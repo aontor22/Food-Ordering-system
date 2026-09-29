@@ -166,9 +166,7 @@ button {
   min-width: 0;
 }
 
-.food-reviews-modal,
-.auth-modal,
-.admin-modal {
+.food-reviews-modal {
   max-height: calc(100dvh - 40px);
 }
 
@@ -246,7 +244,7 @@ button {
 
 .admin-sidebar {
   height: 100dvh;
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
 }
 
@@ -259,7 +257,16 @@ button {
 }
 
 .admin-table {
-  min-width: max-content;
+  min-width: 760px;
+  white-space: normal;
+}
+
+.admin-table th {
+  white-space: nowrap;
+}
+
+.status-badge {
+  white-space: nowrap;
 }
 
 .admin-table th,
@@ -598,9 +605,7 @@ button {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  .food-reviews-modal,
-  .auth-modal,
-  .admin-modal {
+  .food-reviews-modal {
     max-height: 94dvh;
   }
 
@@ -1020,22 +1025,8 @@ button {
   }
 
   .auth-modal {
-    padding: 30px 18px max(24px, env(safe-area-inset-bottom, 0px));
-  }
-
-  .auth-close {
-    right: 14px;
-    top: 14px;
-  }
-
-  .auth-modal h2 {
-    font-size: 1.65rem;
-    padding-right: 36px;
-  }
-
-  .auth-divider {
-    gap: 9px;
-    font-size: .72rem;
+    padding-left: 18px;
+    padding-right: 18px;
   }
 
   .admin-topbar {
@@ -1253,9 +1244,7 @@ button {
     display: none;
   }
 
-  .auth-modal,
-  .food-reviews-modal,
-  .admin-modal {
+  .food-reviews-modal {
     max-height: 96dvh;
   }
 }
