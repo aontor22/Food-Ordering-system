@@ -12,21 +12,48 @@ const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '
 const absoluteUrl = value => !value ? `${siteUrl}/favicon-512.png` : /^https?:\/\//i.test(value) ? value : `${siteUrl}${value.startsWith('/') ? '' : '/'}${value}`;
 const xmlEscape = value => String(value ?? '').replace(/[<>&'\"]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[char]));
 
-async function fetchJson(endpoint, attempts = 3) {
+const DEFAULT_FETCH_TIMEOUT_MS = requireProductFeed ? 75000 : 8000;
+const DEFAULT_FETCH_ATTEMPTS = requireProductFeed ? 4 : 3;
+const fetchTimeoutMs = Math.max(1000, Number(process.env.SEO_FETCH_TIMEOUT_MS || DEFAULT_FETCH_TIMEOUT_MS));
+const fetchAttempts = Math.max(1, Number(process.env.SEO_FETCH_ATTEMPTS || DEFAULT_FETCH_ATTEMPTS));
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function fetchJson(endpoint, { attempts = fetchAttempts, timeoutMs = fetchTimeoutMs } = {}) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(`${apiUrl}${endpoint}`, { signal: controller.signal, headers: { Accept: 'application/json' } });
+      const response = await fetch(`${apiUrl}${endpoint}`, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json', 'User-Agent': 'tomato-seo-build/1.0' },
+      });
       if (!response.ok) throw new Error(`${endpoint} returned ${response.status}`);
       return await response.json();
     } catch (error) {
       lastError = error;
-      if (attempt < attempts) await new Promise(resolve => setTimeout(resolve, 400 * attempt));
-    } finally { clearTimeout(timer); }
+      if (attempt < attempts) {
+        const delayMs = Math.min(5000, 1000 * attempt);
+        console.warn(`[seo] ${endpoint} attempt ${attempt}/${attempts} failed: ${error.message}. Retrying in ${delayMs}ms...`);
+        await sleep(delayMs);
+      }
+    } finally {
+      clearTimeout(timer);
+    }
   }
   throw lastError;
+}
+
+async function warmProductionApi() {
+  if (!requireProductFeed) return;
+  try {
+    console.log(`[seo] Warming product API at ${apiUrl} before generating SEO assets...`);
+    await fetchJson('/health', { attempts: 2, timeoutMs: fetchTimeoutMs });
+  } catch (error) {
+    // The warm-up is best-effort. The required /products request below remains authoritative.
+    console.warn(`[seo] API warm-up did not complete: ${error.message}. Continuing with product-feed retries...`);
+  }
 }
 
 function setTitle(html, value) {
@@ -104,8 +131,13 @@ let products = [];
 let store = null;
 let fulfillment = null;
 try {
-  const [productsData, storeData, fulfillmentData] = await Promise.all([
-    fetchJson('/products'), fetchJson('/store/status').catch(() => null), fetchJson('/store/fulfillment').catch(() => null),
+  await warmProductionApi();
+  // Fetch the required product feed first. On free Render instances this also avoids
+  // racing three requests against the same cold-starting service.
+  const productsData = await fetchJson('/products');
+  const [storeData, fulfillmentData] = await Promise.all([
+    fetchJson('/store/status', { attempts: 2 }).catch(() => null),
+    fetchJson('/store/fulfillment', { attempts: 2 }).catch(() => null),
   ]);
   products = Array.isArray(productsData?.products) ? productsData.products.filter(product => product.slug && product.isAvailable !== false) : [];
   store = storeData?.store || null;
