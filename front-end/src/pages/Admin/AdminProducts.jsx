@@ -258,7 +258,7 @@ export default function AdminProducts() {
       <select value={availability} onChange={event => setAvailability(event.target.value)} aria-label="Filter availability"><option value="all">All products</option><option value="active">Available</option><option value="archived">Archived</option></select>
     </div>
     <section className="admin-card">
-      {visible.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Category</th><th>Base price</th><th>Stock</th><th>Options</th><th>Wishlist</th><th>Status</th><th className="align-right">Actions</th></tr></thead>
+      {visible.length ? <div className="admin-table-wrap"><table className="admin-table product-admin-table"><thead><tr><th>Product</th><th>Category</th><th>Base price</th><th>Stock</th><th>Options</th><th>Wishlist</th><th>Status</th><th className="align-right">Actions</th></tr></thead>
         <tbody>{visible.map(product => {
           const image = displayImage(product); const optionCount = (product.optionGroups || []).reduce((sum, group) => sum + group.options.length, 0);
           return <tr key={product.id}>

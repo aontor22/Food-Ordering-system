@@ -137,9 +137,8 @@ export default function AdminStoreOperations() {
             </div>
           </article>)}
         </div>
+        <div className="store-save-bar"><p>Changes affect new orders immediately. Existing orders continue normally.</p><button className="button button-primary" disabled={saving}>{saving ? 'Saving…' : 'Save store hours'}</button></div>
       </section>
-
-      <div className="store-save-bar"><p>Changes affect new orders immediately. Existing orders continue normally.</p><button className="button button-primary" disabled={saving}>{saving ? 'Saving…' : 'Save store hours'}</button></div>
     </form>
 
     <section className="admin-card store-closures-card">
