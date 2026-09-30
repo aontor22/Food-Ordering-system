@@ -535,3 +535,105 @@
 .admin-table-wrap { scrollbar-width: thin; scrollbar-color: #cfd7d2 transparent; }
 .admin-table-wrap::-webkit-scrollbar { height: 8px; }
 .admin-table-wrap::-webkit-scrollbar-thumb { border-radius: 999px; background: #cfd7d2; }
+
+/* Category/admin layout follow-up — prevent data-heavy pages from squeezing columns. */
+.product-admin-table { min-width: 1080px; table-layout: auto; }
+.product-admin-table th:first-child,
+.product-admin-table td:first-child { min-width: 280px; width: 30%; }
+.product-admin-table th:nth-child(2),
+.product-admin-table td:nth-child(2) { min-width: 150px; }
+.product-admin-table th:nth-child(3),
+.product-admin-table td:nth-child(3),
+.product-admin-table th:nth-child(4),
+.product-admin-table td:nth-child(4) { min-width: 110px; }
+.product-admin-table th:nth-child(5),
+.product-admin-table td:nth-child(5),
+.product-admin-table th:nth-child(6),
+.product-admin-table td:nth-child(6),
+.product-admin-table th:nth-child(7),
+.product-admin-table td:nth-child(7) { min-width: 105px; }
+.product-admin-table th:last-child,
+.product-admin-table td:last-child { min-width: 92px; }
+.product-cell { min-width: 0; align-items: flex-start; }
+.product-cell > div { min-width: 0; }
+.product-cell strong { white-space: normal; overflow-wrap: break-word; }
+.product-cell small {
+  display: -webkit-box;
+  margin-top: 3px;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.payment-admin-table { min-width: 1040px; table-layout: auto; }
+.payment-admin-table th:first-child,
+.payment-admin-table td:first-child { min-width: 175px; }
+.payment-admin-table th:nth-child(2),
+.payment-admin-table td:nth-child(2) { min-width: 210px; }
+.payment-admin-table th:nth-child(3),
+.payment-admin-table td:nth-child(3) { min-width: 135px; }
+.payment-admin-table th:nth-child(4),
+.payment-admin-table td:nth-child(4) { min-width: 130px; }
+.payment-admin-table th:nth-child(5),
+.payment-admin-table td:nth-child(5) { min-width: 125px; }
+.payment-admin-table th:nth-child(6),
+.payment-admin-table td:nth-child(6) { min-width: 150px; }
+.payment-admin-table th:last-child,
+.payment-admin-table td:last-child { min-width: 140px; }
+.payment-admin-table strong,
+.payment-admin-table small { overflow-wrap: anywhere; }
+
+.gateway-health-card {
+  min-width: 0;
+  padding: 16px 18px;
+}
+.gateway-health-card > div { min-width: 0; flex: 1 1 auto; }
+.gateway-health-card .status-badge { flex: 0 0 auto; }
+.gateway-health-card p,
+.gateway-health-card small { overflow-wrap: anywhere; word-break: normal; }
+
+/* Save actions are card footers, not floating elements that overlap the next section. */
+.store-operations-form { margin-bottom: 20px; }
+.store-save-bar {
+  position: static;
+  bottom: auto;
+  width: 100%;
+  margin: 0;
+  padding: 15px 22px;
+  border: 0;
+  border-top: 1px solid #edf0ee;
+  border-radius: 0;
+  background: #fafcfb;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.store-save-bar .button { flex: 0 0 auto; }
+
+/* Monitoring content gets a consistent inner gutter and never competes for width. */
+.monitoring-grid > .admin-card { overflow: hidden; }
+.monitoring-grid > .admin-card > .monitoring-runtime { margin: 18px 18px 12px; }
+.monitoring-grid > .admin-card > .monitoring-integrations { margin: 0 18px 18px; }
+.monitoring-grid > .admin-card > .monitoring-event-counts { margin: 18px 18px 12px; }
+.monitoring-grid > .admin-card > .monitoring-source-list { margin: 0 18px 18px; }
+.monitoring-integrations > div,
+.monitoring-event-counts > div,
+.monitoring-source-list > div { min-width: 0; }
+.monitoring-integrations strong,
+.monitoring-integrations small,
+.monitoring-source-list span { overflow-wrap: anywhere; }
+
+@media (max-width: 1250px) {
+  .monitoring-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  .store-save-bar { align-items: stretch; flex-direction: column; padding: 14px 16px; }
+  .store-save-bar .button { width: 100%; }
+  .monitoring-grid > .admin-card > .monitoring-runtime,
+  .monitoring-grid > .admin-card > .monitoring-event-counts { margin: 14px 14px 10px; }
+  .monitoring-grid > .admin-card > .monitoring-integrations,
+  .monitoring-grid > .admin-card > .monitoring-source-list { margin: 0 14px 14px; }
+}
