@@ -18,7 +18,7 @@ export default function LoginPopup({ onClose }) {
   const [recoveryCodes, setRecoveryCodes] = useState([]);
   const modalRef = useRef(null);
   const previousFocusRef = useRef(null);
-  const { authenticate, authenticateWithGoogle, acceptAuthSession } = useContext(StoreContext);
+  const { authenticateWithGoogle, acceptAuthSession } = useContext(StoreContext);
   const googleEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim());
 
   useEffect(() => {
@@ -79,7 +79,10 @@ export default function LoginPopup({ onClose }) {
         setPreviewUrl(data.previewUrl || '');
         return;
       }
-      const data = await authenticate(mode, mode === 'login' ? { email: values.email, password: values.password } : values);
+      const data = mode === 'login'
+        ? await api.login({ email: values.email, password: values.password })
+        : await api.register({ name: values.name, email: values.email, password: values.password });
+      if (data?.accessToken) await acceptAuthSession(data);
       await handleAuthResult(data);
     } catch (requestError) {
       if (requestError.code === 'EMAIL_NOT_VERIFIED') {

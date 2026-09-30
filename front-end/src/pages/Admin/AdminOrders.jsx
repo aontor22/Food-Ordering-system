@@ -101,7 +101,7 @@ function OrderRows({ order, expanded, onExpand, onStatus, onEta, busy }) {
   return <>
     <tr>
       <td><strong>{order.orderNumber}</strong><small>{formatDate(order.createdAt)}</small></td>
-      <td><strong>{order.user?.name || `${order.firstName} ${order.lastName}`}</strong><small>{order.email}</small><span className={`customer-type-badge is-${String(order.customerType || 'REGISTERED').toLowerCase()}`}>{order.customerType === 'GUEST' ? (order.userId ? 'Guest · linked' : 'Guest') : 'Registered'}</span></td>
+      <td className="order-customer-cell"><strong>{order.user?.name || `${order.firstName} ${order.lastName}`}</strong><small>{order.email}</small><span className={`customer-type-badge is-${String(order.customerType || 'REGISTERED').toLowerCase()}`}>{order.customerType === 'GUEST' ? (order.userId ? 'Guest · linked' : 'Guest') : 'Registered'}</span></td>
       <td><StatusBadge value={order.status} /></td><td><StatusBadge value={order.paymentStatus} /></td><td><strong>{formatCurrency(order.totalCents / 100, order.payment?.currency)}</strong><small>{order.items.length} item types</small></td>
       <td><div className="admin-table-actions"><button className="admin-icon-action" onClick={onExpand} title="View order details" aria-label={`View ${order.orderNumber}`}><Icon name={expanded ? 'chevronDown' : 'eye'} size={17} /></button></div></td>
     </tr>

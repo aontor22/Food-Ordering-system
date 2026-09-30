@@ -23,6 +23,7 @@ function ensureGoogleInitialized(clientId) {
       else activeGoogleConsumer?.onError?.(new Error('Google sign-in did not return a credential'));
     },
     ux_mode: 'popup',
+    use_fedcm_for_button: true,
     auto_select: false,
     cancel_on_tap_outside: true,
   });

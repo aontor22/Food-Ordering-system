@@ -95,24 +95,32 @@ export default function Notifications() {
 
     <div className="notification-channel-grid">
       <article className="surface-card notification-channel-card">
-        <div className="notification-channel-icon"><Icon name="mail" size={22} /></div>
-        <div className="notification-channel-copy">
-          <div className="notification-title-row"><h2>Email</h2><span className={`notification-state ${capabilities.email ? 'is-ready' : 'is-off'}`}>{capabilities.email ? 'Available' : 'Not configured'}</span></div>
-          <p>Receive order status updates at <strong>{user.email}</strong>.</p>
+        <div className="notification-channel-main">
+          <div className="notification-channel-icon"><Icon name="mail" size={22} /></div>
+          <div className="notification-channel-copy">
+            <div className="notification-title-row"><h2>Email</h2><span className={`notification-state ${capabilities.email ? 'is-ready' : 'is-off'}`}>{capabilities.email ? 'Available' : 'Not configured'}</span></div>
+            <p>Receive order status updates at <strong>{user.email}</strong>.</p>
+          </div>
         </div>
-        <Toggle checked={preference.emailEnabled} disabled={!capabilities.email} label="Toggle email notifications" onChange={value => update({ emailEnabled: value })} />
-        <button className="button button-secondary notification-test" disabled={!capabilities.email || !preference.emailEnabled || busy === 'test-EMAIL'} onClick={() => sendTest('EMAIL')}>{busy === 'test-EMAIL' ? 'Sending…' : 'Send test email'}</button>
+        <div className="notification-channel-actions">
+          <Toggle checked={preference.emailEnabled} disabled={!capabilities.email} label="Toggle email notifications" onChange={value => update({ emailEnabled: value })} />
+          <button className="button button-secondary notification-test" disabled={!capabilities.email || !preference.emailEnabled || busy === 'test-EMAIL'} onClick={() => sendTest('EMAIL')}>{busy === 'test-EMAIL' ? 'Sending…' : 'Send test email'}</button>
+        </div>
       </article>
 
       <article className="surface-card notification-channel-card">
-        <div className="notification-channel-icon"><Icon name="bell" size={22} /></div>
-        <div className="notification-channel-copy">
-          <div className="notification-title-row"><h2>Browser push</h2><span className={`notification-state ${pushState.subscribed ? 'is-ready' : 'is-off'}`}>{pushState.subscribed ? 'Enabled on this device' : permissionDenied ? 'Permission blocked' : pushReady ? 'Available' : 'Unavailable'}</span></div>
-          <p>Get order updates even when this tab is not open. Permission is always requested by your browser.</p>
+        <div className="notification-channel-main">
+          <div className="notification-channel-icon"><Icon name="bell" size={22} /></div>
+          <div className="notification-channel-copy">
+            <div className="notification-title-row"><h2>Browser push</h2><span className={`notification-state ${pushState.subscribed ? 'is-ready' : 'is-off'}`}>{pushState.subscribed ? 'Enabled on this device' : permissionDenied ? 'Permission blocked' : pushReady ? 'Available' : 'Unavailable'}</span></div>
+            <p>Get order updates even when this tab is not open. Permission is always requested by your browser.</p>
+          </div>
         </div>
-        {pushState.subscribed ? <button className="button button-secondary" disabled={busy === 'push'} onClick={disablePush}>{busy === 'push' ? 'Updating…' : 'Disable on this device'}</button>
-          : <button className="button button-primary" disabled={!pushReady || permissionDenied || busy === 'push'} onClick={enablePush}>{busy === 'push' ? 'Enabling…' : 'Enable browser notifications'}</button>}
-        <button className="button button-ghost notification-test" disabled={!pushState.subscribed || !preference.pushEnabled || busy === 'test-PUSH'} onClick={() => sendTest('PUSH')}>{busy === 'test-PUSH' ? 'Sending…' : 'Send test push'}</button>
+        <div className="notification-channel-actions">
+          {pushState.subscribed ? <button className="button button-secondary notification-primary-action" disabled={busy === 'push'} onClick={disablePush}>{busy === 'push' ? 'Updating…' : 'Disable on this device'}</button>
+            : <button className="button button-primary notification-primary-action" disabled={!pushReady || permissionDenied || busy === 'push'} onClick={enablePush}>{busy === 'push' ? 'Enabling…' : 'Enable browser notifications'}</button>}
+          <button className="button button-ghost notification-test" disabled={!pushState.subscribed || !preference.pushEnabled || busy === 'test-PUSH'} onClick={() => sendTest('PUSH')}>{busy === 'test-PUSH' ? 'Sending…' : 'Send test push'}</button>
+        </div>
         {!pushState.supported && <small className="notification-hint">This browser/device does not expose the Web Push APIs. On iPhone/iPad, install the site to the Home Screen before enabling web push.</small>}
         {permissionDenied && <small className="notification-hint">Notification permission is blocked in your browser settings. Allow notifications for this site, then reload this page.</small>}
       </article>

@@ -664,3 +664,28 @@
   .monitoring-event-counts { grid-template-columns: 1fr; }
   .gateway-health-heading { align-items: flex-start; }
 }
+
+/* Screenshot QA follow-up — component-specific fixes. */
+.analytics-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 16px; }
+.analytics-presets { flex: 0 0 auto; }
+.analytics-custom-range { flex: 1 1 430px; min-width: min(430px, 100%); grid-template-columns: repeat(2, minmax(145px, 1fr)) max-content; }
+.analytics-custom-range .button { min-width: max-content; white-space: nowrap; }
+.analytics-export-actions { flex: 1 1 320px; justify-content: flex-end; }
+.analytics-export-actions .button { white-space: nowrap; }
+.analytics-metrics { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+.analytics-metrics .metric-card strong { overflow-wrap: normal; word-break: normal; white-space: nowrap; }
+.order-customer-cell { min-width: 240px; }
+.order-customer-cell > strong { white-space: normal; overflow-wrap: anywhere; }
+.order-customer-cell > small { display: block; max-width: 100%; margin-top: 4px; white-space: normal; overflow-wrap: anywhere; }
+.order-customer-cell > .customer-type-badge { margin-top: 7px; }
+@media (max-width: 760px) {
+  .analytics-controls { align-items: stretch; }
+  .analytics-presets, .analytics-custom-range, .analytics-export-actions { width: 100%; flex-basis: 100%; }
+  .analytics-custom-range { min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .analytics-custom-range .button { width: 100%; grid-column: 1 / -1; }
+  .analytics-export-actions { justify-content: flex-start; }
+}
+@media (max-width: 520px) {
+  .analytics-custom-range { grid-template-columns: 1fr; }
+  .analytics-custom-range .button { width: 100%; grid-column: auto; }
+}
