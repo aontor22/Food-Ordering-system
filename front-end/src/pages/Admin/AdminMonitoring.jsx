@@ -86,16 +86,20 @@ export default function AdminMonitoring() {
     <div className="monitoring-grid">
       <section className="admin-card">
         <div className="admin-card-header"><div><h3>Runtime & integrations</h3><p>Configuration presence only; secrets are never returned.</p></div></div>
-        <div className="monitoring-runtime"><div><span>Memory RSS</span><strong>{data?.process?.memoryMb?.rss || 0} MB</strong></div><div><span>Heap used</span><strong>{data?.process?.memoryMb?.heapUsed || 0} MB</strong></div><div><span>Heap allocated</span><strong>{data?.process?.memoryMb?.heapTotal || 0} MB</strong></div></div>
-        <div className="monitoring-integrations">{Object.entries(data?.integrations || {}).map(([key, value]) => <div key={key}><span className={`monitoring-dot ${value ? 'is-ok' : 'is-off'}`} /><div><strong>{integrationLabels[key] || key}</strong><small>{stateLabel(value)}</small></div></div>)}</div>
+        <div className="monitoring-card-body">
+          <div className="monitoring-runtime"><div><span>Memory RSS</span><strong>{data?.process?.memoryMb?.rss || 0} MB</strong></div><div><span>Heap used</span><strong>{data?.process?.memoryMb?.heapUsed || 0} MB</strong></div><div><span>Heap allocated</span><strong>{data?.process?.memoryMb?.heapTotal || 0} MB</strong></div></div>
+          <div className="monitoring-integrations">{Object.entries(data?.integrations || {}).map(([key, value]) => <div key={key}><span className={`monitoring-dot ${value ? 'is-ok' : 'is-off'}`} /><div><strong>{integrationLabels[key] || key}</strong><small>{stateLabel(value)}</small></div></div>)}</div>
+        </div>
       </section>
 
       <section className="admin-card">
         <div className="admin-card-header"><div><h3>24-hour event mix</h3><p>Structured incidents and slow-request warnings.</p></div></div>
-        <div className="monitoring-event-counts">
-          {['FATAL', 'ERROR', 'WARN', 'INFO'].map(level => <div key={level}><span className={`monitoring-level is-${level.toLowerCase()}`}>{level}</span><strong>{eventsByLevel[level] || 0}</strong></div>)}
+        <div className="monitoring-card-body">
+          <div className="monitoring-event-counts">
+            {['FATAL', 'ERROR', 'WARN', 'INFO'].map(level => <div key={level}><span className={`monitoring-level is-${level.toLowerCase()}`}>{level}</span><strong>{eventsByLevel[level] || 0}</strong></div>)}
+          </div>
+          <div className="monitoring-source-list">{Object.entries(data?.operations?.events24h?.bySource || {}).sort((a,b) => b[1]-a[1]).slice(0, 8).map(([source, count]) => <div key={source}><span>{source}</span><strong>{count}</strong></div>)}</div>
         </div>
-        <div className="monitoring-source-list">{Object.entries(data?.operations?.events24h?.bySource || {}).sort((a,b) => b[1]-a[1]).slice(0, 8).map(([source, count]) => <div key={source}><span>{source}</span><strong>{count}</strong></div>)}</div>
       </section>
     </div>
 

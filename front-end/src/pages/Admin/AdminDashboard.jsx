@@ -67,7 +67,7 @@ export default function AdminDashboard() {
     <section className="admin-grid equal">
       <article className="admin-card">
         <div className="admin-card-header"><div><h3>Recent orders</h3><p>The latest customer activity.</p></div><Link className="text-link" to="/admin/orders">View all</Link></div>
-        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Order</th><th>Customer</th><th>Status</th><th className="align-right">Total</th></tr></thead>
+        <div className="admin-table-wrap"><table className="admin-table dashboard-order-table"><thead><tr><th>Order</th><th>Customer</th><th>Status</th><th className="align-right">Total</th></tr></thead>
           <tbody>{data.recentOrders.length ? data.recentOrders.map(order => <tr key={order.id}>
             <td><strong>{order.orderNumber}</strong><small>{formatDate(order.createdAt)}</small></td>
             <td><strong>{order.user?.name || `${order.firstName} ${order.lastName}`}</strong><small>{order.email}</small></td>

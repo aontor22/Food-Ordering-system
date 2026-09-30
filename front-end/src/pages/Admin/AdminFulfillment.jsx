@@ -114,7 +114,7 @@ export default function AdminFulfillment() {
         <div className="field"><label htmlFor="pickupAddress">Pickup address</label><input id="pickupAddress" maxLength="300" value={form.pickupAddress || ''} onChange={event => update('pickupAddress', event.target.value)} placeholder="Restaurant address customers should visit" /></div>
         <div className="field"><label htmlFor="pickupInstructions">Pickup instructions</label><textarea id="pickupInstructions" maxLength="500" value={form.pickupInstructions || ''} onChange={event => update('pickupInstructions', event.target.value)} placeholder="Where to collect, what to show, parking notes…" /></div>
       </div>
-      <div className="store-save-bar"><p>Scheduled capacity is checked again when the order is created, so a full slot cannot be overbooked by normal checkout requests.</p><button className="button button-primary" disabled={saving}>{saving ? 'Saving…' : 'Save fulfilment settings'}</button></div>
+      <div className="settings-save-bar"><p>Scheduled capacity is checked again when the order is created, so a full slot cannot be overbooked by normal checkout requests.</p><button className="button button-primary" disabled={saving}>{saving ? 'Saving…' : 'Save fulfilment settings'}</button></div>
     </form>
 
     <section className="admin-card fulfillment-overrides-card">

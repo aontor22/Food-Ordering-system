@@ -155,11 +155,19 @@ export default function StoreContextProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => {
+    const refreshPublicStore = () => {
       api.getStoreStatus().then(data => setStoreStatus(data.store)).catch(() => {});
       api.getProducts().then(data => setFoodList(normalizeProducts(data.products))).catch(() => {});
-    }, 60_000);
-    return () => clearInterval(timer);
+    };
+    const refreshWhenVisible = () => { if (!document.hidden) refreshPublicStore(); };
+    const timer = setInterval(refreshPublicStore, 60_000);
+    window.addEventListener('focus', refreshPublicStore);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', refreshPublicStore);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, []);
 
   useEffect(() => localStorage.setItem('cart', JSON.stringify(cartItems)), [cartItems]);

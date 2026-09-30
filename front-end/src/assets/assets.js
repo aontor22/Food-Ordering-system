@@ -24,13 +24,13 @@ export const assets = {
   twitter_icon,
 };
 
-export const menu_list = [
-  { menu_name: 'Salad', menu_image: menu_1 },
-  { menu_name: 'Rolls', menu_image: menu_2 },
-  { menu_name: 'Deserts', menu_image: menu_3 },
-  { menu_name: 'Sandwich', menu_image: menu_4 },
-  { menu_name: 'Cake', menu_image: menu_5 },
-  { menu_name: 'Pure Veg', menu_image: menu_6 },
-  { menu_name: 'Pasta', menu_image: menu_7 },
-  { menu_name: 'Noodles', menu_image: menu_8 },
-];
+export const category_images = Object.freeze({
+  Salad: menu_1,
+  Rolls: menu_2,
+  Deserts: menu_3,
+  Sandwich: menu_4,
+  Cake: menu_5,
+  'Pure Veg': menu_6,
+  Pasta: menu_7,
+  Noodles: menu_8,
+});

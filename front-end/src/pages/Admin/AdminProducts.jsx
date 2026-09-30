@@ -109,7 +109,7 @@ export default function AdminProducts() {
 
   const openCreate = () => {
     resetImageState(); setEditing(null);
-    setForm({ ...emptyForm, category: categories[0] || 'Salad', optionGroups: [] });
+    setForm({ ...emptyForm, category: categories[0] || '', optionGroups: [] });
     setFormError('');
   };
 

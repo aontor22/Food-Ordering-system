@@ -1,9 +1,9 @@
 import { useContext, useEffect, useMemo } from 'react';
-import { menu_list } from '../../assets/assets';
+import { category_images } from '../../assets/assets';
 import { StoreContext } from '../../context/StoreContext';
 import './ExploreMenu.css';
 
-const presetImages = new Map(menu_list.map(item => [item.menu_name.toLowerCase(), item.menu_image]));
+const presetImages = new Map(Object.entries(category_images).map(([name, image]) => [name.toLowerCase(), image]));
 
 function normalizeCategory(value) {
   return String(value || '').trim();
@@ -31,15 +31,7 @@ export default function ExploreMenu({ category, setCategory }) {
       }
     });
 
-    const presetOrder = new Map(menu_list.map((item, index) => [item.menu_name.toLowerCase(), index]));
-    return [...byName.values()].sort((a, b) => {
-      const aPreset = presetOrder.get(a.menu_name.toLowerCase());
-      const bPreset = presetOrder.get(b.menu_name.toLowerCase());
-      if (aPreset != null && bPreset != null) return aPreset - bPreset;
-      if (aPreset != null) return -1;
-      if (bPreset != null) return 1;
-      return a.menu_name.localeCompare(b.menu_name, undefined, { sensitivity: 'base' });
-    });
+    return [...byName.values()].sort((a, b) => a.menu_name.localeCompare(b.menu_name, undefined, { sensitivity: 'base' }));
   }, [food_list]);
 
   useEffect(() => {

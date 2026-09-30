@@ -149,7 +149,7 @@ export default function AdminAnalytics() {
 
     <section className="admin-card analytics-table-card">
       <div className="admin-card-header"><div><h3>Top product performance</h3><p>Delivered units and revenue in the selected period.</p></div></div>
-      {data.topProducts.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Category</th><th>Units</th><th>Orders</th><th>Rating</th><th>Wishlists</th><th className="align-right">Revenue</th></tr></thead><tbody>
+      {data.topProducts.length ? <div className="admin-table-wrap"><table className="admin-table analytics-admin-table"><thead><tr><th>Product</th><th>Category</th><th>Units</th><th>Orders</th><th>Rating</th><th>Wishlists</th><th className="align-right">Revenue</th></tr></thead><tbody>
         {data.topProducts.map(product => <tr key={product.id}><td><strong>{product.name}</strong></td><td>{product.category}</td><td><strong>{product.units}</strong></td><td>{product.orderCount}</td><td>{product.reviewCount ? `${product.ratingAverage.toFixed(1)} ★` : '—'}</td><td>{product.wishlistCount}</td><td className="align-right"><strong>{money(product.revenueCents)}</strong></td></tr>)}
       </tbody></table></div> : <AdminEmpty icon="products" title="No delivered product sales" text="Product performance appears after orders are delivered in this period." />}
     </section>
@@ -167,7 +167,7 @@ export default function AdminAnalytics() {
 
     <section className="admin-card analytics-table-card">
       <div className="admin-card-header"><div><h3>Low-velocity active products</h3><p>Active products with the fewest delivered units in this period. Zero sales remain visible.</p></div></div>
-      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Category</th><th>Units sold</th><th>Orders</th><th>Current stock</th><th className="align-right">Revenue</th></tr></thead><tbody>
+      <div className="admin-table-wrap"><table className="admin-table analytics-admin-table"><thead><tr><th>Product</th><th>Category</th><th>Units sold</th><th>Orders</th><th>Current stock</th><th className="align-right">Revenue</th></tr></thead><tbody>
         {data.slowProducts.map(product => <tr key={product.id}><td><strong>{product.name}</strong></td><td>{product.category}</td><td>{product.units}</td><td>{product.orderCount}</td><td>{product.stock}</td><td className="align-right"><strong>{money(product.revenueCents)}</strong></td></tr>)}
       </tbody></table></div>
     </section>

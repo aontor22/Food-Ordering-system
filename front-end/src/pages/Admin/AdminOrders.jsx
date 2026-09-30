@@ -83,7 +83,7 @@ export default function AdminOrders() {
       <select value={status} onChange={event => setStatus(event.target.value)} aria-label="Filter order status"><option value="ALL">All statuses</option>{statusValues.map(value => <option key={value} value={value}>{humanizeStatus(value)}</option>)}</select>
     </div>
     <section className="admin-card">
-      {visible.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Payment</th><th>Total</th><th className="align-right">Actions</th></tr></thead>
+      {visible.length ? <div className="admin-table-wrap"><table className="admin-table order-admin-table"><thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Payment</th><th>Total</th><th className="align-right">Actions</th></tr></thead>
         <tbody>{visible.map(order => <OrderRows key={order.id} order={order} expanded={expanded === order.id} onExpand={() => setExpanded(value => value === order.id ? '' : order.id)} onStatus={next => updateStatus(order, next)} onEta={minutes => updateEta(order, minutes)} busy={busy} />)}</tbody>
       </table></div> : <AdminEmpty icon="orders" title="No matching orders" text="Try a different search term or status filter." />}
     </section>

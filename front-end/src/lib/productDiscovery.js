@@ -38,7 +38,7 @@ export function filterAndSortProducts(products, filters = {}) {
   const high = maxPrice === '' ? null : Number(maxPrice);
 
   const matched = products.filter(product => {
-    if (category !== 'All' && product.category !== category) return false;
+    if (category !== 'All' && normalizeText(product.category) !== normalizeText(category)) return false;
     if (searchTerms.length) {
       const haystack = productSearchText(product);
       if (!searchTerms.every(term => haystack.includes(term))) return false;

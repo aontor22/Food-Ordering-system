@@ -43,7 +43,7 @@ router.get('/', validate(querySchema), async (req, res) => {
   const products = await prisma.product.findMany({
     where: {
       isAvailable: true,
-      ...(category && category !== 'All' ? { category } : {}),
+      ...(category && category !== 'All' ? { category: { equals: category, mode: 'insensitive' } } : {}),
       ...dietaryWhere(dietaryFilters),
       ...priceWhere(minPrice, maxPrice),
       ...(query ? {

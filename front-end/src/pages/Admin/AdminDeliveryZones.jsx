@@ -98,7 +98,7 @@ export default function AdminDeliveryZones() {
     finally { setBusy(''); }
   };
 
-  const currency = data?.currency || 'BDT';
+  const currency = data?.currency || import.meta.env.VITE_CURRENCY || 'USD';
   const activeZones = useMemo(() => data?.zones?.filter(zone => zone.active).length || 0, [data]);
 
   if (loading) return <AdminLoading label="Loading delivery zones…" />;
@@ -115,10 +115,10 @@ export default function AdminDeliveryZones() {
     {message && <p className="form-success" role="status">{message}</p>}
 
     <div className="admin-metrics delivery-zone-metrics">
-      <article><span className="metric-icon"><Icon name="delivery" /></span><div><small>Active zones</small><strong>{activeZones}</strong><p>Available at checkout</p></div></article>
-      <article><span className="metric-icon"><Icon name="products" /></span><div><small>Total zones</small><strong>{data?.stats?.total || 0}</strong><p>Including disabled areas</p></div></article>
-      <article><span className="metric-icon"><Icon name="store" /></span><div><small>Postal mapped</small><strong>{data?.stats?.postalMapped || 0}</strong><p>Zones with postcode validation</p></div></article>
-      <article><span className="metric-icon"><Icon name="cash" /></span><div><small>Currency</small><strong>{currency}</strong><p>Fees use store currency</p></div></article>
+      <article className="admin-card metric-card"><span className="metric-icon"><Icon name="delivery" /></span><div><small>Active zones</small><strong>{activeZones}</strong><p>Available at checkout</p></div></article>
+      <article className="admin-card metric-card"><span className="metric-icon"><Icon name="products" /></span><div><small>Total zones</small><strong>{data?.stats?.total || 0}</strong><p>Including disabled areas</p></div></article>
+      <article className="admin-card metric-card"><span className="metric-icon"><Icon name="store" /></span><div><small>Postal mapped</small><strong>{data?.stats?.postalMapped || 0}</strong><p>Zones with postcode validation</p></div></article>
+      <article className="admin-card metric-card"><span className="metric-icon"><Icon name="cash" /></span><div><small>Currency</small><strong>{currency}</strong><p>Fees use store currency</p></div></article>
     </div>
 
     <section className="admin-card delivery-zone-create-card">

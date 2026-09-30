@@ -56,10 +56,10 @@ export default function AdminLoyalty() {
     {message && <p className="form-success" role="status">{message}</p>}
 
     <div className="admin-metrics loyalty-metrics">
-      <article><span className="metric-icon"><Icon name="gift" /></span><div><small>Outstanding points</small><strong>{stats?.outstandingPoints || 0}</strong><p>Current customer balances</p></div></article>
-      <article><span className="metric-icon"><Icon name="users" /></span><div><small>Customers with points</small><strong>{stats?.customersWithPoints || 0}</strong><p>Balances above zero</p></div></article>
-      <article><span className="metric-icon"><Icon name="trend" /></span><div><small>Points awarded</small><strong>{stats?.pointsEarned || 0}</strong><p>From delivered orders</p></div></article>
-      <article><span className="metric-icon"><Icon name="coupon" /></span><div><small>Points redeemed</small><strong>{stats?.pointsRedeemed || 0}</strong><p>{stats?.pointsRestored ? `${stats.pointsRestored} later restored` : 'Used for discounts'}</p></div></article>
+      <article className="admin-card metric-card"><span className="metric-icon"><Icon name="gift" /></span><div><small>Outstanding points</small><strong>{stats?.outstandingPoints || 0}</strong><p>Current customer balances</p></div></article>
+      <article className="admin-card metric-card"><span className="metric-icon"><Icon name="users" /></span><div><small>Customers with points</small><strong>{stats?.customersWithPoints || 0}</strong><p>Balances above zero</p></div></article>
+      <article className="admin-card metric-card"><span className="metric-icon"><Icon name="trend" /></span><div><small>Points awarded</small><strong>{stats?.pointsEarned || 0}</strong><p>From delivered orders</p></div></article>
+      <article className="admin-card metric-card"><span className="metric-icon"><Icon name="coupon" /></span><div><small>Points redeemed</small><strong>{stats?.pointsRedeemed || 0}</strong><p>{stats?.pointsRestored ? `${stats.pointsRestored} later restored` : 'Used for discounts'}</p></div></article>
     </div>
 
     <section className="admin-card loyalty-settings-card">
