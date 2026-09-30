@@ -137,7 +137,7 @@ export default function StoreContextProvider({ children }) {
       if (!active) return;
       if (productsResult.status === 'fulfilled') setFoodList(normalizeProducts(productsResult.value.products));
       if (storeResult.status === 'fulfilled') setStoreStatus(storeResult.value.store);
-      if (authResult.status === 'fulfilled') {
+      if (authResult.status === 'fulfilled' && authResult.value?.accessToken && authResult.value?.user) {
         setAccessToken(authResult.value.accessToken);
         setUser(authResult.value.user);
         try { if (active) await mergeGuestWishlist(); } catch { /* Wishlist should not block sign-in restoration. */ }

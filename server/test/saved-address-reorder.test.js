@@ -66,6 +66,13 @@ function address(overrides = {}) {
   };
 }
 
+test('saved addresses reject invalid short fields with a field-level validation detail', async () => {
+  const response = await request(app).post('/api/addresses').set('Authorization', `Bearer ${token}`).send(address({ state: 'g' }));
+  assert.equal(response.status, 400, JSON.stringify(response.body));
+  assert.equal(response.body.error.code, 'VALIDATION_ERROR');
+  assert.ok(response.body.error.details.some(issue => issue.path?.at(-1) === 'state'));
+});
+
 test('saved addresses are account-owned and maintain one default address', async () => {
   let response = await request(app).post('/api/addresses').set('Authorization', `Bearer ${token}`).send(address());
   assert.equal(response.status, 201, JSON.stringify(response.body));

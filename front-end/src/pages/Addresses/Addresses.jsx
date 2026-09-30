@@ -9,6 +9,14 @@ const blankAddress = {
   label: 'Home', firstName: '', lastName: '', phone: '', street: '', city: '', state: '', postalCode: '', country: 'Bangladesh', isDefault: false,
 };
 
+const ADDRESS_TEXT_FIELDS = ['label', 'firstName', 'lastName', 'phone', 'street', 'city', 'state', 'postalCode', 'country'];
+
+function normalizeAddressForm(form) {
+  const normalized = { ...form };
+  for (const key of ADDRESS_TEXT_FIELDS) normalized[key] = String(normalized[key] ?? '').trim();
+  return normalized;
+}
+
 export default function Addresses({ onLogin }) {
   const { user } = useContext(StoreContext);
   const [addresses, setAddresses] = useState([]);
@@ -50,9 +58,10 @@ export default function Addresses({ onLogin }) {
     event.preventDefault();
     setBusy('save'); setError('');
     try {
-      if (editing === 'new') await api.createAddress(form);
+      const payload = normalizeAddressForm(form);
+      if (editing === 'new') await api.createAddress(payload);
       else {
-        const { isDefault: _ignored, ...updates } = form;
+        const { isDefault: _ignored, ...updates } = payload;
         await api.updateAddress(editing, updates);
       }
       await load();
@@ -100,12 +109,12 @@ export default function Addresses({ onLogin }) {
         <div className="field"><label htmlFor="addressFirstName">First name *</label><input id="addressFirstName" value={form.firstName} onChange={event => setForm(previous => ({ ...previous, firstName: event.target.value }))} maxLength="50" required autoComplete="given-name" /></div>
         <div className="field"><label htmlFor="addressLastName">Last name *</label><input id="addressLastName" value={form.lastName} onChange={event => setForm(previous => ({ ...previous, lastName: event.target.value }))} maxLength="50" required autoComplete="family-name" /></div>
       </div>
-      <div className="field"><label htmlFor="addressStreet">Street address *</label><input id="addressStreet" value={form.street} onChange={event => setForm(previous => ({ ...previous, street: event.target.value }))} maxLength="150" required autoComplete="street-address" /></div>
+      <div className="field"><label htmlFor="addressStreet">Street address *</label><input id="addressStreet" value={form.street} onChange={event => setForm(previous => ({ ...previous, street: event.target.value }))} minLength="2" maxLength="150" required autoComplete="street-address" /></div>
       <div className="field-grid">
-        <div className="field"><label htmlFor="addressCity">City *</label><input id="addressCity" value={form.city} onChange={event => setForm(previous => ({ ...previous, city: event.target.value }))} maxLength="80" required autoComplete="address-level2" /></div>
-        <div className="field"><label htmlFor="addressState">State/Division *</label><input id="addressState" value={form.state} onChange={event => setForm(previous => ({ ...previous, state: event.target.value }))} maxLength="80" required autoComplete="address-level1" /></div>
-        <div className="field"><label htmlFor="addressPostal">Postal code *</label><input id="addressPostal" value={form.postalCode} onChange={event => setForm(previous => ({ ...previous, postalCode: event.target.value }))} maxLength="20" required autoComplete="postal-code" /></div>
-        <div className="field"><label htmlFor="addressCountry">Country *</label><input id="addressCountry" value={form.country} onChange={event => setForm(previous => ({ ...previous, country: event.target.value }))} maxLength="80" required autoComplete="country-name" /></div>
+        <div className="field"><label htmlFor="addressCity">City *</label><input id="addressCity" value={form.city} onChange={event => setForm(previous => ({ ...previous, city: event.target.value }))} minLength="2" maxLength="80" required autoComplete="address-level2" /></div>
+        <div className="field"><label htmlFor="addressState">State/Division *</label><input id="addressState" value={form.state} onChange={event => setForm(previous => ({ ...previous, state: event.target.value }))} minLength="2" maxLength="80" required autoComplete="address-level1" /></div>
+        <div className="field"><label htmlFor="addressPostal">Postal code *</label><input id="addressPostal" value={form.postalCode} onChange={event => setForm(previous => ({ ...previous, postalCode: event.target.value }))} minLength="2" maxLength="20" required autoComplete="postal-code" /></div>
+        <div className="field"><label htmlFor="addressCountry">Country *</label><input id="addressCountry" value={form.country} onChange={event => setForm(previous => ({ ...previous, country: event.target.value }))} minLength="2" maxLength="80" required autoComplete="country-name" /></div>
       </div>
       {editing === 'new' && <label className="address-default-checkbox"><input type="checkbox" checked={form.isDefault} onChange={event => setForm(previous => ({ ...previous, isDefault: event.target.checked }))} />Use as my default delivery address</label>}
       <div className="address-editor-actions"><button className="button button-primary" disabled={busy === 'save'}>{busy === 'save' ? 'Saving…' : editing === 'new' ? 'Save address' : 'Save changes'}</button><button className="button button-secondary" type="button" onClick={() => setEditing(null)}>Cancel</button></div>

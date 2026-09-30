@@ -39,6 +39,7 @@ after(async () => {
   await prisma.$disconnect();
 });
 test('health endpoint', async () => { const r = await request(app).get('/api/health'); assert.equal(r.status, 200); assert.equal(r.body.status, 'ok'); });
+test('anonymous auth bootstrap returns no session without a console-worthy 401', async () => { const r = await request(app).post('/api/auth/refresh'); assert.equal(r.status, 204); });
 test('health readiness endpoint checks PostgreSQL', async () => { const r = await request(app).get('/api/health/ready'); assert.equal(r.status, 200); assert.equal(r.body.status, 'ready'); assert.equal(r.body.checks.database.status, 'ok'); assert.ok(Number.isInteger(r.body.checks.database.latencyMs)); });
 test('register, authenticate, list products, and place order', async () => {
   let r = await request(app).post('/api/auth/register').send({ name: 'Test User', email, password: 'StrongPass123!' }); assert.equal(r.status, 201); token = r.body.accessToken;

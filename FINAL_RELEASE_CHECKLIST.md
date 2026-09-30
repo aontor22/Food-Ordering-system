@@ -66,6 +66,8 @@ VITE_CURRENCY=...
 VITE_GOOGLE_CLIENT_ID=...
 ```
 
+Keep `VITE_API_URL` pointing at Render because the build-time SEO generator uses it directly. In the deployed browser, when `VITE_SITE_URL` matches the current site origin, the client intentionally uses same-origin `/api`; both Vercel configs proxy that path to the same Render backend. This keeps the HttpOnly refresh cookie first-party and avoids depending on third-party-cookie support.
+
 Deploy only after Render is healthy. A production SEO build now fails instead of silently publishing zero product shells if the Render product feed is unavailable.
 
 ## Post-deploy smoke check
@@ -76,6 +78,7 @@ curl -I https://food-ordering-system-ten-sable.vercel.app/admin
 curl https://food-ordering-system-ten-sable.vercel.app/robots.txt
 curl https://food-ordering-system-ten-sable.vercel.app/sitemap.xml
 curl https://food-ordering-system-1-t2nu.onrender.com/api/health
+curl https://food-ordering-system-ten-sable.vercel.app/api/health
 curl https://food-ordering-system-1-t2nu.onrender.com/api/health/ready
 ```
 

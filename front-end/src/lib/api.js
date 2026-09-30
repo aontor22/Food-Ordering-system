@@ -1,4 +1,20 @@
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+function resolveRuntimeApiUrl() {
+  const configured = String(import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+  if (typeof window === 'undefined' || !import.meta.env.PROD) return configured;
+
+  const siteUrl = String(import.meta.env.VITE_SITE_URL || '').trim();
+  if (!siteUrl) return configured;
+  try {
+    // In production the browser talks to Vercel on the same origin. Vercel proxies
+    // /api to Render, so the HttpOnly refresh cookie remains first-party instead
+    // of relying on cross-site/third-party cookie support. Build-time SEO still
+    // uses VITE_API_URL directly from the Node script.
+    if (new URL(siteUrl).origin === window.location.origin) return '/api';
+  } catch { /* Keep the explicitly configured API URL if VITE_SITE_URL is malformed. */ }
+  return configured;
+}
+
+const API_URL = resolveRuntimeApiUrl();
 let accessToken = null;
 let refreshPromise = null;
 export const setAccessToken = value => { accessToken = value; };
@@ -14,19 +30,40 @@ export class ApiError extends Error {
   }
 }
 
+const VALIDATION_FIELD_LABELS = {
+  name: 'Name', email: 'Email', password: 'Password', label: 'Label', firstName: 'First name', lastName: 'Last name',
+  phone: 'Phone', street: 'Street address', city: 'City', state: 'State/Division', postalCode: 'Postal code', country: 'Country',
+};
+
+function validationMessage(details) {
+  if (!Array.isArray(details) || !details.length) return '';
+  const issue = details.find(item => item?.message) || details[0];
+  if (!issue?.message) return '';
+  const path = Array.isArray(issue.path) ? issue.path.filter(part => !['body', 'query', 'params'].includes(String(part))) : [];
+  const field = path.length ? String(path.at(-1)) : '';
+  const label = VALIDATION_FIELD_LABELS[field] || (field ? field.replace(/([A-Z])/g, ' $1').replace(/^./, value => value.toUpperCase()) : 'Request');
+  return `${label}: ${issue.message}`;
+}
+
 async function parseError(response, fallback = 'Request failed') {
   const data = await response.json().catch(() => ({}));
   const requestId = data.error?.requestId || response.headers.get('x-request-id') || null;
-  const baseMessage = data.error?.message || fallback;
+  const details = data.error?.details ?? null;
+  const baseMessage = data.error?.code === 'VALIDATION_ERROR' ? (validationMessage(details) || data.error?.message || fallback) : (data.error?.message || fallback);
   const message = response.status >= 500 && requestId ? `${baseMessage} (Support ID: ${requestId})` : baseMessage;
-  return new ApiError(message, { code: data.error?.code, status: response.status, details: data.error?.details, requestId });
+  return new ApiError(message, { code: data.error?.code, status: response.status, details, requestId });
 }
 
-async function refreshAccessToken() {
+async function refreshAccessToken({ allowAnonymous = false } = {}) {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const response = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
+        if (response.status === 204) {
+          setAccessToken(null);
+          if (allowAnonymous) return { accessToken: null, user: null, anonymous: true };
+          throw new ApiError('Session is missing', { code: 'NO_REFRESH_TOKEN', status: 401 });
+        }
         if (response.ok) {
           const data = await response.json();
           setAccessToken(data.accessToken);
@@ -232,7 +269,7 @@ export const api = {
   enableAdmin2fa: (challengeToken, code) => request('/auth/admin-2fa/enable', { method: 'POST', body: JSON.stringify({ challengeToken, code }), authRetry: false }),
   verifyAdmin2fa: (challengeToken, code) => request('/auth/admin-2fa/verify', { method: 'POST', body: JSON.stringify({ challengeToken, code }), authRetry: false }),
   regenerateAdminRecoveryCodes: body => request('/auth/admin-2fa/recovery-codes', { method: 'POST', body: JSON.stringify(body) }),
-  refresh: () => refreshAccessToken(),
+  refresh: () => refreshAccessToken({ allowAnonymous: true }),
   logout: () => request('/auth/logout', { method: 'POST', authRetry: false }),
   changePassword: body => request('/auth/change-password', { method: 'POST', body: JSON.stringify(body) }),
   getSessions: () => request('/auth/sessions'),

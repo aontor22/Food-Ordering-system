@@ -215,7 +215,19 @@ router.post('/register', registrationLimiter, validate(authBody), async (req, re
   try {
     if (isProduction && !emailConfigured()) throw new AppError(503, 'EMAIL_DELIVERY_UNAVAILABLE', 'Email verification is temporarily unavailable');
     const { name, email, password } = req.validated.body;
-    if (await prisma.user.findUnique({ where: { email } })) throw new AppError(409, 'EMAIL_EXISTS', 'An account with this email already exists');
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      if (existing.isActive && !existing.emailVerifiedAt && !(config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS)) {
+        const verification = await createVerification(existing);
+        return res.status(202).json({
+          verificationRequired: true,
+          email: maskEmail(email),
+          message: 'This account already exists but still needs email verification. A fresh verification link has been sent.',
+          ...(!isProduction && verification.delivery.skipped ? { previewUrl: verification.url } : {}),
+        });
+      }
+      throw new AppError(409, 'EMAIL_EXISTS', 'An account with this email already exists');
+    }
     let user = await prisma.user.create({ data: { name, email, passwordHash: await bcrypt.hash(password, 12), ...(config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS ? { emailVerifiedAt: new Date() } : {}) } });
     if (config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS) return res.status(201).json(await issueSession(req, res, user));
     const verification = await createVerification(user);
@@ -420,8 +432,8 @@ router.post('/admin-2fa/recovery-codes', mfaLimiter, requireAuth, requireRole('A
 
 router.post('/refresh', requireTrustedOrigin, async (req, res, next) => {
   const token = req.cookies[REFRESH_COOKIE_NAME];
+  if (!token) return res.status(204).end();
   try {
-    if (!token) throw new AppError(401, 'NO_REFRESH_TOKEN', 'Session is missing');
     const payload = verifyRefreshToken(token);
     const session = await prisma.session.findUnique({ where: { id: payload.sid }, include: { user: true } });
     const now = new Date();

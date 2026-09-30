@@ -27,15 +27,15 @@ async function addressTransaction(work, retries = 2) {
 }
 
 const addressFields = {
-  label: z.string().trim().min(1).max(30),
-  firstName: z.string().trim().min(1).max(50),
-  lastName: z.string().trim().min(1).max(50),
-  phone: z.string().trim().min(7).max(24),
-  street: z.string().trim().min(2).max(150),
-  city: z.string().trim().min(2).max(80),
-  state: z.string().trim().min(2).max(80),
-  postalCode: z.string().trim().min(2).max(20),
-  country: z.string().trim().min(2).max(80),
+  label: z.string().trim().min(1, 'Enter an address label').max(30, 'Address label must be 30 characters or fewer'),
+  firstName: z.string().trim().min(1, 'Enter a first name').max(50, 'First name must be 50 characters or fewer'),
+  lastName: z.string().trim().min(1, 'Enter a last name').max(50, 'Last name must be 50 characters or fewer'),
+  phone: z.string().trim().min(7, 'Phone number must be at least 7 characters').max(24, 'Phone number must be 24 characters or fewer'),
+  street: z.string().trim().min(2, 'Street address must be at least 2 characters').max(150, 'Street address must be 150 characters or fewer'),
+  city: z.string().trim().min(2, 'City must be at least 2 characters').max(80, 'City must be 80 characters or fewer'),
+  state: z.string().trim().min(2, 'State/Division must be at least 2 characters').max(80, 'State/Division must be 80 characters or fewer'),
+  postalCode: z.string().trim().min(2, 'Postal code must be at least 2 characters').max(20, 'Postal code must be 20 characters or fewer'),
+  country: z.string().trim().min(2, 'Country must be at least 2 characters').max(80, 'Country must be 80 characters or fewer'),
 };
 const createSchema = z.object({
   body: z.object({ ...addressFields, isDefault: z.boolean().optional().default(false) }),

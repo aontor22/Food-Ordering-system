@@ -32,7 +32,7 @@ app.use(pinoHttp({
     censor: '[REDACTED]',
   },
 }));
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(helmet({ crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }, crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: config.CLIENT_ORIGIN.split(',').map(v => v.trim()), credentials: true, methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','X-Order-Access-Token','X-Request-ID'], exposedHeaders: ['X-Request-ID'] }));
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '20kb' }));

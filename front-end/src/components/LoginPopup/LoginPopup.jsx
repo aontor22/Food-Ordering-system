@@ -82,8 +82,13 @@ export default function LoginPopup({ onClose }) {
       const data = await authenticate(mode, mode === 'login' ? { email: values.email, password: values.password } : values);
       await handleAuthResult(data);
     } catch (requestError) {
-      setError(requestError.message);
-      if (requestError.code === 'EMAIL_NOT_VERIFIED') setNotice('Need another verification email? Use the button below.');
+      if (requestError.code === 'EMAIL_NOT_VERIFIED') {
+        setMode('verification-needed');
+        setNotice('This account exists, but the email address still needs verification. Send a fresh verification link below.');
+      } else if (mode === 'register' && requestError.code === 'EMAIL_EXISTS') {
+        setMode('login');
+        setNotice('An account with this email already exists. Sign in below, or use Forgot password if needed.');
+      } else setError(requestError.message);
     } finally { setBusy(false); }
   };
 
@@ -156,9 +161,9 @@ export default function LoginPopup({ onClose }) {
       <button type="button" className="auth-close icon-button" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
       <div className="auth-mark">T.</div>
       <div className="section-kicker">Welcome to Tomato</div>
-      <h2 id="auth-title">{mode === 'login' ? 'Good to see you again' : mode === 'register' ? 'Create your account' : mode === 'forgot' ? 'Reset your password' : 'Check your email'}</h2>
-      <p>{mode === 'login' ? 'Sign in to keep orders, points, reviews, and tracking in one account.' : mode === 'register' ? 'New password accounts verify their email before the first sign-in.' : mode === 'forgot' ? 'Enter your account email. If it matches an active account, we will send a private reset link.' : 'Open the one-time verification link we sent, then return here to sign in.'}</p>
-      {mode !== 'verification-sent' && <form onSubmit={submit}>
+      <h2 id="auth-title">{mode === 'login' ? 'Good to see you again' : mode === 'register' ? 'Create your account' : mode === 'forgot' ? 'Reset your password' : mode === 'verification-needed' ? 'Verify your email' : 'Check your email'}</h2>
+      <p>{mode === 'login' ? 'Sign in to keep orders, points, reviews, and tracking in one account.' : mode === 'register' ? 'New password accounts verify their email before the first sign-in.' : mode === 'forgot' ? 'Enter your account email. If it matches an active account, we will send a private reset link.' : mode === 'verification-needed' ? 'Password sign-in is ready after you confirm this email address.' : 'Open the one-time verification link we sent, then return here to sign in.'}</p>
+      {!['verification-sent', 'verification-needed'].includes(mode) && <form onSubmit={submit}>
         {mode === 'register' && <div className="field"><label htmlFor="auth-name">Full name</label><input id="auth-name" name="name" value={values.name} onChange={update} required autoComplete="name" placeholder="Your name" /></div>}
         <div className="field"><label htmlFor="auth-email">Email address</label><input id="auth-email" name="email" value={values.email} onChange={update} required type="email" autoComplete="email" placeholder="you@example.com" /></div>
         {mode !== 'forgot' && <div className="field"><label htmlFor="auth-password">Password</label><input id="auth-password" name="password" value={values.password} onChange={update} required minLength={mode === 'register' ? 12 : 1} maxLength="72" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder={mode === 'register' ? 'At least 12 characters' : 'Your password'} /></div>}
@@ -168,13 +173,13 @@ export default function LoginPopup({ onClose }) {
         {mode === 'register' && <label className="terms-check"><input type="checkbox" required /><span>I agree to the terms of use and privacy policy.</span></label>}
         <button className="button button-primary button-full" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'register' ? 'Create account' : 'Send reset link'}</button>
       </form>}
-      {mode === 'verification-sent' && <>{notice && <p className="auth-notice" role="status">{notice}</p>}{previewUrl && <a className="auth-dev-link" href={previewUrl}>Development preview link</a>}<button type="button" className="button button-secondary button-full" onClick={resendVerification} disabled={busy}>{busy ? 'Sending…' : 'Resend verification email'}</button></>}
+      {['verification-sent', 'verification-needed'].includes(mode) && <>{notice && <p className="auth-notice" role="status">{notice}</p>}{previewUrl && <a className="auth-dev-link" href={previewUrl}>Development preview link</a>}<button type="button" className="button button-secondary button-full" onClick={resendVerification} disabled={busy}>{busy ? 'Sending…' : 'Resend verification email'}</button></>}
       {mode === 'login' && notice && <button type="button" className="button button-secondary button-full auth-secondary-action" onClick={resendVerification} disabled={busy}>Resend verification email</button>}
       {mode === 'login' && <button type="button" className="auth-text-action" onClick={() => switchMode('forgot')}>Forgot password?</button>}
       {googleEnabled && ['login', 'register'].includes(mode) && <><div className="auth-divider" aria-hidden="true"><span>or continue with</span></div><GoogleSignInButton disabled={busy} onCredential={googleSignIn} onError={requestError => setError(requestError.message)} /></>}
       {mode === 'login' && <p className="auth-switch">New to Tomato? <button type="button" onClick={() => switchMode('register')}>Create an account</button></p>}
       {mode === 'register' && <p className="auth-switch">Already have an account? <button type="button" onClick={() => switchMode('login')}>Sign in</button></p>}
-      {['forgot', 'verification-sent'].includes(mode) && <p className="auth-switch"><button type="button" onClick={() => switchMode('login')}>Back to sign in</button></p>}
+      {['forgot', 'verification-sent', 'verification-needed'].includes(mode) && <p className="auth-switch"><button type="button" onClick={() => switchMode('login')}>Back to sign in</button></p>}
     </section>
   </div>;
 }

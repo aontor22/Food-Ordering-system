@@ -3,6 +3,32 @@ import { useEffect, useRef, useState } from 'react';
 const SCRIPT_ID = 'google-identity-services';
 const SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 
+let initializedClientId = null;
+let activeGoogleConsumer = null;
+
+function activateGoogleConsumer(id, onCredential, onError) {
+  activeGoogleConsumer = { id, onCredential, onError };
+}
+
+function deactivateGoogleConsumer(id) {
+  if (activeGoogleConsumer?.id === id) activeGoogleConsumer = null;
+}
+
+function ensureGoogleInitialized(clientId) {
+  if (initializedClientId === clientId) return;
+  window.google.accounts.id.initialize({
+    client_id: clientId,
+    callback: response => {
+      if (response?.credential) activeGoogleConsumer?.onCredential?.(response.credential);
+      else activeGoogleConsumer?.onError?.(new Error('Google sign-in did not return a credential'));
+    },
+    ux_mode: 'popup',
+    auto_select: false,
+    cancel_on_tap_outside: true,
+  });
+  initializedClientId = clientId;
+}
+
 function loadGoogleScript() {
   if (window.google?.accounts?.id) return Promise.resolve();
 
@@ -30,6 +56,7 @@ export default function GoogleSignInButton({ disabled = false, onCredential, onE
   const slotRef = useRef(null);
   const callbackRef = useRef(onCredential);
   const errorRef = useRef(onError);
+  const consumerIdRef = useRef(Symbol('google-signin'));
   const [ready, setReady] = useState(false);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
 
@@ -46,16 +73,8 @@ export default function GoogleSignInButton({ disabled = false, onCredential, onE
     loadGoogleScript().then(() => {
       if (cancelled || !slotRef.current || !window.google?.accounts?.id) return;
 
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: response => {
-          if (response?.credential) callbackRef.current?.(response.credential);
-          else errorRef.current?.(new Error('Google sign-in did not return a credential'));
-        },
-        ux_mode: 'popup',
-        auto_select: false,
-        cancel_on_tap_outside: true,
-      });
+      activateGoogleConsumer(consumerIdRef.current, credential => callbackRef.current?.(credential), error => errorRef.current?.(error));
+      ensureGoogleInitialized(clientId);
 
       const renderButton = () => {
         if (cancelled || !slotRef.current) return;
@@ -89,6 +108,7 @@ export default function GoogleSignInButton({ disabled = false, onCredential, onE
     return () => {
       cancelled = true;
       observer?.disconnect();
+      deactivateGoogleConsumer(consumerIdRef.current);
     };
   }, [clientId]);
 
