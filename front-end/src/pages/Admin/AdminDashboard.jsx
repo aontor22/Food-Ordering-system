@@ -29,10 +29,12 @@ export default function AdminDashboard() {
     { label: 'Orders', value: metrics.orders, detail: `${metrics.todayOrders} placed today`, icon: 'orders', tone: 'is-orange' },
     { label: 'Customers', value: metrics.customers, detail: 'Registered accounts', icon: 'users', tone: 'is-blue' },
     { label: 'Active products', value: metrics.products, detail: `${metrics.lowStock} low-stock items`, icon: 'products', tone: 'is-gold' },
+    { label: 'Wishlist saves', value: metrics.wishlistSaves || 0, detail: 'Saved customer favourites', icon: 'heart', tone: 'is-red' },
   ];
 
   return <>
-    <AdminPageHeader eyebrow="Live operations" title="Everything at a glance" description={`${metrics.pendingOrders} orders currently require attention.`} action={<button className="button button-secondary" onClick={load}><Icon name="refresh" />Refresh</button>} />
+    <AdminPageHeader eyebrow="Live operations" title="Everything at a glance" description={`${metrics.pendingOrders} orders currently require attention.`} action={<div className="admin-header-actions"><Link className="button button-primary" to="/admin/analytics"><Icon name="trend" />Analytics</Link><button className="button button-secondary" onClick={load}><Icon name="refresh" />Refresh</button></div>} />
+    {data.storeStatus && <Link to="/admin/store-operations" className={`dashboard-store-status ${data.storeStatus.isOpen ? 'is-open' : 'is-closed'}`}><span><Icon name={data.storeStatus.isOpen ? 'check' : 'clock'} /><strong>{data.storeStatus.headline}</strong></span><p>{data.storeStatus.message}</p><Icon name="arrow" /></Link>}
     <section className="admin-metrics" aria-label="Business metrics">
       {cards.map(card => <article className="admin-card metric-card" key={card.label}>
         <span className={`metric-icon ${card.tone}`}><Icon name={card.icon} size={23} /></span>
@@ -65,7 +67,7 @@ export default function AdminDashboard() {
     <section className="admin-grid equal">
       <article className="admin-card">
         <div className="admin-card-header"><div><h3>Recent orders</h3><p>The latest customer activity.</p></div><Link className="text-link" to="/admin/orders">View all</Link></div>
-        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Order</th><th>Customer</th><th>Status</th><th className="align-right">Total</th></tr></thead>
+        <div className="admin-table-wrap"><table className="admin-table dashboard-order-table"><thead><tr><th>Order</th><th>Customer</th><th>Status</th><th className="align-right">Total</th></tr></thead>
           <tbody>{data.recentOrders.length ? data.recentOrders.map(order => <tr key={order.id}>
             <td><strong>{order.orderNumber}</strong><small>{formatDate(order.createdAt)}</small></td>
             <td><strong>{order.user?.name || `${order.firstName} ${order.lastName}`}</strong><small>{order.email}</small></td>

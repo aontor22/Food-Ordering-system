@@ -18,3 +18,16 @@
 .promo-form small { color: var(--success); line-height: 1.45; }
 @media (max-width: 880px) { .cart-layout { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .cart-list { padding: 4px 16px; } .cart-row { grid-template-columns: 72px 1fr auto; gap: 13px; } .cart-row > img { width: 72px; height: 72px; } .cart-quantity { grid-column: 2; }.cart-line-total { grid-column: 3; grid-row: 2; }.remove-item { grid-column: 3; grid-row: 1; } .cart-list-footer span { display: none; } }
+.cart-store-closed { display: flex; align-items: flex-start; gap: 9px; margin: 16px 0 0; padding: 12px; border: 1px solid #efcbb9; border-radius: 12px; color: #8a4b2e; background: #fff4ee; }
+.cart-store-closed > svg { flex: 0 0 auto; margin-top: 1px; }
+.cart-store-closed strong { display: block; font-size: .78rem; }
+.cart-store-closed p { margin-top: 2px; font-size: .72rem; line-height: 1.45; }
+
+.cart-delivery-note { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 16px; padding: 11px 12px; border-radius: 11px; color: #5f6d65; background: #f5f8f6; font-size: .76rem; line-height: 1.45; }
+.cart-delivery-note svg { flex: 0 0 auto; margin-top: 1px; color: var(--brand); }
+
+/* Step 10: customized cart lines */
+.cart-customizations{display:grid;gap:3px;margin-top:8px}.cart-customizations small{display:block;color:#66726b;font-size:.72rem;line-height:1.35}.cart-customizations strong{color:#4b5850}.cart-special-note{max-width:520px;display:flex!important;align-items:flex-start;gap:5px;margin-top:7px;color:#875a2d!important;font-style:italic;line-height:1.4}.cart-special-note svg{flex:0 0 auto;margin-top:1px}.cart-edit-customization{margin-top:8px;padding:0;border:0;color:var(--brand);background:transparent;font-size:.72rem;font-weight:800;text-decoration:underline;text-underline-offset:3px}.cart-edit-customization:hover{opacity:.78}
+
+/* Step 12: reorder status */
+.reorder-cart-notice{display:flex;align-items:flex-start;gap:9px;margin-bottom:18px;padding:13px 15px;border:1px solid #cfe4d7;border-radius:13px;color:#2d6547;background:#f1faf4;font-size:.8rem;line-height:1.5}.reorder-cart-notice svg{flex:0 0 auto;margin-top:1px}

@@ -35,6 +35,11 @@ a { color: inherit; text-decoration: none; }
 h1, h2, h3, .display-font { font-family: 'Manrope', sans-serif; }
 :focus-visible { outline: 3px solid rgba(244, 81, 44, .28); outline-offset: 3px; }
 
+.skip-link { position: fixed; top: 10px; left: 10px; z-index: 10000; padding: 10px 14px; border-radius: 10px; background: var(--ink); color: #fff; font-weight: 800; transform: translateY(-160%); transition: transform .16s ease; }
+.skip-link:focus { transform: translateY(0); }
+#main-content:focus { outline: none; }
+
+
 .app-shell { min-height: calc(100vh - 340px); }
 .page-container { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
 .page-main { min-height: 65vh; padding-bottom: 48px; }
@@ -98,3 +103,6 @@ h1, h2, h3, .display-font { font-family: 'Manrope', sans-serif; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Step 10: immutable order-item customization snapshots */
+.order-item-customization{display:grid;gap:4px;margin:6px 0 2px 28px;color:#6f7973;font-size:.7rem;line-height:1.35}.order-item-customization-group{display:flex;gap:5px;flex-wrap:wrap}.order-item-customization-group>strong{color:#526058}.order-item-customization-group>span{display:flex;gap:5px;flex-wrap:wrap}.order-item-customization-group>span>span:not(:last-child)::after{content:' ·';color:#a1aaa4}.order-item-customization p{display:flex;align-items:flex-start;gap:5px;color:#875a2d;font-style:italic}.order-item-customization p svg{flex:0 0 auto;margin-top:1px}.order-item-customization.is-compact{margin-left:0}

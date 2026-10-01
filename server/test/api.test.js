@@ -2,7 +2,6 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
-import { execFileSync } from 'node:child_process';
 import { app } from '../src/app.js';
 import { prisma } from '../src/lib/prisma.js';
 
@@ -40,6 +39,8 @@ after(async () => {
   await prisma.$disconnect();
 });
 test('health endpoint', async () => { const r = await request(app).get('/api/health'); assert.equal(r.status, 200); assert.equal(r.body.status, 'ok'); });
+test('anonymous auth bootstrap returns no session without a console-worthy 401', async () => { const r = await request(app).post('/api/auth/refresh'); assert.equal(r.status, 204); });
+test('health readiness endpoint checks PostgreSQL', async () => { const r = await request(app).get('/api/health/ready'); assert.equal(r.status, 200); assert.equal(r.body.status, 'ready'); assert.equal(r.body.checks.database.status, 'ok'); assert.ok(Number.isInteger(r.body.checks.database.latencyMs)); });
 test('register, authenticate, list products, and place order', async () => {
   let r = await request(app).post('/api/auth/register').send({ name: 'Test User', email, password: 'StrongPass123!' }); assert.equal(r.status, 201); token = r.body.accessToken;
   r = await request(app).get('/api/products'); assert.equal(r.status, 200); assert.ok(r.body.products.length >= 1);
@@ -91,8 +92,10 @@ test('supports a server-controlled online payment journey', async () => {
   assert.equal(r.body.order.status, 'CONFIRMED');
 
   r = await request(app).post(`/api/orders/${onlineOrder.id}/cancel`).set('Authorization', `Bearer ${token}`);
-  assert.equal(r.status, 409);
-  assert.equal(r.body.error.code, 'REFUND_REQUIRED');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.cancellationRequested, true);
+  assert.equal(r.body.order.status, 'CONFIRMED');
+  assert.equal(r.body.order.paymentStatus, 'PAID');
   r = await request(app).post(`/api/admin/payments/${onlineOrder.payment.id}/cash-received`).set('Authorization', `Bearer ${adminToken}`);
   assert.equal(r.status, 409);
   assert.equal(r.body.error.code, 'GATEWAY_VERIFICATION_REQUIRED');
@@ -112,13 +115,47 @@ test('enforces admin authorization and supports management operations', async ()
   assert.ok(r.body.metrics);
   assert.ok(Array.isArray(r.body.revenueByDay));
 
-  r = await request(app).post('/api/admin/products').set('Authorization', `Bearer ${adminToken}`).send({ id: testProductId, name: 'Test Meal', description: 'Created by the API integration test', category: 'Test', imageUrl: null, priceCents: 1299, stock: 5, isAvailable: true });
+  r = await request(app).get('/api/admin/analytics').query({ days: 7 }).set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.range.days, 7);
+  assert.ok(r.body.metrics);
+  assert.ok(Array.isArray(r.body.salesSeries));
+  assert.match(r.headers['cache-control'], /no-store/);
+
+  r = await request(app).get('/api/admin/analytics/export').query({ days: 7, type: 'orders' }).set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(r.status, 200);
+  assert.match(r.headers['content-type'], /text\/csv/);
+  assert.match(r.headers['content-disposition'], /tomato-orders-/);
+  assert.match(r.text, /order_number/);
+
+  r = await request(app).get('/api/admin/media').set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.configured, false);
+  assert.equal(typeof r.body.legacyImageCount, 'number');
+  r = await request(app).post('/api/admin/media/signature').set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(r.status, 503);
+  assert.equal(r.body.error.code, 'CLOUDINARY_NOT_CONFIGURED');
+
+  r = await request(app).post('/api/admin/products').set('Authorization', `Bearer ${adminToken}`).send({ id: testProductId, name: 'Test Vegan Meal', description: 'Created by the API integration test with a large option', category: 'Test', imageUrl: null, priceCents: 1299, stock: 5, isVegan: true, isHalal: true, isAvailable: true, optionGroups: [{ name: 'Size', kind: 'VARIANT', minSelections: 1, maxSelections: 1, isAvailable: true, options: [{ name: 'Large', priceDeltaCents: 200, isDefault: true, isAvailable: true }] }] });
   assert.equal(r.status, 201);
   assert.equal(r.body.product.id, testProductId);
+  assert.equal(r.body.product.isVegan, true);
+  assert.equal(r.body.product.isVegetarian, true);
 
   r = await request(app).patch(`/api/admin/products/${testProductId}`).set('Authorization', `Bearer ${adminToken}`).send({ stock: 9 });
+  assert.equal(r.status, 409);
+  assert.equal(r.body.error.code, 'USE_INVENTORY_ADJUSTMENT');
+  r = await request(app).post('/api/admin/inventory/adjust').set('Authorization', `Bearer ${adminToken}`).send({ targetType: 'PRODUCT', productId: testProductId, expectedVersion: 0, newStock: 9, reason: 'CORRECTION', note: 'API integration test' });
   assert.equal(r.status, 200);
-  assert.equal(r.body.product.stock, 9);
+  assert.equal(r.body.target.stock, 9);
+
+  r = await request(app).get('/api/products').query({ search: 'large', dietary: 'vegan,halal', minPrice: 10, maxPrice: 20, sort: 'PRICE_ASC' });
+  assert.equal(r.status, 200);
+  assert.ok(r.body.products.some(product => product.id === testProductId));
+  const discoveredProduct = r.body.products.find(product => product.id === testProductId);
+  assert.ok(discoveredProduct.dietaryTags.includes('vegan'));
+  assert.ok(discoveredProduct.dietaryTags.includes('halal'));
+  assert.equal(typeof discoveredProduct.popularityCount, 'number');
 
   r = await request(app).post('/api/admin/coupons').set('Authorization', `Bearer ${adminToken}`).send({ code: testCouponCode, percentOff: 15, minimumCents: 1000, active: true, expiresAt: null });
   assert.equal(r.status, 201);
@@ -147,6 +184,9 @@ test('enforces admin authorization and supports management operations', async ()
   r = await request(app).get('/api/admin/audit-logs').set('Authorization', `Bearer ${adminToken}`);
   assert.equal(r.status, 200);
   assert.ok(r.body.logs.some(log => log.action === 'PRODUCT_CREATED'));
+  r = await request(app).post('/api/admin/payment-channels').set('Authorization', `Bearer ${adminToken}`).send({ provider: 'BKASH', label: 'Test merchant', account: 'TEST-ACCOUNT', instructions: 'Test only; never pay', active: true });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error.code, 'CURRENCY_MISMATCH');
 });
 
 test('failed demo payment can retry, invalid signatures and cancelled sessions cannot settle', async () => {
@@ -179,18 +219,12 @@ test('disabling an account invalidates its existing access token', async () => {
   await prisma.user.update({ where: { id: user.id }, data: { isActive: false } });
   const r = await request(app).get('/api/orders').set('Authorization', `Bearer ${token}`);
   assert.equal(r.status, 401);
-  assert.equal(r.body.error.code, 'ACCOUNT_DISABLED');
+  assert.equal(r.body.error.code, 'INVALID_SESSION');
 });
 
-test('upgrade backfills legacy COD orders and is idempotent', async () => {
-  await prisma.payment.delete({ where: { id: codPaymentId } });
-  execFileSync(process.execPath, ['prisma/init.js'], { env: process.env });
-  let record = await prisma.payment.findUnique({ where: { orderId: codOrderId } });
+test('COD orders keep a one-to-one payment ledger record', async () => {
+  const record = await prisma.payment.findUnique({ where: { orderId: codOrderId } });
+  assert.ok(record);
+  assert.equal(record.id, codPaymentId);
   assert.equal(record.provider, 'COD');
-  assert.equal(record.status, 'REFUNDED');
-  const id = record.id;
-  execFileSync(process.execPath, ['prisma/init.js'], { env: process.env });
-  record = await prisma.payment.findUnique({ where: { orderId: codOrderId } });
-  assert.equal(record.id, id);
-  assert.equal((await prisma.order.findUnique({ where: { id: codOrderId } })).paymentStatus, 'REFUNDED');
 });

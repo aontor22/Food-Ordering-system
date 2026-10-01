@@ -1,7 +1,22 @@
-.dishes-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
+.dishes-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
 .dishes-toolbar h2 { font-size: clamp(1.8rem, 3vw, 2.6rem); letter-spacing: -.04em; }
 .dishes-toolbar p { margin-top: 6px; color: var(--muted); }
+.dishes-toolbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; flex-wrap: wrap; }
 .search-chip { display: flex; align-items: center; gap: 7px; border: 1px solid #f4b5a6; color: var(--brand-dark); background: var(--brand-soft); border-radius: 999px; padding: 9px 13px; font-weight: 700; }
+.discovery-clear { border: 0; color: var(--brand-dark); background: transparent; font-weight: 800; font-size: .78rem; text-decoration: underline; text-underline-offset: 3px; }
+.discovery-panel { display: grid; gap: 12px; margin-bottom: 26px; padding: 15px; border: 1px solid var(--line); border-radius: 18px; background: #fff; box-shadow: 0 10px 30px rgba(40,32,24,.04); }
+.discovery-search { min-height: 46px; display: flex; align-items: center; gap: 9px; padding: 0 12px; border: 1px solid #dedbd5; border-radius: 12px; background: #faf9f6; }
+.discovery-search > svg { flex: 0 0 auto; color: var(--muted); }
+.discovery-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; }
+.discovery-search button { display: grid; place-items: center; border: 0; color: var(--muted); background: transparent; }
+.discovery-dietary { display: flex; gap: 8px; flex-wrap: wrap; }
+.discovery-dietary button { padding: 8px 11px; border: 1px solid #ddd8cf; border-radius: 999px; color: #655f57; background: #fff; font-size: .75rem; font-weight: 800; transition: .18s ease; }
+.discovery-dietary button:hover { border-color: #ef9c87; color: var(--brand-dark); }
+.discovery-dietary button.is-active { border-color: #ef9c87; color: var(--brand-dark); background: var(--brand-soft); box-shadow: inset 0 0 0 1px rgba(235,91,55,.08); }
+.discovery-controls { display: grid; grid-template-columns: 1fr .75fr .75fr 1.25fr; gap: 10px; }
+.discovery-controls label { min-width: 0; display: grid; gap: 5px; color: var(--muted); font-size: .67rem; font-weight: 800; }
+.discovery-controls input, .discovery-controls select { width: 100%; min-width: 0; height: 40px; padding: 0 10px; border: 1px solid #dedbd5; border-radius: 10px; outline: none; color: var(--text); background: #fff; font: inherit; font-size: .78rem; }
+.discovery-controls input:focus, .discovery-controls select:focus, .discovery-search:focus-within { border-color: #ee9a84; box-shadow: 0 0 0 3px rgba(235,91,55,.09); }
 .food-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
 .food-skeleton { height: 360px; padding: 0 18px; border-radius: var(--radius); background: #fff; border: 1px solid var(--line); overflow: hidden; }
 .food-skeleton div, .food-skeleton span { display: block; background: linear-gradient(90deg, #f4f2ed 25%, #faf9f6 50%, #f4f2ed 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
@@ -11,6 +26,7 @@
 .no-results { padding: 55px 20px; border: 1px dashed #d7d1c7; border-radius: var(--radius); text-align: center; }
 .no-results > span { font-size: 2.4rem; }.no-results h3 { margin: 10px 0 6px; }.no-results p { color: var(--muted); margin-bottom: 20px; }
 @keyframes shimmer { to { background-position: -200% 0; } }
-@media (max-width: 1080px) { .food-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 760px) { .food-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; } .dishes-toolbar { align-items: start; flex-direction: column; } }
+@media (max-width: 1080px) { .food-grid { grid-template-columns: repeat(3, 1fr); } .discovery-controls { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 760px) { .food-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; } .dishes-toolbar { align-items: start; flex-direction: column; } .dishes-toolbar-actions { justify-content: flex-start; } }
+@media (max-width: 540px) { .discovery-panel { padding: 12px; border-radius: 14px; } .discovery-controls { grid-template-columns: 1fr 1fr; } .discovery-sort { grid-column: 1 / -1; } .discovery-dietary { gap: 6px; }.discovery-dietary button { flex: 1 1 calc(50% - 6px); } }
 @media (max-width: 500px) { .food-grid { grid-template-columns: 1fr; } }

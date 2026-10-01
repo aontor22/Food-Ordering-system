@@ -1,0 +1,27 @@
+{
+  "id": "/",
+  "name": "Tomato — Fresh food, delivered",
+  "short_name": "Tomato",
+  "description": "Order fresh, chef-crafted food, track delivery live, save favourites and manage rewards with Tomato.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "theme_color": "#f4512c",
+  "background_color": "#fbfaf7",
+  "categories": ["food", "shopping", "lifestyle"],
+  "icons": [
+    { "src": "/favicon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "My orders", "short_name": "Orders", "url": "/orders?source=pwa-shortcut", "icons": [{ "src": "/favicon-192.png", "sizes": "192x192" }] },
+    { "name": "Wishlist", "short_name": "Wishlist", "url": "/wishlist?source=pwa-shortcut", "icons": [{ "src": "/favicon-192.png", "sizes": "192x192" }] },
+    { "name": "Cart", "short_name": "Cart", "url": "/cart?source=pwa-shortcut", "icons": [{ "src": "/favicon-192.png", "sizes": "192x192" }] }
+  ]
+}

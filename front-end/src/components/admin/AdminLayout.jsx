@@ -6,22 +6,44 @@ import './admin.css';
 
 const navigation = [
   { to: '/admin', label: 'Overview', icon: 'dashboard', end: true },
+  { to: '/admin/analytics', label: 'Analytics', icon: 'trend' },
+  { to: '/admin/monitoring', label: 'Monitoring', icon: 'alert' },
   { to: '/admin/products', label: 'Products', icon: 'products' },
+  { to: '/admin/inventory', label: 'Inventory', icon: 'activity' },
   { to: '/admin/orders', label: 'Orders', icon: 'orders' },
+  { to: '/admin/kitchen', label: 'Kitchen display', icon: 'clock' },
+  { to: '/admin/store-operations', label: 'Store hours', icon: 'clock' },
+  { to: '/admin/delivery-zones', label: 'Delivery zones', icon: 'delivery' },
+  { to: '/admin/fulfillment', label: 'Scheduling', icon: 'calendar' },
   { to: '/admin/payments', label: 'Payments', icon: 'card' },
+  { to: '/admin/notifications', label: 'Notifications', icon: 'bell' },
   { to: '/admin/customers', label: 'Customers', icon: 'users' },
+  { to: '/admin/reviews', label: 'Reviews', icon: 'star' },
+  { to: '/admin/loyalty', label: 'Tomato Points', icon: 'gift' },
   { to: '/admin/coupons', label: 'Coupons', icon: 'coupon' },
   { to: '/admin/activity', label: 'Activity log', icon: 'activity' },
+  { to: '/admin/security', label: 'Security', icon: 'shield' },
 ];
 
 const titles = {
   '/admin': ['Dashboard overview', 'Monitor the health of your restaurant in real time.'],
-  '/admin/products': ['Product management', 'Control menu availability, prices and stock.'],
-  '/admin/orders': ['Order operations', 'Review orders and move them through fulfilment.'],
+  '/admin/analytics': ['Sales analytics', 'Understand revenue, customers, products and demand with exportable reporting.'],
+  '/admin/monitoring': ['Production monitoring', 'Inspect service health, dependency readiness, operational incidents and delivery queues.'],
+  '/admin/products': ['Product management', 'Control menu availability, pricing, variants and add-ons.'],
+  '/admin/inventory': ['Inventory control', 'Manage concurrency-safe product and option stock with a complete adjustment history.'],
+  '/admin/orders': ['Live order operations', 'Track, estimate and move orders through fulfilment in real time.'],
+  '/admin/kitchen': ['Kitchen display', 'Run a live NEW → PREPARING → READY production board with kitchen timers.'],
+  '/admin/store-operations': ['Store availability', 'Set opening hours, temporary pauses and holiday closures.'],
+  '/admin/delivery-zones': ['Delivery zones', 'Control service areas, delivery fees, minimum orders and free-delivery thresholds.'],
+  '/admin/fulfillment': ['Fulfilment scheduling', 'Control delivery, pickup, ASAP orders, future slots and capacity.'],
   '/admin/payments': ['Payment operations', 'Verify cash collection and monitor gateway transactions.'],
-  '/admin/customers': ['Customer accounts', 'Review activity and manage account access.'],
+  '/admin/notifications': ['Notifications', 'Monitor transactional email and browser push delivery.'],
+  '/admin/customers': ['Customer accounts', 'Review activity, points balances and manage account access.'],
+  '/admin/reviews': ['Food reviews', 'Moderate verified customer feedback from delivered orders.'],
+  '/admin/loyalty': ['Tomato Points', 'Control rewards, redemption thresholds and point value.'],
   '/admin/coupons': ['Coupons & offers', 'Create and manage customer promotions.'],
   '/admin/activity': ['Activity log', 'Review sensitive administrative actions.'],
+  '/admin/security': ['Security & sessions', 'Manage active devices, password security and administrator recovery codes.'],
 };
 
 export default function AdminLayout() {
@@ -32,8 +54,19 @@ export default function AdminLayout() {
 
   useEffect(() => setOpen(false), [location.pathname]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    document.body.classList.add('admin-nav-open');
+    const closeOnEscape = event => event.key === 'Escape' && setOpen(false);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.classList.remove('admin-nav-open');
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
   return <div className="admin-app">
-    <aside className={`admin-sidebar ${open ? 'is-open' : ''}`}>
+    <aside id="admin-navigation" className={`admin-sidebar ${open ? 'is-open' : ''}`}>
       <Link to="/admin" className="admin-brand"><span>T.</span><div>Tomato<small>Restaurant OS</small></div></Link>
       <nav aria-label="Admin navigation">
         <p>Workspace</p>
@@ -43,17 +76,17 @@ export default function AdminLayout() {
       </nav>
       <div className="admin-sidebar-footer">
         <Link to="/"><Icon name="store" size={18} />View storefront</Link>
-        <button onClick={logout}><Icon name="logout" size={18} />Sign out</button>
+        <button type="button" onClick={logout}><Icon name="logout" size={18} />Sign out</button>
       </div>
     </aside>
-    {open && <button className="admin-backdrop" aria-label="Close navigation" onClick={() => setOpen(false)} />}
+    {open && <button type="button" className="admin-backdrop" aria-label="Close navigation" onClick={() => setOpen(false)} />}
     <div className="admin-workspace">
       <header className="admin-topbar">
-        <button className="icon-button admin-menu-toggle" onClick={() => setOpen(true)} aria-label="Open navigation"><Icon name="menu" /></button>
+        <button type="button" className="icon-button admin-menu-toggle" onClick={() => setOpen(true)} aria-label="Open navigation" aria-controls="admin-navigation" aria-expanded={open}><Icon name="menu" /></button>
         <div><h1>{title}</h1><p>{subtitle}</p></div>
         <div className="admin-profile"><span>{user.name.charAt(0).toUpperCase()}</span><div><strong>{user.name}</strong><small>Administrator</small></div></div>
       </header>
-      <main className="admin-content"><Outlet /></main>
+      <main id="main-content" className="admin-content" tabIndex="-1"><Outlet /></main>
     </div>
   </div>;
 }

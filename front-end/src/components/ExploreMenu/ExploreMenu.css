@@ -1,7 +1,122 @@
-.category-list { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(104px, 1fr); gap: 14px; overflow-x: auto; padding: 4px 4px 15px; scrollbar-width: thin; scrollbar-color: #d7d2c9 transparent; }
-.category-card { border: 1px solid var(--line); background: #fff; border-radius: 18px; padding: 14px 10px; min-width: 104px; display: grid; justify-items: center; gap: 10px; color: var(--muted); font-weight: 700; transition: .22s; }
-.category-card:hover { transform: translateY(-3px); border-color: #f4b6a7; color: var(--brand-dark); box-shadow: var(--shadow-sm); }
-.category-card.active { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); box-shadow: 0 8px 20px rgba(244,81,44,.10); }
-.category-card img, .all-category { width: 68px; height: 68px; border-radius: 50%; object-fit: cover; }
-.all-category { display: grid; place-items: center; background: linear-gradient(135deg, var(--brand), #ff8b70); color: #fff; font-family: 'Manrope'; font-size: 1.1rem; }
-@media (max-width: 700px) { .category-list { grid-auto-columns: 100px; margin-right: -14px; } .category-card img, .all-category { width: 62px; height: 62px; } }
+.category-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.category-card {
+  width: 106px;
+  min-width: 106px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 18px;
+  padding: 14px 10px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+  color: var(--muted);
+  font-weight: 700;
+  transition: transform .22s, border-color .22s, color .22s, box-shadow .22s, background .22s;
+  scroll-snap-align: start;
+}
+
+.category-card:hover {
+  transform: translateY(-3px);
+  border-color: #f4b6a7;
+  color: var(--brand-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+.category-card.active {
+  border-color: var(--brand);
+  color: var(--brand-dark);
+  background: var(--brand-soft);
+  box-shadow: 0 8px 20px rgba(244,81,44,.10);
+}
+
+.category-card-all {
+  flex: 0 0 106px;
+  position: relative;
+  z-index: 2;
+}
+
+.category-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 4px 13px 1px;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+  scrollbar-width: thin;
+  scrollbar-color: #cfc9bf transparent;
+}
+
+.category-scroll::-webkit-scrollbar { height: 8px; }
+.category-scroll::-webkit-scrollbar-track { background: transparent; }
+.category-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: #cfc9bf; }
+.category-scroll:focus-visible { outline: 3px solid rgba(244,81,44,.18); outline-offset: 4px; border-radius: 16px; }
+
+.category-track {
+  width: max-content;
+  min-width: 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.category-card img,
+.all-category,
+.category-fallback {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+}
+
+.category-card img { object-fit: cover; }
+
+.all-category,
+.category-fallback {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-family: 'Manrope';
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.all-category { background: linear-gradient(135deg, var(--brand), #ff8b70); }
+.category-fallback { background: linear-gradient(135deg, #27372f, #5d7568); }
+
+.category-name {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .category-strip { gap: 9px; }
+  .category-card,
+  .category-card-all { width: 94px; min-width: 94px; flex-basis: 94px; }
+  .category-card { padding: 12px 8px; border-radius: 16px; }
+  .category-card img,
+  .all-category,
+  .category-fallback { width: 60px; height: 60px; }
+  .category-scroll { margin-right: calc(var(--page-gutter) * -1); padding-right: var(--page-gutter); }
+  .category-track { gap: 10px; }
+}
+
+@media (max-width: 420px) {
+  .category-card,
+  .category-card-all { width: 86px; min-width: 86px; flex-basis: 86px; }
+  .category-card img,
+  .all-category,
+  .category-fallback { width: 54px; height: 54px; }
+  .category-name { font-size: .82rem; }
+}
