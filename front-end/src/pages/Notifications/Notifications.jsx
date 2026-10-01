@@ -75,8 +75,13 @@ export default function Notifications() {
 
   const sendTest = async channel => {
     setBusy(`test-${channel}`); setError(''); setMessage('');
-    try { await api.sendTestNotification(channel); setMessage(`${channel === 'EMAIL' ? 'Email' : 'Browser'} test notification sent.`); }
-    catch (err) { setError(err.message); }
+    try {
+      const result = await api.sendTestNotification(channel);
+      if (channel === 'EMAIL') setMessage(result?.messageId
+        ? `SMTP accepted the test email. Check your inbox/spam. Message ID: ${result.messageId}`
+        : 'SMTP accepted the test email. Check your inbox/spam.');
+      else setMessage('Browser test notification sent.');
+    } catch (err) { setError(err.message); }
     finally { setBusy(''); }
   };
 
