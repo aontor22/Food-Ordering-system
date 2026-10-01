@@ -87,6 +87,10 @@ function requireTrustedOrigin(req, _res, next) {
   return next(new AppError(403, 'UNTRUSTED_ORIGIN', 'This authentication request came from an untrusted origin'));
 }
 
+function emailVerificationRequiredFor(user) {
+  return user?.role === 'ADMIN' || config.EMAIL_VERIFICATION_REQUIRED;
+}
+
 function publicUser(user) {
   return {
     id: user.id,
@@ -98,6 +102,7 @@ function publicUser(user) {
     pointsBalance: user.pointsBalance || 0,
     emailVerifiedAt: user.emailVerifiedAt || null,
     emailVerified: Boolean(user.emailVerifiedAt),
+    emailVerificationRequired: emailVerificationRequiredFor(user),
     twoFactorEnabled: Boolean(user.twoFactorEnabledAt),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -227,11 +232,11 @@ async function consumeMfaLoginCode(challenge, code) {
 
 router.post('/register', registrationLimiter, validate(authBody), async (req, res, next) => {
   try {
-    if (isProduction && !emailConfigured()) throw new AppError(503, 'EMAIL_DELIVERY_UNAVAILABLE', 'Email verification is temporarily unavailable');
+    if (config.EMAIL_VERIFICATION_REQUIRED && isProduction && !emailConfigured()) throw new AppError(503, 'EMAIL_DELIVERY_UNAVAILABLE', 'Email verification is temporarily unavailable');
     const { name, email, password } = req.validated.body;
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      if (existing.isActive && !existing.emailVerifiedAt && !(config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS)) {
+      if (config.EMAIL_VERIFICATION_REQUIRED && existing.isActive && !existing.emailVerifiedAt && !(config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS)) {
         const verification = await createVerification(existing);
         return res.status(202).json({
           verificationRequired: true,
@@ -242,8 +247,10 @@ router.post('/register', registrationLimiter, validate(authBody), async (req, re
       }
       throw new AppError(409, 'EMAIL_EXISTS', 'An account with this email already exists');
     }
-    let user = await prisma.user.create({ data: { name, email, passwordHash: await bcrypt.hash(password, 12), ...(config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS ? { emailVerifiedAt: new Date() } : {}) } });
-    if (config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS) return res.status(201).json(await issueSession(req, res, user));
+    const user = await prisma.user.create({ data: { name, email, passwordHash: await bcrypt.hash(password, 12), ...(config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS ? { emailVerifiedAt: new Date() } : {}) } });
+    if ((config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS) || !config.EMAIL_VERIFICATION_REQUIRED) {
+      return res.status(201).json(await issueSession(req, res, user));
+    }
     const verification = await createVerification(user);
     res.status(201).json({
       verificationRequired: true,
@@ -261,7 +268,7 @@ router.post('/login', primaryAuthLimiter, validate(loginBody), async (req, res, 
     const candidateHash = user?.passwordHash || await dummyHashPromise;
     const passwordMatches = await bcrypt.compare(password, candidateHash);
     if (!user || !user.isActive || !passwordMatches) throw new AppError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
-    if (!user.emailVerifiedAt && !(config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS)) throw new AppError(403, 'EMAIL_NOT_VERIFIED', 'Verify your email before signing in');
+    if (!user.emailVerifiedAt && emailVerificationRequiredFor(user) && !(config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS)) throw new AppError(403, 'EMAIL_NOT_VERIFIED', 'Verify your email before signing in');
     return completePrimaryAuth(req, res, user);
   } catch (error) { next(error); }
 });
@@ -311,15 +318,19 @@ router.post('/google', primaryAuthLimiter, validate(googleBody), async (req, res
 router.post('/resend-verification', emailActionLimiter, validate(emailBody), async (req, res, next) => {
   try {
     const startedAt = Date.now();
-    if (isProduction && !emailConfigured()) throw new AppError(503, 'EMAIL_DELIVERY_UNAVAILABLE', 'Account email delivery is temporarily unavailable');
     const user = await prisma.user.findUnique({ where: { email: req.validated.body.email } });
+    const verificationRequired = Boolean(user && emailVerificationRequiredFor(user));
+    if (verificationRequired && isProduction && !emailConfigured()) throw new AppError(503, 'EMAIL_DELIVERY_UNAVAILABLE', 'Account email delivery is temporarily unavailable');
     let previewUrl;
-    if (user?.isActive && !user.emailVerifiedAt) {
+    if (verificationRequired && user?.isActive && !user.emailVerifiedAt) {
       const result = await createVerification(user);
       if (!isProduction && result.delivery.skipped) previewUrl = result.url;
     }
     await minimumResponseTime(startedAt);
-    res.status(202).json({ message: 'If the account still needs verification, a new email has been sent.', ...(previewUrl ? { previewUrl } : {}) });
+    res.status(202).json({
+      message: verificationRequired ? 'If the account still needs verification, a new email has been sent.' : 'Email verification is currently not required for customer accounts.',
+      ...(previewUrl ? { previewUrl } : {}),
+    });
   } catch (error) { next(error); }
 });
 
