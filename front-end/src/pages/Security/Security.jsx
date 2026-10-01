@@ -73,7 +73,7 @@ export default function Security() {
   };
 
   return <section className="security-page">
-    <div className="security-heading"><div><div className="section-kicker">Account protection</div><h1>Security & sessions</h1><p>Review signed-in devices, change your password, and manage administrator recovery credentials.</p></div><span className="security-badge"><Icon name="shield" size={20} />{user.emailVerified ? 'Verified account' : 'Email unverified'}</span></div>
+    <div className="security-heading"><div><div className="section-kicker">Account protection</div><h1>Security & sessions</h1><p>Review signed-in devices, change your password, and manage administrator recovery credentials.</p></div><span className="security-badge"><Icon name="shield" size={20} />{user.emailVerified ? 'Verified account' : user.emailVerificationRequired ? 'Email unverified' : 'Verification not required'}</span></div>
     {error && <p className="form-error" role="alert">{error}</p>}
     {notice && <p className="security-notice" role="status">{notice}</p>}
 
@@ -96,10 +96,10 @@ export default function Security() {
       <article className="surface-card security-card">
         <h2>Email & two-factor</h2>
         <div className="security-status-row"><span>Email</span><strong>{user.email}</strong></div>
-        <div className="security-status-row"><span>Verification</span><strong>{user.emailVerified ? 'Verified' : 'Pending'}</strong></div>
+        <div className="security-status-row"><span>Verification</span><strong>{user.emailVerified ? 'Verified' : user.emailVerificationRequired ? 'Pending' : 'Not required currently'}</strong></div>
         {user.role === 'ADMIN'
           ? <><div className="security-status-row"><span>Admin 2FA</span><strong>{user.twoFactorEnabled ? 'Required · enabled' : 'Setup required'}</strong></div><p className="security-help">Admin 2FA cannot be disabled from the application. If you replace your authenticator, generate fresh recovery codes while you still have access.</p></>
-          : <><div className="security-status-row"><span>Authenticator 2FA</span><strong>Administrator accounts only</strong></div><p className="security-help">Customer accounts currently use verified email, password or Google sign-in. Authenticator codes are required only for administrator sessions.</p></>}
+          : <><div className="security-status-row"><span>Authenticator 2FA</span><strong>Administrator accounts only</strong></div><p className="security-help">Customer accounts use password or Google sign-in. Email verification can be required by the server when production mail is ready; authenticator codes remain administrator-only.</p></>}
       </article>
 
       {user.role === 'ADMIN' && user.twoFactorEnabled && <article className="surface-card security-card security-card-wide">
