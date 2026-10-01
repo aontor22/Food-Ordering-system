@@ -16,13 +16,13 @@ export const signAccessToken = (user, sessionId) => jwt.sign({
   audience: 'food-ordering-web',
 });
 
-export const signRefreshToken = (userId, sessionId) => jwt.sign({
+export const signRefreshToken = (userId, sessionId, expiresIn = `${config.REFRESH_TOKEN_DAYS}d`) => jwt.sign({
   sub: userId,
   sid: sessionId,
   type: 'refresh',
   jti: crypto.randomUUID(),
 }, config.JWT_REFRESH_SECRET, {
-  expiresIn: `${config.REFRESH_TOKEN_DAYS}d`,
+  expiresIn,
   issuer: 'food-ordering-api',
   audience: 'food-ordering-web',
 });
