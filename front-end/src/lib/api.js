@@ -54,31 +54,40 @@ async function parseError(response, fallback = 'Request failed') {
   return new ApiError(message, { code: data.error?.code, status: response.status, details, requestId });
 }
 
+async function runRefreshRequest({ allowAnonymous = false } = {}) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
+    if (response.status === 204) {
+      setAccessToken(null);
+      if (allowAnonymous) return { accessToken: null, user: null, anonymous: true };
+      throw new ApiError('Session is missing', { code: 'NO_REFRESH_TOKEN', status: 401 });
+    }
+    if (response.ok) {
+      const data = await response.json();
+      setAccessToken(data.accessToken);
+      return data;
+    }
+    const error = await parseError(response, 'Session expired');
+    if (error.code === 'STALE_REFRESH_TOKEN' && attempt === 0) {
+      await new Promise(resolve => setTimeout(resolve, 120));
+      continue;
+    }
+    setAccessToken(null);
+    throw error;
+  }
+  throw new ApiError('Session expired', { code: 'INVALID_SESSION', status: 401 });
+}
+
+async function runRefreshWithCrossTabLock(options) {
+  if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+    return navigator.locks.request('tomato-auth-refresh', { mode: 'exclusive' }, () => runRefreshRequest(options));
+  }
+  return runRefreshRequest(options);
+}
+
 async function refreshAccessToken({ allowAnonymous = false } = {}) {
   if (!refreshPromise) {
-    refreshPromise = (async () => {
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        const response = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
-        if (response.status === 204) {
-          setAccessToken(null);
-          if (allowAnonymous) return { accessToken: null, user: null, anonymous: true };
-          throw new ApiError('Session is missing', { code: 'NO_REFRESH_TOKEN', status: 401 });
-        }
-        if (response.ok) {
-          const data = await response.json();
-          setAccessToken(data.accessToken);
-          return data;
-        }
-        const error = await parseError(response, 'Session expired');
-        if (error.code === 'STALE_REFRESH_TOKEN' && attempt === 0) {
-          await new Promise(resolve => setTimeout(resolve, 120));
-          continue;
-        }
-        setAccessToken(null);
-        throw error;
-      }
-      throw new ApiError('Session expired', { code: 'INVALID_SESSION', status: 401 });
-    })().finally(() => { refreshPromise = null; });
+    refreshPromise = runRefreshWithCrossTabLock({ allowAnonymous }).finally(() => { refreshPromise = null; });
   }
   return refreshPromise;
 }
