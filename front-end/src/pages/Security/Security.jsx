@@ -97,7 +97,9 @@ export default function Security() {
         <h2>Email & two-factor</h2>
         <div className="security-status-row"><span>Email</span><strong>{user.email}</strong></div>
         <div className="security-status-row"><span>Verification</span><strong>{user.emailVerified ? 'Verified' : 'Pending'}</strong></div>
-        {user.role === 'ADMIN' && <><div className="security-status-row"><span>Admin 2FA</span><strong>{user.twoFactorEnabled ? 'Required · enabled' : 'Setup required'}</strong></div><p className="security-help">Admin 2FA cannot be disabled from the application. If you replace your authenticator, generate fresh recovery codes while you still have access.</p></>}
+        {user.role === 'ADMIN'
+          ? <><div className="security-status-row"><span>Admin 2FA</span><strong>{user.twoFactorEnabled ? 'Required · enabled' : 'Setup required'}</strong></div><p className="security-help">Admin 2FA cannot be disabled from the application. If you replace your authenticator, generate fresh recovery codes while you still have access.</p></>
+          : <><div className="security-status-row"><span>Authenticator 2FA</span><strong>Administrator accounts only</strong></div><p className="security-help">Customer accounts currently use verified email, password or Google sign-in. Authenticator codes are required only for administrator sessions.</p></>}
       </article>
 
       {user.role === 'ADMIN' && user.twoFactorEnabled && <article className="surface-card security-card security-card-wide">
