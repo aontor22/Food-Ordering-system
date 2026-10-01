@@ -86,7 +86,7 @@ The storefront service worker is `front-end/public/sw.js`. Customers enable push
 3. Toggle email on/off.
 4. Enable browser notifications for the current device.
 5. Choose order events.
-6. Use **Send test email** / **Send test push** to verify configuration.
+6. Use **Send test email** / **Send test push** to verify configuration. A successful email test now reports that the SMTP server accepted the message and, when available, shows the provider message ID. Check Inbox/Spam as the final delivery confirmation.
 
 Signing out removes the current browser push subscription from the account and unsubscribes that browser endpoint.
 
@@ -107,6 +107,7 @@ The background worker also checks the queue automatically every 10 seconds while
 
 ## 6. Production notes
 
+- **Admin → Monitoring → Email / SMTP = Configured** only confirms that the required environment variables are present; it does not prove SMTP authentication or mailbox delivery. Use **Account → Notifications → Send test email** for an actual SMTP send attempt.
 - Use a dedicated transactional email provider or SMTP account; avoid committing credentials.
 - Add SPF/DKIM/DMARC for the sending domain through your email provider/DNS host.
 - Keep `VAPID_PRIVATE_KEY` server-side.

@@ -10,7 +10,7 @@ Step 18 upgrades the existing JWT/refresh-session authentication model without r
 - Password-reset links are random, stored only as SHA-256 hashes, expire after 30 minutes, work once, and revoke all active sessions after use.
 - New passwords must be 12–72 characters. Existing shorter passwords are not silently invalidated; customers can still sign in and later upgrade them.
 - Access JWTs now contain a server-side session ID. Every authenticated request verifies that session is active, so revoking a device invalidates its access immediately instead of waiting for the access JWT to expire.
-- Refresh tokens remain HttpOnly cookies and continue rotating. Refresh/logout requests reject browser requests from origins outside `CLIENT_ORIGIN`.
+- Refresh tokens remain HttpOnly cookies and continue rotating. A successful sign-in creates one persistent device session for at least 7 days (`REFRESH_TOKEN_DAYS`, minimum 7). Refreshing an access token does not extend that absolute session expiry, so the user signs in again when the session reaches its expiry. Browser tabs coordinate refresh-token rotation with a same-origin cross-tab lock where the browser supports it, reducing stale-refresh races when several Tomato tabs are open. Refresh/logout requests reject browser requests from origins outside `CLIENT_ORIGIN`.
 - Account → Security & sessions lists active devices with masked IP addresses and supports individual revocation, sign-out of all other devices, and password change.
 
 ## Mandatory administrator TOTP
@@ -26,7 +26,7 @@ On the first administrator sign-in after Step 18:
 5. Only SHA-256 hashes of recovery codes are stored.
 6. An MFA-verified server session is then created.
 
-Later administrator logins require a current TOTP code or one unused recovery code. A TOTP time-step cannot be reused. Admin APIs additionally reject sessions that were not MFA verified.
+Later administrator logins require a current TOTP code or one unused recovery code. A TOTP time-step cannot be reused. Once the administrator completes MFA, that MFA-verified device session remains valid until its session expiry (7 days by default), so normal page reloads and access-token refreshes do not ask for another authenticator code. Admin APIs additionally reject sessions that were not MFA verified. Customer accounts do not currently use TOTP; they use verified email/password or Google sign-in.
 
 Save the initial recovery codes offline. They are shown only once. Fresh recovery codes can be generated from Admin → Security with the current password and a fresh authenticator code; generating new codes invalidates all previous recovery codes.
 
