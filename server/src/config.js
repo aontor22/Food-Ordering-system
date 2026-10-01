@@ -14,7 +14,7 @@ const schema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32).default(DEVELOPMENT_REFRESH_SECRET),
   AUTH_ENCRYPTION_KEY: z.string().min(32).optional().transform(value => value || undefined),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
-  REFRESH_TOKEN_DAYS: z.coerce.number().int().min(1).max(30).default(7),
+  REFRESH_TOKEN_DAYS: z.coerce.number().int().min(1).max(30).default(7).transform(value => Math.max(7, value)),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
   PUBLIC_API_URL: z.url().default('http://localhost:4000'),
   GOOGLE_CLIENT_ID: z.string().trim().optional().transform(value => value || undefined),
