@@ -53,6 +53,8 @@ const emailActionLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 5, standard
 const mfaLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 12, standardHeaders: 'draft-8', legacyHeaders: false });
 
 const REFRESH_COOKIE_NAME = 'refreshToken';
+const DAY_MS = 24 * 60 * 60_000;
+const SESSION_LIFETIME_MS = config.REFRESH_TOKEN_DAYS * DAY_MS;
 const refreshCookieBase = {
   httpOnly: true,
   secure: isProduction,
@@ -60,6 +62,16 @@ const refreshCookieBase = {
   path: '/api/auth',
   priority: 'high',
 };
+
+function remainingSessionMs(expiresAt, now = Date.now()) {
+  return Math.max(0, new Date(expiresAt).getTime() - now);
+}
+
+function setRefreshCookie(res, token, expiresAt) {
+  const maxAge = remainingSessionMs(expiresAt);
+  if (maxAge <= 0) return;
+  res.cookie(REFRESH_COOKIE_NAME, token, { ...refreshCookieBase, maxAge });
+}
 const allowedOrigins = new Set(config.CLIENT_ORIGIN.split(',').map(value => value.trim()).filter(Boolean));
 const dummyHashPromise = bcrypt.hash('not-a-real-account-password', 12);
 
@@ -137,20 +149,22 @@ async function createPasswordReset(user) {
 
 async function issueSession(req, res, user, { mfaVerifiedAt = null } = {}) {
   const id = newSessionId();
-  const refreshToken = signRefreshToken(user.id, id);
+  const now = Date.now();
+  const expiresAt = new Date(now + SESSION_LIFETIME_MS);
+  const refreshToken = signRefreshToken(user.id, id, Math.max(1, Math.ceil(SESSION_LIFETIME_MS / 1000)));
   await prisma.session.create({
     data: {
       id,
       userId: user.id,
       tokenHash: hashToken(refreshToken),
-      expiresAt: new Date(Date.now() + config.REFRESH_TOKEN_DAYS * 86400000),
+      expiresAt,
       userAgent: req.get('user-agent')?.slice(0, 500),
       ipAddress: req.ip,
-      lastSeenAt: new Date(),
+      lastSeenAt: new Date(now),
       mfaVerifiedAt,
     },
   });
-  res.cookie(REFRESH_COOKIE_NAME, refreshToken, { ...refreshCookieBase, maxAge: config.REFRESH_TOKEN_DAYS * 86400000 });
+  setRefreshCookie(res, refreshToken, expiresAt);
   return { accessToken: signAccessToken(user, id), user: publicUser(user) };
 }
 
@@ -441,14 +455,16 @@ router.post('/refresh', requireTrustedOrigin, async (req, res, next) => {
     if (session.tokenHash !== hashToken(token)) throw new AppError(401, 'STALE_REFRESH_TOKEN', 'A newer refresh token already exists for this device session');
     if (!(config.NODE_ENV === 'test' && config.TEST_AUTH_BYPASS) && session.user.role === 'ADMIN' && (!session.user.twoFactorEnabledAt || !session.mfaVerifiedAt)) throw new AppError(401, 'ADMIN_2FA_REQUIRED', 'Administrator sign-in requires two-factor authentication');
 
-    const replacement = signRefreshToken(session.userId, session.id);
-    const expiresAt = new Date(Date.now() + config.REFRESH_TOKEN_DAYS * 86400000);
+    const remainingMs = remainingSessionMs(session.expiresAt, now.getTime());
+    if (remainingMs <= 0) throw new AppError(401, 'INVALID_SESSION', 'Session is invalid or expired');
+    const replacement = signRefreshToken(session.userId, session.id, Math.max(1, Math.ceil(remainingMs / 1000)));
     const rotated = await prisma.session.updateMany({
-      where: { id: session.id, tokenHash: hashToken(token), revokedAt: null },
-      data: { tokenHash: hashToken(replacement), expiresAt, lastSeenAt: now },
+      where: { id: session.id, tokenHash: hashToken(token), revokedAt: null, expiresAt: { gt: now } },
+      data: { tokenHash: hashToken(replacement), lastSeenAt: now },
     });
     if (rotated.count !== 1) throw new AppError(401, 'STALE_REFRESH_TOKEN', 'A newer refresh token already exists for this device session');
-    res.cookie(REFRESH_COOKIE_NAME, replacement, { ...refreshCookieBase, maxAge: config.REFRESH_TOKEN_DAYS * 86400000 }).json({ accessToken: signAccessToken(session.user, session.id), user: publicUser(session.user) });
+    setRefreshCookie(res, replacement, session.expiresAt);
+    res.json({ accessToken: signAccessToken(session.user, session.id), user: publicUser(session.user) });
   } catch (error) {
     if (error?.code !== 'STALE_REFRESH_TOKEN') res.clearCookie(REFRESH_COOKIE_NAME, refreshCookieBase);
     if (error?.name === 'JsonWebTokenError' || error?.name === 'TokenExpiredError') return next(new AppError(401, 'INVALID_SESSION', 'Session is invalid or expired'));

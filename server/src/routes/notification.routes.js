@@ -89,7 +89,7 @@ router.post('/test/:channel', testNotificationLimiter, async (req, res, next) =>
     if (channel === 'PUSH' && !capabilities.push) throw new AppError(503, 'PUSH_NOT_CONFIGURED', 'Browser push notifications are not configured');
     const result = await sendTestNotification(req.auth.sub, channel);
     if (result?.skipped) throw new AppError(409, 'NOTIFICATION_NOT_READY', result.reason);
-    res.json({ ok: true, channel });
+    res.json({ ok: true, channel, messageId: result?.messageId || null });
   } catch (error) { next(error); }
 });
 
