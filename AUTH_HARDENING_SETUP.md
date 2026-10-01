@@ -5,7 +5,7 @@ Step 18 upgrades the existing JWT/refresh-session authentication model without r
 ## Production behavior
 
 - Existing accounts are grandfathered as email-verified by the migration because they were created before verification existed.
-- New password registrations do not receive a session until the email address is verified through a one-time 24-hour link.
+- Password registrations require a one-time 24-hour email verification link when `EMAIL_VERIFICATION_REQUIRED=true`. When it is `false`, customer registration/login is allowed without marking the email as verified; administrator email verification remains enforced.
 - Google sign-in continues to require Google's `email_verified` claim and therefore creates/links a verified account.
 - Password-reset links are random, stored only as SHA-256 hashes, expire after 30 minutes, work once, and revoke all active sessions after use.
 - New passwords must be 12–72 characters. Existing shorter passwords are not silently invalidated; customers can still sign in and later upgrade them.
@@ -46,7 +46,15 @@ AUTH_ENCRYPTION_KEY=<generated value>
 
 `AUTH_ENCRYPTION_KEY` is mandatory when `NODE_ENV=production`. Keep it server-side only and keep it stable between normal deployments. It encrypts administrator TOTP secrets at rest. Do not put it in Vercel or any `VITE_*` variable.
 
-Existing variables remain required as before. In particular, production password registration/recovery requires working Step 07 SMTP settings (`SMTP_HOST`, `EMAIL_FROM`, etc.). Google-only sign-in does not require SMTP.
+Customer email verification feature flag:
+
+```env
+EMAIL_VERIFICATION_REQUIRED=true
+```
+
+Use `false` to pause verification for customer password registrations/logins without changing `emailVerifiedAt` values in the database. Switching it back to `true` will require any still-unverified password account to verify on its next sign-in. Administrator accounts are not exempted by this flag.
+
+Existing variables remain required as before. Set `EMAIL_VERIFICATION_REQUIRED=false` temporarily if customer email verification must be paused until a production sending domain is ready. Password reset still depends on working Step 07 SMTP settings (`SMTP_HOST`, `EMAIL_FROM`, etc.). Google-only sign-in does not require SMTP.
 
 ## Migration
 
