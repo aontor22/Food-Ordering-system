@@ -1,5 +1,7 @@
 .order-tracker { margin: 14px 0 16px; padding: 16px; border: 1px solid #e9ece9; border-radius: 15px; background: linear-gradient(180deg,#fbfcfb,#fff); }
-.tracking-progress { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 0; }
+/* Equal-width, non-wrapping flow for both 6-step delivery and 5-step pickup. */
+.tracking-progress { display: flex; flex-wrap: nowrap; gap: 0; }
+.tracking-progress > .tracking-step { flex: 1 1 0; min-width: 0; }
 .tracking-step { position: relative; display: grid; justify-items: center; gap: 7px; color: #9aa19d; text-align: center; font-size: .68rem; font-weight: 800; }
 .tracking-step::before { content: ''; position: absolute; top: 13px; right: 50%; width: 100%; height: 2px; background: #e5e8e6; z-index: 0; }
 .tracking-step:first-child::before { display: none; }
