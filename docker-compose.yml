@@ -1,11 +1,31 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tomato
+      POSTGRES_USER: tomato
+      POSTGRES_PASSWORD: tomato
+    ports:
+      - "5432:5432"
+    volumes:
+      - tomato_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tomato -d tomato"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build: .
     env_file: server/.env
-    ports: ["8080:4000"]
+    ports:
+      - "8080:4000"
     environment:
       NODE_ENV: production
-      DATABASE_URL: file:/data/dev.db
-    volumes: ["food_data:/data"]
+      DATABASE_URL: postgresql://tomato:tomato@db:5432/tomato?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
-  food_data:
+  tomato_pg_data:

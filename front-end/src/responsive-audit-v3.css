@@ -1,0 +1,445 @@
+/*
+ * Tomato storefront / admin responsive audit v3 (v2 + targeted fixes)
+ * Additive, layout-only fixes; imported AFTER responsive.css from app.jsx.
+ * No visibility, business rules, navigation events or data behavior changed.
+ * Targets the verified class names in the public GitHub source on 2026-11-11.
+ */
+
+/* Components are allowed to shrink before their children wrap. */
+.success-page,
+.payment-page,
+.guest-order-page,
+.cart-layout,
+.checkout-layout,
+.order-card,
+.payment-receipt,
+.order-documents,
+.addresses-page,
+.address-grid,
+.notification-page,
+.product-detail-grid,
+.security-grid,
+.admin-grid,
+.admin-card,
+.admin-content,
+.kds-page,
+.kds-board,
+.kds-lane {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* ORDER CONFIRMATION — data was formerly squeezed into ~120px columns. */
+.success-page {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 4vw, 48px);
+}
+.success-page h1 { max-width: 23ch; margin-inline: auto; }
+.success-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 12px;
+  padding: 18px 0;
+  text-align: left;
+}
+.success-details > div,
+.success-details > div + div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+}
+.success-details > div + div { border-left: 1px solid var(--line); }
+.success-details span { line-height: 1.35; }
+.success-details strong { max-width: 100%; line-height: 1.45; overflow-wrap: anywhere; }
+.success-item > div:first-child > strong { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+.success-item > div:first-child > span { flex: 0 0 auto; }
+.success-actions { flex-wrap: wrap; }
+
+/* Invoice / receipt is a narrow component even on desktop-sized screens.
+ * Use the component's width instead of the full viewport breakpoint. */
+.success-page .order-documents,
+.payment-page .order-documents,
+.guest-order-page .order-documents,
+.orders-page .order-documents {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  container-type: inline-size;
+}
+.order-documents-heading,
+.order-document-row,
+.order-document-actions { min-width: 0; flex-wrap: wrap; }
+.order-document-copy { min-width: 0; flex: 1 1 150px; overflow-wrap: anywhere; }
+.order-document-actions { flex: 0 1 auto; }
+@container (max-width: 460px) {
+  .order-document-row { flex-direction: column; align-items: stretch; gap: 10px; }
+  .order-document-copy { flex: 0 1 auto; }
+  .order-document-actions { width: 100%; justify-content: stretch; }
+  .order-document-actions .button { flex: 1 1 125px; justify-content: center; }
+  .order-documents-heading > small { text-align: left; }
+}
+
+/* SHOPPING CART — keep product title, controls and total readable. */
+.cart-list,
+.cart-row,
+.cart-item-copy,
+.cart-customizations { min-width: 0; }
+.cart-row { grid-template-columns: 82px minmax(0, 1fr) auto 78px 36px; gap: clamp(8px, 1.5vw, 18px); }
+.cart-row > img { max-width: 100%; }
+.cart-item-copy h2,
+.cart-item-copy p,
+.cart-special-note { overflow-wrap: anywhere; }
+.promo-form > div { min-width: 0; }
+.promo-form input { min-width: 0; }
+
+/* CHECKOUT — ensure selectable methods never crush the descriptions. */
+.checkout-form,
+.checkout-sidebar,
+.checkout-section-title > div,
+.payment-option > div,
+.fulfillment-type-card span,
+.fulfillment-mode > div { min-width: 0; }
+.payment-option { grid-template-columns: auto minmax(0, 1fr) auto; }
+.payment-option small,
+.fulfillment-type-card small,
+.fulfillment-mode small,
+.delivery-zone-hint p { overflow-wrap: anywhere; }
+.order-summary .summary-lines > div { min-width: 0; gap: 12px; }
+.order-summary .summary-lines > div > * { min-width: 0; overflow-wrap: anywhere; }
+.order-summary .summary-lines strong { text-align: right; }
+
+/* ORDERS & GUEST ORDERS — prevent monetary figures from squeezing the names. */
+.order-card-head > *,
+.order-card-foot > *,
+.order-items-preview > div > *,
+.order-item-line > *,
+.guest-order-grid > *,
+.guest-order-hero > *,
+.guest-account-link > *,
+.guest-order-items > div > * { min-width: 0; }
+.order-card h2,
+.order-card p,
+.order-items-preview strong,
+.guest-order-hero h1,
+.guest-order-items strong,
+.guest-order-total strong { overflow-wrap: anywhere; }
+.order-items-preview > div,
+.order-item-line { grid-template-columns: 34px minmax(0, 1fr) auto; }
+.guest-order-items > div,
+.guest-order-total { align-items: flex-start; }
+.guest-order-items > div > :last-child,
+.guest-order-total > :last-child { flex: 0 0 auto; }
+
+/* PAYMENT / ACCOUNT / PROFILE — adapt to card size rather than page width. */
+.payment-receipt > div,
+.payment-receipt strong,
+.manual-instructions,
+.manual-payment-form,
+.security-session > *,
+.security-status-row > *,
+.address-card-head > *,
+.address-card-actions,
+.notification-channel-actions > * { min-width: 0; }
+.security-recovery-codes code { overflow-wrap: anywhere; }
+.address-card address,
+.notification-channel-copy,
+.security-session small { overflow-wrap: anywhere; }
+.product-detail-title-row > *,
+.product-review-list article,
+.product-detail-description { min-width: 0; overflow-wrap: anywhere; }
+
+/* ADMIN — preserve tables as scrollable tables instead of hiding actions. */
+.admin-table-wrap { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+.admin-table { width: 100%; }
+.admin-page-header > *,
+.admin-toolbar > *,
+.admin-header-actions > *,
+.admin-card-header > *,
+.metric-card > *,
+.admin-grid > *,
+.monitoring-grid > * { min-width: 0; }
+.admin-search { min-width: 0; }
+.admin-card-header h3,
+.admin-card-header p,
+.metric-card strong,
+.kds-ticket-top strong { overflow-wrap: anywhere; }
+.kds-board { min-width: 0; }
+.kds-ticket-actions > *,
+.kds-ticket-actions select { min-width: 0; width: 100%; }
+
+/* Earlier switch to a one-column checkout/cart avoids 900–1050px squeeze. */
+@media (max-width: 1080px) {
+  .cart-layout,
+  .checkout-layout { grid-template-columns: minmax(0, 1fr); }
+  .order-summary { position: static; }
+}
+@media (max-width: 920px) {
+  .product-detail-grid { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+  .product-detail-media,
+  .product-detail-media img { min-height: 0; }
+  .product-detail-media img { aspect-ratio: 4 / 3; object-fit: cover; }
+}
+@media (max-width: 760px) {
+  .payment-receipt.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .guest-order-hero { flex-wrap: wrap; }
+  .guest-account-link { flex-wrap: wrap; }
+  .security-grid { grid-template-columns: minmax(0, 1fr); }
+  .addresses-title-row { flex-wrap: wrap; }
+  .admin-grid,
+  .admin-grid.equal,
+  .monitoring-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-toolbar,
+  .admin-header-actions { flex-wrap: wrap; }
+}
+@media (max-width: 640px) {
+  .success-details { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .success-details > div,
+  .success-details > div + div { padding: 12px 14px; }
+  .success-item > div:first-child { gap: 8px; }
+  .success-actions { flex-direction: column; align-items: stretch; }
+  .success-actions .button { width: 100%; }
+  .cart-row { grid-template-columns: 68px minmax(0, 1fr) 36px; gap: 11px; }
+  .cart-row > img { width: 68px; height: 68px; }
+  .cart-quantity { grid-column: 2; grid-row: 2; }
+  .cart-line-total { grid-column: 3; grid-row: 2; }
+  .remove-item { grid-column: 3; grid-row: 1; }
+  .payment-options,
+  .fulfillment-type-options,
+  .schedule-picker { grid-template-columns: minmax(0, 1fr); }
+  .payment-option { min-width: 0; }
+  .order-card-head,
+  .order-card-foot,
+  .order-payment-meta { flex-direction: column; align-items: stretch; }
+  .guest-order-grid { grid-template-columns: minmax(0, 1fr); }
+  .guest-account-link { flex-direction: column; align-items: stretch; }
+  .guest-order-actions { flex-direction: column; }
+  .guest-order-actions .button { width: 100%; }
+  .addresses-title-row { align-items: stretch; flex-direction: column; }
+  .address-editor { padding: 18px 14px; }
+  .notification-event-row { align-items: flex-start; flex-wrap: wrap; }
+  .notification-events-header { flex-direction: column; align-items: flex-start; }
+  .security-status-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .security-status-row strong { text-align: left; }
+  .admin-page-header { align-items: stretch; flex-wrap: wrap; }
+  .admin-page-header > .button,
+  .admin-header-actions .button { max-width: 100%; }
+  .admin-card-header { flex-wrap: wrap; }
+}
+@media (max-width: 480px) {
+  .success-page { padding-inline: 14px; }
+  .success-item > div:first-child { flex-wrap: wrap; }
+  .success-item > div:first-child > span { width: 100%; white-space: normal; }
+  .cart-row { grid-template-columns: 58px minmax(0, 1fr) 34px; gap: 8px; }
+  .cart-row > img { width: 58px; height: 58px; }
+  .order-items-preview > div,
+  .order-item-line { grid-template-columns: 26px minmax(0, 1fr); }
+  .order-items-preview > div > strong,
+  .order-item-line > strong { grid-column: 2; }
+  .payment-receipt,
+  .payment-receipt.compact { grid-template-columns: minmax(0, 1fr); }
+  .payment-actions { flex-direction: column; width: 100%; }
+  .payment-actions .button { width: 100%; }
+  .security-session { grid-template-columns: auto minmax(0, 1fr); }
+  .security-session .button { grid-column: 1 / -1; width: 100%; }
+  .security-recovery-codes > div { grid-template-columns: minmax(0, 1fr); }
+  .guest-order-tracking,
+  .guest-order-panel,
+  .guest-account-link { padding: 16px; }
+  .admin-content { padding-inline: 10px; }
+}
+
+
+/* ========================================================================
+   Order history refinement — specifically addresses the live /orders image.
+   The page uses .order-reorder-row but its original Orders.css has no rule
+   for that row. This adds a deliberate layout without modifying JSX/actions.
+   ======================================================================== */
+.orders-page .order-card {
+  min-width: 0;
+}
+.orders-page .order-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding: 15px 0 14px;
+}
+.orders-page .order-card-foot > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  line-height: 1.5;
+}
+.orders-page .order-card-foot > p {
+  display: inline-flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin: 0 0 0 auto;
+  min-width: 0;
+  text-align: right;
+}
+.orders-page .order-card-foot > p > strong {
+  margin-left: 0;
+  white-space: nowrap;
+  font-size: clamp(1.03rem, 2vw, 1.18rem);
+}
+
+.orders-page .order-reorder-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px 15px;
+  padding: 13px 16px;
+  margin: 0 0 14px;
+  min-width: 0;
+  border: 1px solid #f2e4db;
+  border-radius: 14px;
+  background: #fffaf7;
+}
+.orders-page .order-reorder-row > .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 132px;
+  min-height: 42px;
+  margin: 0;
+}
+.orders-page .order-reorder-row > small {
+  flex: 1 1 260px;
+  min-width: 0;
+  margin: 0;
+  color: var(--muted, #66716c);
+  font-size: .78rem;
+  line-height: 1.5;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/* Align the document heading, descriptions and actions without squeezing
+   the invoice titles or letting action buttons drift into odd columns. */
+.orders-page .order-documents {
+  min-width: 0;
+  max-width: 100%;
+  padding: clamp(15px, 2.2vw, 20px);
+  border-radius: 16px;
+}
+.orders-page .order-documents-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 7px 22px;
+  padding-bottom: 12px;
+}
+.orders-page .order-documents-heading > small {
+  flex: 1 1 210px;
+  min-width: 0;
+  max-width: 310px;
+  padding-top: 5px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.orders-page .order-document-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 16px;
+}
+.orders-page .order-document-copy {
+  flex: unset;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.orders-page .order-document-copy > div { min-width: 0; }
+.orders-page .order-document-actions {
+  display: flex;
+  flex: unset;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.orders-page .order-document-actions > .button {
+  min-height: 38px;
+  margin: 0;
+  white-space: nowrap;
+}
+.orders-page .order-item-line {
+  grid-template-columns: 34px minmax(0,1fr) auto;
+  align-items: start;
+}
+.orders-page .order-item-line > p { min-width: 0; margin: 0; }
+.orders-page .order-item-line > strong {
+  max-width: 100%;
+  white-space: nowrap;
+  text-align: right;
+}
+.orders-page .review-editor { max-width: 100%; }
+.orders-page .review-editor textarea { max-width: 100%; }
+
+@media (max-width: 720px) {
+  .orders-page .order-reorder-row { align-items: stretch; }
+  .orders-page .order-reorder-row > small { flex-basis: 100%; }
+  .orders-page .order-documents-heading > small {
+    max-width: none;
+    text-align: left;
+    padding-top: 0;
+  }
+  .orders-page .order-document-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .orders-page .order-document-actions {
+    justify-content: flex-start;
+  }
+}
+@media (max-width: 520px) {
+  .orders-page .order-card { padding: 16px 14px; }
+  .orders-page .order-card-foot { align-items: flex-start; }
+  .orders-page .order-card-foot > p {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+    text-align: left;
+  }
+  .orders-page .order-reorder-row { padding: 12px; }
+  .orders-page .order-reorder-row > .button { width: 100%; }
+  .orders-page .order-documents { padding: 14px 12px; }
+  .orders-page .order-document-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+  .orders-page .order-document-actions > .button {
+    min-width: 0;
+    width: 100%;
+    white-space: normal;
+    font-size: .75rem;
+    line-height: 1.2;
+    padding-inline: 8px;
+  }
+  .orders-page .review-editor,
+  .orders-page .review-start { margin-left: 0; margin-right: 0; }
+  .orders-page .order-item-line { grid-template-columns: 26px minmax(0,1fr); }
+  .orders-page .order-item-line > strong {
+    grid-column: 2;
+    text-align: left;
+  }
+}

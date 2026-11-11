@@ -7,7 +7,7 @@ process.env.SSLCOMMERZ_STORE_PASSWORD = 'test-password';
 process.env.SSLCOMMERZ_LIVE = 'false';
 const { app } = await import('../src/app.js');
 const { prisma } = await import('../src/lib/prisma.js');
-const { validateSslCommerzPayment, reconcileSslCommerzPayment, initiateOrderPayment } = await import('../src/services/payment.js');
+const { approveSslCommerzRiskPayment, requestSslCommerzRefund, reconcileSslCommerzRefund, validateSslCommerzPayment, reconcileSslCommerzPayment, initiateOrderPayment } = await import('../src/services/payment.js');
 let user;
 let order;
 const originalFetch = globalThis.fetch;
@@ -44,6 +44,14 @@ test('verified risk payment blocks retry and remains under review', async () => 
   assert.equal(result.review, true);
   assert.equal(result.order.paymentStatus, 'REVIEW');
 });
+test('admin can accept a gateway-validated risk payment', async () => {
+  const accepted = await approveSslCommerzRiskPayment(order.payment.id);
+  assert.equal(accepted.status, 'PAID');
+  const updatedOrder = await prisma.order.findUnique({ where: { id: order.id } });
+  assert.equal(updatedOrder.paymentStatus, 'PAID');
+  assert.equal(updatedOrder.status, 'CONFIRMED');
+});
+
 test('verified settlement is idempotent and cannot be downgraded by fail callbacks', async () => {
   globalThis.fetch = async () => reply(validResult());
   const first = await validateSslCommerzPayment({ val_id: 'paid' });
@@ -55,3 +63,25 @@ test('verified settlement is idempotent and cannot be downgraded by fail callbac
   const settled = await reconcileSslCommerzPayment(order.payment.transactionId);
   assert.equal(settled.paymentStatus, 'PAID');
 });
+test('full gateway refund stays pending until gateway confirms it', async () => {
+  let refundRequestUrl = '';
+  globalThis.fetch = async url => {
+    refundRequestUrl = String(url);
+    return reply({ APIConnect: 'DONE', bank_tran_id: 'BANK-TEST', trans_id: order.payment.transactionId, refund_ref_id: 'REF-TEST-001', status: 'success', errorReason: '' });
+  };
+  const requested = await requestSslCommerzRefund(order.payment.id, 'Customer requested cancellation');
+  assert.equal(requested.status, 'REFUND_PENDING');
+  assert.equal(requested.refundReferenceId, 'REF-TEST-001');
+  assert.match(refundRequestUrl, /refund_trans_id=/);
+  assert.match(refundRequestUrl, /refund_amount=12\.00/);
+  assert.equal((await prisma.order.findUnique({ where: { id: order.id } })).paymentStatus, 'REFUND_PENDING');
+
+  globalThis.fetch = async () => reply({ APIConnect: 'DONE', bank_tran_id: 'BANK-TEST', tran_id: order.payment.transactionId, refund_ref_id: 'REF-TEST-001', status: 'refunded' });
+  const refundedOrder = await reconcileSslCommerzRefund(order.payment.id);
+  assert.equal(refundedOrder.paymentStatus, 'REFUNDED');
+  const refundedPayment = await prisma.payment.findUnique({ where: { id: order.payment.id } });
+  assert.equal(refundedPayment.status, 'REFUNDED');
+  assert.equal(refundedPayment.refundStatus, 'REFUNDED');
+  assert.ok(refundedPayment.refundedAt);
+});
+

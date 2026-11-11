@@ -2,15 +2,23 @@
   "name": "food-ordering-system",
   "private": true,
   "version": "1.0.0",
-  "workspaces": ["front-end", "server"],
+  "workspaces": [
+    "front-end",
+    "server"
+  ],
   "scripts": {
     "dev": "concurrently -n api,web -c red,green \"npm run dev -w server\" \"npm run dev -w front-end\"",
     "build": "npm run build -w front-end",
     "test": "npm test -w server",
     "db:setup": "npm run db:setup -w server",
-    "start": "npm start -w server"
+    "start": "npm start -w server",
+    "security:audit": "npm audit --omit=dev --audit-level=high",
+    "qa:release": "npm run db:generate -w server && npm test && npm run build && npm run security:audit"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=20.19.0"
   }
 }

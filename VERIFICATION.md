@@ -1,31 +1,44 @@
-# Customer and admin payment update
+# Verification status
 
-Verified locally on 19 September 2026.
+Current release: Step 03 — PostgreSQL + hardened payments + restaurant opening hours/closure controls.
 
-## Delivered
+## Step 03 implemented
 
-- Customer checkout offers COD and configured online payment, with a development-only demo.
-- Payment results use authenticated server data, not URL success flags. Orders expose payment status, retry/continue, and permitted cancellation.
-- Admin Payments lists transaction details, filters, cash received/refunded actions, and gateway status checks. Online payments cannot be manually marked paid.
-- Online fulfilment requires verified payment. Cancellation and cash settlement read current state within database transactions. Refunded cash cannot be collected again.
-- Gateway settlement validates transaction identity, amount, currency, and risk. Failure/cancel notifications trigger a server-to-server query. Duplicate settlement cannot downgrade paid status.
-- Existing COD orders are backfilled into the ledger on database setup. Re-running setup preserves the records.
-- Disabled accounts lose access immediately, including previously issued access tokens.
+- Database-backed restaurant timezone and weekly opening schedule.
+- Closed-day, 24-hour and overnight opening windows.
+- Master **Accept new orders** switch for immediate operational pauses.
+- Temporary closure with reason and optional restaurant-local automatic reopening time.
+- Holiday/special full-day closure records.
+- Public `GET /api/store/status` state for storefront UI.
+- Storefront open/closed strip and Cart/Checkout blocking while closed.
+- `POST /api/orders` checks availability before processing and again inside the order transaction.
+- Existing orders/payment/review flows continue even when new ordering is closed.
+- Admin dashboard exposes current store status and links to the Store hours workspace.
+- Admin schedule/closure changes are captured in the audit log.
+- Migration defaults all seven days to 24-hour availability to avoid unexpectedly taking an existing deployment offline.
 
-## Verification
+## Static verification completed in this workspace
 
-- `npm test`: 12 passing integration tests, isolated temporary SQLite database.
-- Gateway verification tests use mocked provider responses; no money charged.
-- `npm run build`: passed, 128 frontend modules.
-- `npm audit --omit=dev`: zero reported production dependency vulnerabilities at check time.
-- Server JavaScript syntax checks passed.
-- Production smoke checks passed for `/admin/payments`, `/payment/result`, `/orders`, unknown API 404, unauthenticated payment rejection, and disabled production demo.
-- Visual browser verification was attempted but Chromium download timed out; no claim of completed visual/browser end-to-end testing.
+- All server/service/route/test JavaScript files passed `node --check`.
+- JSON package files parse successfully.
+- PostgreSQL migration SQL and Prisma schema definitions were reviewed together for matching tables, fields and unique constraints.
+- A new integration test covers public store status, admin pause, server-side order rejection, temporary closure, closure CRUD and reopening.
 
-## Deployment limits
+## Verification still required in your Codespace/Render environment
 
-Real SSLCOMMERZ credentials and public HTTPS callbacks must be configured and tested in the merchant sandbox before live use. Automated online refunds and operator risk-review resolution are not included. Ambiguous gateway sessions remain processing until verified; they are not assumed failed. The admin ledger shows the latest 250 payment records. This is implementation verification, not an independent penetration test.
+Dependency installation in this workspace timed out, so the complete Prisma/Vite dependency-backed suite was not rerun here. After copying the release, run:
 
-See README.md for upgrade commands, environment variables, and payment operation details.
+```bash
+npm install
+npm run db:setup
+npm test
+npm run build
+```
 
-Gateway protocol reference: https://developer.sslcommerz.com/doc/v4/
+Then deploy the backend first so the PostgreSQL migration is applied, followed by the Vercel frontend. Configure the actual business schedule under **Admin → Store hours**.
+
+## Existing Step 02 payment protections retained
+
+- SSLCOMMERZ validation/IPN reconciliation, risk review and refund status tracking remain unchanged.
+- Manual payment and COD flows remain available according to their existing configuration.
+- Merchant secrets remain server-side.

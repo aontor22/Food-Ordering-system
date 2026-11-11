@@ -7,6 +7,7 @@ import { AdminEmpty, AdminError, AdminLoading, AdminModal, AdminPageHeader, Stat
 const emptyForm = { code: '', percentOff: '10', minimum: '0', expiresAt: '', active: true };
 
 export default function AdminCoupons() {
+  const currency = import.meta.env.VITE_CURRENCY || 'USD';
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,7 +52,7 @@ export default function AdminCoupons() {
     {error && <p className="form-error" role="alert">{error}</p>}
     <div className="admin-toolbar"><label className="admin-search"><Icon name="search" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search coupon code…" aria-label="Search coupons" /></label></div>
     <section className="admin-card">
-      {visible.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Code</th><th>Discount</th><th>Minimum order</th><th>Expiry</th><th>Status</th><th className="align-right">Actions</th></tr></thead>
+      {visible.length ? <div className="admin-table-wrap"><table className="admin-table coupon-admin-table"><thead><tr><th>Code</th><th>Discount</th><th>Minimum order</th><th>Expiry</th><th>Status</th><th className="align-right">Actions</th></tr></thead>
         <tbody>{visible.map(coupon => {
           const expired = coupon.expiresAt && new Date(coupon.expiresAt) < new Date();
           const status = !coupon.active ? 'INACTIVE' : expired ? 'EXPIRED' : 'ACTIVE';
@@ -63,7 +64,7 @@ export default function AdminCoupons() {
     {form && <AdminModal title={editing ? `Edit ${editing.code}` : 'Create a coupon'} subtitle="Coupon codes are automatically saved in uppercase." onClose={close}>
       <form className="admin-form" onSubmit={save}>
         <div className="field"><label htmlFor="coupon-code">Coupon code</label><input id="coupon-code" name="code" required minLength="3" maxLength="30" pattern="[A-Za-z0-9_-]+" value={form.code} onChange={update} placeholder="SUMMER20" /></div>
-        <div className="field-grid"><div className="field"><label htmlFor="coupon-percent">Discount percentage</label><input id="coupon-percent" name="percentOff" type="number" required min="1" max="100" step="1" value={form.percentOff} onChange={update} /></div><div className="field"><label htmlFor="coupon-minimum">Minimum order (USD)</label><input id="coupon-minimum" name="minimum" type="number" required min="0" step="0.01" value={form.minimum} onChange={update} /></div></div>
+        <div className="field-grid"><div className="field"><label htmlFor="coupon-percent">Discount percentage</label><input id="coupon-percent" name="percentOff" type="number" required min="1" max="100" step="1" value={form.percentOff} onChange={update} /></div><div className="field"><label htmlFor="coupon-minimum">Minimum order ({currency})</label><input id="coupon-minimum" name="minimum" type="number" required min="0" step="0.01" value={form.minimum} onChange={update} /></div></div>
         <div className="field"><label htmlFor="coupon-expiry">Expiry date (optional)</label><input id="coupon-expiry" name="expiresAt" type="datetime-local" value={form.expiresAt} onChange={update} /></div>
         <label className="toggle-field"><div><p>Coupon is active</p><small>Inactive coupons cannot be used at checkout.</small></div><span className="switch"><input name="active" type="checkbox" checked={form.active} onChange={update} /><span /></span></label>
         {formError && <p className="form-error" role="alert">{formError}</p>}
