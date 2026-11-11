@@ -41,6 +41,7 @@ import Security from './pages/Security/Security';
 import ProductDetail from './pages/ProductDetail/ProductDetail';
 import SeoRoutePolicy from './components/SeoRoutePolicy';
 import './responsive.css';
+import './responsive-audit-v2.css';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
