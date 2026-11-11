@@ -44,8 +44,8 @@ function setCanonical(url) {
 }
 
 export function applySeo({
-  title = 'Tomato — Fresh food, delivered',
-  description = 'Order fresh, chef-crafted food from Tomato for delivery or pickup.',
+  title = 'Tomato Food Ordering | Fresh Food Delivery & Pickup',
+  description = 'Browse the Tomato food menu, check prices and availability, and order fresh meals online for delivery or pickup.',
   canonicalPath = '/',
   image = '/og-cover.webp',
   type = 'website',

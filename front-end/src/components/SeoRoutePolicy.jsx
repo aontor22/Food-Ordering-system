@@ -12,8 +12,8 @@ export default function SeoRoutePolicy() {
   useEffect(() => {
     if (pathname === '/') {
       applySeo({
-        title: 'Tomato — Fresh food, delivered',
-        description: 'Order fresh, chef-crafted food from Tomato for fast delivery or pickup.',
+        title: 'Tomato Food Ordering | Fresh Food Delivery & Pickup',
+        description: 'Browse the Tomato food menu, check prices and availability, and order fresh meals online for delivery or pickup.',
         canonicalPath: '/',
         image: '/og-cover.webp',
         jsonLd: { '@context': 'https://schema.org', '@type': 'Restaurant', name: 'Tomato', url: `${siteUrl()}/`, image: `${siteUrl()}/og-cover.webp`, servesCuisine: ['Fresh meals', 'International'], priceRange: '$$', acceptsReservations: false, hasMenu: `${siteUrl()}/#dishes` },

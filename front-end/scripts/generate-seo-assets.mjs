@@ -4,7 +4,7 @@ import path from 'node:path';
 const DIST = path.resolve('dist');
 const DEFAULT_SITE_URL = 'https://food-ordering-system-ten-sable.vercel.app';
 const siteUrl = String(process.env.VITE_SITE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '') || DEFAULT_SITE_URL).replace(/\/$/, '');
-const apiUrl = String(process.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/$/, '');
+const apiUrl = String(process.env.SEO_API_URL || process.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/$/, '');
 const currency = String(process.env.VITE_CURRENCY || 'USD').toUpperCase();
 const requireProductFeed = process.env.VERCEL_ENV === 'production';
 
